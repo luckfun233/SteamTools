@@ -25,6 +25,20 @@ sealed partial class TitaniumCertificateManagerImpl : CertificateManagerImpl, IC
 
         manager.RootCertificate = manager.LoadRootCertificate();
 
+        // 免证书隧道模式不会使用 MITM，但 Titanium 启动时需要有一个根证书对象。
+        // 这里只生成/加载本地证书，不导入系统信任区。
+        if (manager.RootCertificate == null)
+        {
+            try
+            {
+                manager.CreateRootCertificate(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("TitaniumCertificateManager", ex, "创建本地根证书失败，免证书隧道模式可能无法启动。");
+            }
+        }
+
         this.manager = manager;
     }
 

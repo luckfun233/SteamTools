@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
+using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 using Titanium.Web.Proxy.Network;
 using Titanium.Web.Proxy.StreamExtended.Models;
@@ -128,6 +129,68 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         return ip;
     }
 
+    /// <summary>
+    /// 带认证信息或签名参数的请求不能走公共镜像，否则私有仓库会 404。
+    /// </summary>
+    static bool ShouldBypassRedirect(Request request)
+    {
+        if (request.Headers.GetFirstHeader("Authorization") != null)
+            return true;
+
+        var cookie = request.Headers.GetFirstHeader("Cookie")?.Value;
+        if (!string.IsNullOrEmpty(cookie) &&
+            (cookie.Contains("user_session", StringComparison.OrdinalIgnoreCase) ||
+             cookie.Contains("_gh_sess", StringComparison.OrdinalIgnoreCase) ||
+             cookie.Contains("dotcom_user", StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        var query = request.RequestUri.Query;
+        return query.Contains("sig=", StringComparison.OrdinalIgnoreCase) ||
+               query.Contains("signature=", StringComparison.OrdinalIgnoreCase) ||
+               query.Contains("x-amz-signature", StringComparison.OrdinalIgnoreCase) ||
+               query.Contains("jwt=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 只替换 authority，保留原始 path/query，避免字符串替换误伤参数。
+    /// </summary>
+    static Uri? BuildRedirectUri(Uri original, AccelerateProjectDTO item)
+    {
+        var forward = item.ForwardDomainName;
+        if (string.IsNullOrWhiteSpace(forward))
+            return null;
+
+        if (forward.Contains("{path}", StringComparison.Ordinal) ||
+            forward.Contains("{args}", StringComparison.Ordinal))
+        {
+            var url = forward.Replace("{path}", original.AbsolutePath)
+                             .Replace("{args}", original.Query);
+            return Uri.TryCreate(url, UriKind.Absolute, out var templateUri) ? templateUri : null;
+        }
+
+        if (!Uri.TryCreate(forward, UriKind.Absolute, out var forwardUri))
+        {
+            if (!Uri.TryCreate($"{original.Scheme}://{forward}", UriKind.Absolute, out forwardUri))
+                return null;
+        }
+
+        if (forwardUri.AbsolutePath.Length > 1)
+        {
+            var prefix = forward.TrimEnd('/');
+            var prefixed = prefix + original.PathAndQuery;
+            return Uri.TryCreate(prefixed, UriKind.Absolute, out var prefixUri) ? prefixUri : null;
+        }
+
+        return new UriBuilder(original)
+        {
+            Scheme = forwardUri.Scheme,
+            Host = forwardUri.Host,
+            Port = forwardUri.IsDefaultPort
+                ? (forwardUri.Scheme == Uri.UriSchemeHttps ? 443 : 80)
+                : forwardUri.Port,
+        }.Uri;
+    }
+
     async Task OnRequest(object sender, SessionEventArgs e)
     {
 #if DEBUG
@@ -187,17 +250,17 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
                     if (item.Redirect)
                     {
-                        var url = item.ForwardDomainName.Replace("{path}", e.HttpClient.Request.RequestUri.AbsolutePath);
-                        url = url.Replace("{args}", e.HttpClient.Request.RequestUri.Query);
-                        //url = url.Replace("{url}", e.HttpClient.Request.RequestUri.AbsoluteUri);
-                        if (Browser2.IsHttpUrl(url))
+                        if (ShouldBypassRedirect(e.HttpClient.Request))
                         {
-                            e.HttpClient.Request.RequestUri = new Uri(e.HttpClient.Request.RequestUri.AbsoluteUri.Replace(e.HttpClient.Request.RequestUri.Scheme + "://" + e.HttpClient.Request.RequestUri.Host, url));
-                            //e.Redirect(e.HttpClient.Request.RequestUri.AbsoluteUri.Replace(e.HttpClient.Request.RequestUri.Scheme + "://" + e.HttpClient.Request.RequestUri.Host, url));
+                            // 镜像无法使用客户端的 Authorization/Cookie，带认证或签名参数的请求必须直连。
                             return;
                         }
-                        e.HttpClient.Request.RequestUri = new Uri(e.HttpClient.Request.RequestUri.AbsoluteUri.Replace(e.HttpClient.Request.RequestUri.Host, url));
-                        //e.Redirect(e.HttpClient.Request.RequestUri.AbsoluteUri.Replace(e.HttpClient.Request.RequestUri.Host, url));
+
+                        var redirectUri = BuildRedirectUri(e.HttpClient.Request.RequestUri, item);
+                        if (redirectUri != null)
+                        {
+                            e.HttpClient.Request.RequestUri = redirectUri;
+                        }
                         return;
                     }
 
@@ -461,7 +524,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }
         if (e.SniHostName.Contains(LocalDomain, StringComparison.OrdinalIgnoreCase) || TwoLevelAgentEnable)
         {
-            e.DecryptSsl = true;
+            e.DecryptSsl = IsRootCertificateInstalled;
             return Task.CompletedTask;
         }
         foreach (var item in ProxyDomains)
@@ -478,8 +541,29 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
                     if (e.SniHostName.IsDomainPattern(h, RegexOptions.IgnoreCase))
                     {
-                        e.ForwardHttpsHostName = item.ServerName;
-                        e.ForwardHttpsPort = item.PortId;
+                        // IP/服务端中转规则可以在不解密 TLS 的情况下换出口，
+                        // 这样无需安装根证书，Authorization/Cookie 也能端到端保留。
+                        if ((item.ProxyType == ProxyType.Local || item.ProxyType == ProxyType.ServerAccelerate) &&
+                            !item.ForwardDomainIsNameOrIP &&
+                            !string.IsNullOrEmpty(item.ForwardDomainIP))
+                        {
+                            e.DecryptSsl = false;
+                            e.ForwardHttpsHostName = item.ForwardDomainIP;
+                            e.ForwardHttpsPort = item.PortId > 0 ? item.PortId : 443;
+                            return Task.CompletedTask;
+                        }
+
+                        if (!IsRootCertificateInstalled)
+                        {
+                            // 没有根证书时不做 MITM，按原始 SNI 透传，避免其他应用断网。
+                            return Task.CompletedTask;
+                        }
+
+                        if (!item.Redirect)
+                        {
+                            e.ForwardHttpsHostName = string.IsNullOrEmpty(item.ServerName) ? e.SniHostName : item.ServerName;
+                            e.ForwardHttpsPort = item.PortId > 0 ? item.PortId : 443;
+                        }
                         e.DecryptSsl = true;
                         return Task.CompletedTask;
                     }
@@ -504,7 +588,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }
         if (e.HttpClient.Request.Host.Contains(LocalDomain, StringComparison.OrdinalIgnoreCase) || TwoLevelAgentEnable || OnlyEnableProxyScript)
         {
-            e.DecryptSsl = true;
+            e.DecryptSsl = IsRootCertificateInstalled;
             return;
         }
         foreach (var item in ProxyDomains)
@@ -513,15 +597,35 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             {
                 if (e.HttpClient.Request.Url.IsDomainPattern(host, RegexOptions.IgnoreCase))
                 {
+                    var isLocalOrServer = item.ProxyType == ProxyType.Local ||
+                                          item.ProxyType == ProxyType.ServerAccelerate;
+
+                    // IP/服务端中转规则不做 MITM，直接换出口，保留原始 SNI 和请求头。
+                    if (isLocalOrServer && !item.ForwardDomainIsNameOrIP && !string.IsNullOrEmpty(item.ForwardDomainIP))
+                    {
+                        var ip = await GetReverseProxyIp(item.ForwardDomainIP, ProxyDNS, false);
+                        if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
+                        {
+                            e.DecryptSsl = false;
+                            e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, item.PortId > 0 ? item.PortId : 443);
+                        }
+                        return;
+                    }
+
+                    if (!IsRootCertificateInstalled)
+                    {
+                        // 没有根证书时不做 MITM，按原始 SNI 透传。
+                        return;
+                    }
+
                     e.DecryptSsl = true;
-                    if (item.ProxyType == ProxyType.Local ||
-                        item.ProxyType == ProxyType.ServerAccelerate)
+                    if (isLocalOrServer)
                     {
                         var addres = item.ForwardDomainIsNameOrIP ? item.ForwardDomainName : item.ForwardDomainIP;
                         var ip = await GetReverseProxyIp(addres, ProxyDNS, item.ForwardDomainIsNameOrIP);
                         if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
                         {
-                            e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, item.PortId);
+                            e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, item.PortId > 0 ? item.PortId : 443);
                         }
                     }
                     return;

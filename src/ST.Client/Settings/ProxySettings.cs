@@ -182,6 +182,13 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         set => ProxyMode.Value = value;
     }
 
+    /// <summary>
+    /// 免证书隧道模式。启用后不进行 MITM，镜像改写和脚本注入不可用。
+    /// Android 7+ 默认开启，其他平台默认关闭。
+    /// </summary>
+    public static SerializableProperty<bool> IsCertificateLessMode { get; }
+        = GetProperty(defaultValue: OperatingSystem2.IsAndroid(), autoSave: false);
+
     public static string ToStringByProxyMode(EProxyMode mode) => mode switch
     {
         EProxyMode.DNSIntercept => AppResources.ProxyMode_DNSIntercept,

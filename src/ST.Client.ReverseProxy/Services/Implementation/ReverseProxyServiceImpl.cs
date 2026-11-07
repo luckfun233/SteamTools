@@ -31,6 +31,12 @@ abstract class ReverseProxyServiceImpl
         set => CertificateManager.RootCertificate = value;
     }
 
+    /// <summary>
+    /// 根证书是否已安装并受信任。
+    /// 未安装时仅启用 TLS 隧道/IP 加速，不进行 MITM。
+    /// </summary>
+    protected bool IsRootCertificateInstalled { get; private set; }
+
     /// <inheritdoc cref="IReverseProxyService.ProxyRunning"/>
     public abstract bool ProxyRunning { get; }
 
@@ -42,6 +48,9 @@ abstract class ReverseProxyServiceImpl
 
     /// <inheritdoc cref="IReverseProxyService.IsEnableScript"/>
     public bool IsEnableScript { get; set; }
+
+    /// <inheritdoc cref="IReverseProxyService.IsCertificateLessMode"/>
+    public bool IsCertificateLessMode { get; set; }
 
     /// <inheritdoc cref="IReverseProxyService.IsOnlyWorkSteamBrowser"/>
     public bool IsOnlyWorkSteamBrowser { get; set; }
@@ -155,14 +164,27 @@ abstract class ReverseProxyServiceImpl
 
     public async ValueTask<bool> StartProxy()
     {
-        if (!CertificateManager.IsRootCertificateInstalled)
+        IsRootCertificateInstalled = !IsCertificateLessMode && CertificateManager.IsRootCertificateInstalled;
+        if (!IsRootCertificateInstalled)
         {
-            //CertificateManager.DeleteRootCertificate();
-            var isOk = await CertificateManager.SetupRootCertificate();
-            if (!isOk)
+            // Android 7+ 默认不信任用户证书，仍允许以 TLS 隧道模式启动；
+            // 只有镜像改写、脚本注入等需要 MITM 的功能会被禁用。
+            if (!IsCertificateLessMode && !OperatingSystem2.IsAndroid())
             {
-                Log.Error("StartProxy", "证书安装失败，或未信任。");
-                return false;
+                //CertificateManager.DeleteRootCertificate();
+                var isOk = await CertificateManager.SetupRootCertificate();
+                if (!isOk)
+                {
+                    Log.Error("StartProxy", "证书安装失败，或未信任。");
+                    return false;
+                }
+                IsRootCertificateInstalled = CertificateManager.IsRootCertificateInstalled;
+            }
+            if (!IsRootCertificateInstalled)
+            {
+                Log.Warn("StartProxy", IsCertificateLessMode
+                    ? "已启用免证书隧道模式，将仅使用 TLS 隧道与 IP 加速，镜像改写和脚本注入不可用。"
+                    : "根证书未安装/未信任，将仅启用 TLS 隧道与 IP 加速，镜像改写和脚本注入不可用。");
             }
         }
 

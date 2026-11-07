@@ -37,6 +37,11 @@ public interface IReverseProxyService : IDisposable
     bool IsEnableScript { get; set; }
 
     /// <summary>
+    /// 免证书隧道模式。启用后不进行 MITM，镜像改写和脚本注入不可用。
+    /// </summary>
+    bool IsCertificateLessMode { get; set; }
+
+    /// <summary>
     /// 是否只针对 Steam 内置浏览器启用脚本
     /// </summary>
     bool IsOnlyWorkSteamBrowser { get; set; }

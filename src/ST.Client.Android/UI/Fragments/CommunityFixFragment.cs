@@ -173,13 +173,13 @@ namespace System.Application.UI.Fragments
             var a = RequireActivity();
             if (start)
             {
-                if (Build.VERSION.SdkInt >= BuildVersionCodes.N)
+                if (Build.VERSION.SdkInt >= BuildVersionCodes.N && ProxySettings.ProxyModeValue != ProxyMode.VPN)
                 {
                     const string textCertificateTrustTip =
-                        "因 Android 7(Nougat API 24) 之后的版本不再信任用户证书，所以此功能已放弃继续开发，" +
-                        "如仍想使用需要自行使用 adb 工具或 Magisk 之类的软件导入证书到系统目录，" +
-                        "未来会使用不需要证书的加速功能替换此功能";
-                    if ((await MessageBox.ShowAsync(textCertificateTrustTip, "已知问题", MessageBox.Button.OKCancel,
+                        "Android 7(Nougat API 24) 之后默认不信任用户证书。" +
+                        "未安装证书时将使用不需要证书的 TLS 隧道/IP 加速；" +
+                        "镜像改写和脚本注入需要自行使用 adb 或 Magisk 将证书导入系统目录。";
+                    if ((await MessageBox.ShowAsync(textCertificateTrustTip, "证书说明", MessageBox.Button.OKCancel,
                          rememberChooseKey: MessageBox.DontPromptType.AndroidCertificateTrustTip)) != MessageBox.Result.OK)
                     {
                         return;
@@ -205,7 +205,8 @@ namespace System.Application.UI.Fragments
                     }
                 }
 
-                if (!IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled) // 检查 CA 证书是否已安装
+                if (!IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled &&
+                    ProxySettings.ProxyModeValue != ProxyMode.VPN) // VPN 模式可以使用免证书隧道启动
                 {
                     // 当未安装证书时
                     intent = new Intent(a, typeof(GuideCACertActivity));

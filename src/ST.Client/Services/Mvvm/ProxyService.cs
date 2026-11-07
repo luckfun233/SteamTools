@@ -60,6 +60,7 @@ namespace System.Application.Services
                     {
                         reverseProxyService.ProxyDomains = EnableProxyDomains;
                         reverseProxyService.IsEnableScript = ProxySettings.IsEnableScript.Value;
+                        reverseProxyService.IsCertificateLessMode = ProxySettings.IsCertificateLessMode.Value;
                         reverseProxyService.OnlyEnableProxyScript = ProxySettings.OnlyEnableProxyScript.Value;
 
                         if (reverseProxyService.IsEnableScript)

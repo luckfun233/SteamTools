@@ -7,6 +7,7 @@ using static System.Application.Services.Native.IServiceBase;
 using AndroidX.Core.App;
 using static System.Properties.ThisAssembly;
 using System.Collections.Generic;
+using System.Net;
 
 namespace System.Application.Services.Native
 {
@@ -94,7 +95,10 @@ namespace System.Application.Services.Native
                 get
                 {
                     var s = ProxyService.Current;
-                    return $"{s.ProxyIp}:{s.Socks5ProxyPortId}";
+                    var ip = IPAddress.Any.Equals(s.ProxyIp) || IPAddress.IPv6Any.Equals(s.ProxyIp)
+                        ? IPAddress.Loopback
+                        : s.ProxyIp;
+                    return $"{ip}:{s.Socks5ProxyPortId}";
                 }
             }
 
