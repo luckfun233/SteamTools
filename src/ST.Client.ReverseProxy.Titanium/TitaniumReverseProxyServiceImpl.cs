@@ -130,9 +130,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
     }
 
     /// <summary>
-    /// 带认证信息或签名参数的请求不能走公共镜像，否则私有仓库会 404。
+    /// 带认证信息或签名参数的请求不能走公共镜像或第三方加速节点，否则私有仓库会 404，凭据也可能泄露。
     /// </summary>
-    static bool ShouldBypassRedirect(Request request)
+    static bool ShouldBypassAcceleration(Request request)
     {
         if (request.Headers.GetFirstHeader("Authorization") != null)
             return true;
@@ -241,6 +241,13 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             {
                 if (e.HttpClient.Request.RequestUri.AbsoluteUri.IsDomainPattern(host, RegexOptions.IgnoreCase))
                 {
+                    if (ShouldBypassAcceleration(e.HttpClient.Request))
+                    {
+                        // 带认证、会话 Cookie 或签名参数的请求只允许直连原始主机，
+                        // 避免凭据进入公共镜像或第三方加速节点。
+                        return;
+                    }
+
                     if (!e.HttpClient.IsHttps)
                     {
                         e.HttpClient.Request.RequestUri = new Uri(e.HttpClient.Request.RequestUri.AbsoluteUri.Remove(0, 4).Insert(0, Uri.UriSchemeHttps));
@@ -250,12 +257,6 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
                     if (item.Redirect)
                     {
-                        if (ShouldBypassRedirect(e.HttpClient.Request))
-                        {
-                            // 镜像无法使用客户端的 Authorization/Cookie，带认证或签名参数的请求必须直连。
-                            return;
-                        }
-
                         var redirectUri = BuildRedirectUri(e.HttpClient.Request.RequestUri, item);
                         if (redirectUri != null)
                         {
