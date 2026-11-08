@@ -260,13 +260,12 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
         if (!string.IsNullOrEmpty(rule.Sni) || !string.IsNullOrEmpty(rule.VerifyHost))
         {
-            var preset = rule.PresetIps.FirstOrDefault();
-            if (!string.IsNullOrEmpty(preset))
+            if (rule.PresetIps.Count > 0)
             {
-                var ip = await GetReverseProxyIp(preset, ProxyDNS, false);
-                if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
+                var presetIp = await PresetIpSelector.PickAsync(rule.PresetIps, 443, TimeSpan.FromMilliseconds(800));
+                if (presetIp != null)
                 {
-                    e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, 443);
+                    e.HttpClient.UpStreamEndPoint = new IPEndPoint(presetIp, 443);
                 }
             }
             ApplySniOverride(e, rule.Sni ?? rule.VerifyHost);
@@ -275,10 +274,10 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
         if (rule.PresetIps.Count > 0 && !sensitive)
         {
-            var ip = await GetReverseProxyIp(rule.PresetIps[0], ProxyDNS, false);
-            if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
+            var presetIp = await PresetIpSelector.PickAsync(rule.PresetIps, 443, TimeSpan.FromMilliseconds(800));
+            if (presetIp != null)
             {
-                e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, 443);
+                e.HttpClient.UpStreamEndPoint = new IPEndPoint(presetIp, 443);
                 return true;
             }
         }

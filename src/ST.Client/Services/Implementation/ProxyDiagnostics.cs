@@ -43,6 +43,27 @@ namespace System.Application.Services.Implementation
 
         public static void Error(string tag, string message) => Write("ERROR", tag, message);
 
+        public static void Clear()
+        {
+            try
+            {
+                if (!Directory.Exists(LogDirectory)) return;
+                lock (sync)
+                {
+                    foreach (var file in Directory.GetFiles(LogDirectory, "proxy-*.log"))
+                    {
+                        File.Delete(file);
+                    }
+                    currentFilePath = null;
+                    currentSize = 0;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
         public static void Write(string level, string tag, string message)
         {
             if (!ProxySettings.EnableProxyDiagnostics.Value) return;

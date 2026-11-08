@@ -30,6 +30,24 @@ namespace System.Application.ProxyRules
             var cachePath = GetCacheFilePath();
             url = string.IsNullOrWhiteSpace(url) ? DefaultConfigUrl : url.Trim();
 
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var configUri) ||
+                !string.Equals(configUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Warn("DevSidecarConfig", $"拒绝非 HTTPS 配置地址: {url}");
+                try
+                {
+                    if (File.Exists(cachePath))
+                    {
+                        return Parse(File.ReadAllText(cachePath));
+                    }
+                }
+                catch (Exception cacheEx)
+                {
+                    Log.Warn("DevSidecarConfig", cacheEx, "读取 DevSidecar 本地缓存失败");
+                }
+                return ProxyRuleSet.Empty;
+            }
+
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);

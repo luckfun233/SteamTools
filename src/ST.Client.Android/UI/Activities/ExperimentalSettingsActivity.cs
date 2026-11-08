@@ -61,6 +61,12 @@ namespace System.Application.UI.Activities
             {
                 Toast.MakeText(this, ProxyDiagnostics.LogDirectory, ToastLength.Long)?.Show();
             });
+
+            AddButton("清理代理日志", () =>
+            {
+                ProxyDiagnostics.Clear();
+                Toast.MakeText(this, "日志已清理", ToastLength.Short)?.Show();
+            });
         }
 
         void AddTitle(string text)
