@@ -198,7 +198,7 @@ namespace System.Application.UI.Activities
 
         public override bool OnCreateOptionsMenu(IMenu? menu)
         {
-            menu?.Add(0, 1001, 0, "实验性设置");
+            menu?.Add(0, 1001, 0, "实验性设置（规则组/SNI）");
             return true;
         }
 

@@ -4,8 +4,20 @@ using System.Text;
 
 namespace System.Application.Services.Implementation
 {
+    public enum TlsFragmentStrategy
+    {
+        /// <summary>按固定大小拆分。</summary>
+        Fixed = 0,
+
+        /// <summary>在 SNI 主机名的首字节处拆成三段，任何一段都不包含完整域名。</summary>
+        SniBoundary = 1,
+
+        /// <summary>按 TLS record 头和 handshake 头拆分。</summary>
+        Record = 2,
+    }
+
     /// <summary>
-    /// 最小 TLS ClientHello 解析：读取/改写 SNI，按字节分片。
+    /// 最小 TLS ClientHello 解析：读取/改写/移除 SNI，按字节分片。
     /// 只处理单个 TLS record 内的 ClientHello，解析失败时调用方应原样转发。
     /// </summary>
     public static class TlsClientHello
@@ -13,6 +25,17 @@ namespace System.Application.Services.Implementation
         const byte HandshakeContentType = 0x16;
         const byte ClientHelloHandshakeType = 0x01;
         const ushort ServerNameExtensionType = 0x0000;
+
+        /// <summary>
+        /// 返回第一段 TLS record 的总长度（5 + record length）。
+        /// </summary>
+        public static bool TryGetRecordLength(ReadOnlySpan<byte> data, out int totalLength)
+        {
+            totalLength = 0;
+            if (data.Length < 5 || data[0] != HandshakeContentType) return false;
+            totalLength = 5 + ReadUInt16(data, 3);
+            return totalLength >= 5;
+        }
 
         public static bool TryGetSni(ReadOnlySpan<byte> data, out string? sni)
         {
@@ -22,10 +45,27 @@ namespace System.Application.Services.Implementation
             return !string.IsNullOrEmpty(sni);
         }
 
+        /// <summary>
+        /// 返回 SNI 主机名在 ClientHello 中的偏移和长度。
+        /// </summary>
+        public static bool TryGetSniRange(ReadOnlySpan<byte> data, out int offset, out int length)
+        {
+            offset = 0;
+            length = 0;
+            if (!TryParse(data, out var info)) return false;
+            offset = info.NameOffset;
+            length = info.NameLength;
+            return true;
+        }
+
         public static bool TryRewriteSni(ReadOnlySpan<byte> data, string newSni, out byte[] rewritten)
         {
             rewritten = Array.Empty<byte>();
             if (string.IsNullOrWhiteSpace(newSni)) return false;
+            if (string.Equals(newSni, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return TryRemoveSni(data, out rewritten);
+            }
             if (newSni.Length > 255) return false;
             if (!TryParse(data, out var info)) return false;
 
@@ -44,12 +84,33 @@ namespace System.Application.Services.Implementation
             newName.CopyTo(result.AsSpan(info.NameOffset));
             data.Slice(info.NameOffset + info.NameLength).CopyTo(result.AsSpan(info.NameOffset + newName.Length));
 
-            if (!TryAdd(result, info.NameLengthOffset, newName.Length, out _)) return false;
+            if (!TryAdd(result, info.NameLengthOffset, delta, out _)) return false;
             if (!TryAdd(result, info.ListLengthOffset, delta, out _)) return false;
             if (!TryAdd(result, info.ExtensionLengthOffset, delta, out _)) return false;
             if (!TryAdd(result, info.ExtensionsLengthOffset, delta, out _)) return false;
             if (!TryAdd(result, info.HandshakeLengthOffset, delta, out _, 3)) return false;
             if (!TryAdd(result, info.RecordLengthOffset, delta, out _)) return false;
+
+            rewritten = result;
+            return true;
+        }
+
+        /// <summary>
+        /// 移除 SNI 扩展，对应 DevSidecar 的 sni: "none"。
+        /// </summary>
+        public static bool TryRemoveSni(ReadOnlySpan<byte> data, out byte[] rewritten)
+        {
+            rewritten = Array.Empty<byte>();
+            if (!TryParse(data, out var info)) return false;
+
+            var removeLength = info.ExtensionTotalLength;
+            var result = new byte[data.Length - removeLength];
+            data.Slice(0, info.ExtensionHeaderOffset).CopyTo(result);
+            data.Slice(info.ExtensionHeaderOffset + removeLength).CopyTo(result.AsSpan(info.ExtensionHeaderOffset));
+
+            if (!TryAdd(result, info.ExtensionsLengthOffset, -removeLength, out _)) return false;
+            if (!TryAdd(result, info.HandshakeLengthOffset, -removeLength, out _, 3)) return false;
+            if (!TryAdd(result, info.RecordLengthOffset, -removeLength, out _)) return false;
 
             rewritten = result;
             return true;
@@ -66,6 +127,48 @@ namespace System.Application.Services.Implementation
             }
             return result;
         }
+
+        /// <summary>
+        /// 在 SNI 首字节处拆成三段，确保没有任何一个 TCP 段包含完整主机名。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentBySni(ReadOnlySpan<byte> data)
+        {
+            if (!TryGetSniRange(data, out var offset, out var length) || length < 2)
+            {
+                return Fragment(data, Math.Max(1, Math.Min(64, data.Length)));
+            }
+
+            var first = data.Slice(0, offset).ToArray();
+            var second = data.Slice(offset, 1).ToArray();
+            var third = data.Slice(offset + 1).ToArray();
+            return new[] { first, second, third };
+        }
+
+        /// <summary>
+        /// 按 TLS record 头与 handshake 头拆分。强度弱于 SNI 边界拆分，仅作为兼容策略。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentByRecord(ReadOnlySpan<byte> data)
+        {
+            if (data.Length <= 9 || data[0] != HandshakeContentType)
+            {
+                return new[] { data.ToArray() };
+            }
+
+            return new[]
+            {
+                data.Slice(0, 5).ToArray(),
+                data.Slice(5, 4).ToArray(),
+                data.Slice(9).ToArray(),
+            };
+        }
+
+        public static IReadOnlyList<byte[]> Fragment(ReadOnlySpan<byte> data, TlsFragmentStrategy strategy, int chunkSize)
+            => strategy switch
+            {
+                TlsFragmentStrategy.SniBoundary => FragmentBySni(data),
+                TlsFragmentStrategy.Record => FragmentByRecord(data),
+                _ => Fragment(data, chunkSize),
+            };
 
         static bool TryParse(ReadOnlySpan<byte> data, out ClientHelloInfo info)
         {
@@ -130,6 +233,8 @@ namespace System.Application.Services.Implementation
                             NameLength = nameLength,
                             NameLengthOffset = nameLengthOffset,
                             ListLengthOffset = listLengthOffset,
+                            ExtensionHeaderOffset = pos,
+                            ExtensionTotalLength = 4 + length,
                             ExtensionLengthOffset = pos + 2,
                             ExtensionsLengthOffset = extensionsLengthOffset,
                             HandshakeLengthOffset = 6,
@@ -184,6 +289,8 @@ namespace System.Application.Services.Implementation
             public int NameLength;
             public int NameLengthOffset;
             public int ListLengthOffset;
+            public int ExtensionHeaderOffset;
+            public int ExtensionTotalLength;
             public int ExtensionLengthOffset;
             public int ExtensionsLengthOffset;
             public int HandshakeLengthOffset;

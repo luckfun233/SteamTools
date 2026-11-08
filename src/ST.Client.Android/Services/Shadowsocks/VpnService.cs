@@ -42,6 +42,9 @@ namespace System.Application.Services.Native
                 IForegroundService f = this;
                 (builder, mNotificationManager, notifyId) = AndroidNotificationServiceImpl.Instance.StartForeground(this, f.NotificationType, f.NotificationText, f.NotificationEntranceAction);
 
+                // 免证书模式要在 tun2socks 计算 SOCKS 出口前就绪。
+                SniSidecarService.Start();
+
                 // 启动本地代理服务
                 ProxyService.Current.ProxyStatus = true;
 
@@ -99,7 +102,14 @@ namespace System.Application.Services.Native
                     var ip = IPAddress.Any.Equals(s.ProxyIp) || IPAddress.IPv6Any.Equals(s.ProxyIp)
                         ? IPAddress.Loopback
                         : s.ProxyIp;
-                    var port = SniSidecarService.IsRunning ? SniSidecarService.Port : s.Socks5ProxyPortId;
+
+                    // 只有免证书模式（或根本未安装根证书）才把 VPN 出口交给 SNI sidecar。
+                    // 有证书时仍然走 Titanium 的 SOCKS5，否则 DevSidecar 的 SNI 伪装、镜像和请求头规则不会生效。
+                    var certificateLess = ProxySettings.IsCertificateLessMode.Value ||
+                        !IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled;
+                    var port = certificateLess && SniSidecarService.IsRunning
+                        ? SniSidecarService.ActivePort
+                        : s.Socks5ProxyPortId;
                     return $"{ip}:{port}";
                 }
             }

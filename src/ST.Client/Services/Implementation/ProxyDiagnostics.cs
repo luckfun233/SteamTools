@@ -21,6 +21,10 @@ namespace System.Application.Services.Implementation
             @"(?i)(token|sig|signature|jwt|password|passwd|secret|key)=([^&]+)",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+        static readonly Regex hostRegex = new(
+            @"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}\b",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         public static string LogDirectory => Path.Combine(IOPath.AppDataDirectory, "ProxyLogs");
 
         public static void Initialize()
@@ -67,10 +71,16 @@ namespace System.Application.Services.Implementation
         public static void Write(string level, string tag, string message)
         {
             if (!ProxySettings.EnableProxyDiagnostics.Value) return;
+            if (!ShouldWrite(level)) return;
             try
             {
                 var now = DateTime.Now;
-                var line = $"{now:yyyy-MM-dd HH:mm:ss.fff} [{level}] [{tag}] {Sanitize(message)}{Environment.NewLine}";
+                var text = Sanitize(message);
+                if (!ProxySettings.ProxyDiagnosticsIncludeHost.Value)
+                {
+                    text = hostRegex.Replace(text, "***");
+                }
+                var line = $"{now:yyyy-MM-dd HH:mm:ss.fff} [{level}] [{tag}] {text}{Environment.NewLine}";
                 lock (sync)
                 {
                     EnsureFile(now);
@@ -83,6 +93,14 @@ namespace System.Application.Services.Implementation
             {
                 // 日志失败不能影响代理主流程
             }
+        }
+
+        static bool ShouldWrite(string level)
+        {
+            var min = Math.Max(0, Math.Min(2, ProxySettings.ProxyDiagnosticsMinimumLevel.Value));
+            if (min == 0) return true;
+            if (min == 1) return !string.Equals(level, "INFO", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(level, "ERROR", StringComparison.OrdinalIgnoreCase);
         }
 
         static void EnsureFile(DateTime now)

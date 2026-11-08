@@ -202,5 +202,14 @@ namespace System.Application.Models
         [N_JsonProperty("12")]
         [S_JsonProperty("12")]
         public List<AccelerateProjectDTO>? Items { get; set; }
+
+        /// <summary>
+        /// 附加请求头，格式：Name=Value; Name2=Value2。值为 [remove] 表示删除。
+        /// 用于内置 Pixiv 图片等需要 Referer 的站点。
+        /// </summary>
+        [MPKey(13)]
+        [N_JsonProperty("13")]
+        [S_JsonProperty("13")]
+        public string? RequestHeaders { get; set; }
     }
 }

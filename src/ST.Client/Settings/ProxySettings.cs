@@ -1,5 +1,7 @@
 using System.Linq;
+using System.Application.ProxyRules;
 using System.Application.Services;
+using System.Application.Services.Implementation;
 using System.Application.UI.Resx;
 using System.Collections.Generic;
 using EProxyMode = System.Application.ProxyMode;
@@ -201,7 +203,9 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// DevSidecar 远程配置地址。
     /// </summary>
     public static SerializableProperty<string> DevSidecarConfigUrl { get; }
-        = GetProperty(defaultValue: "https://ds-official-config.bestar.de5.net/remote_config.json5", autoSave: false);
+        = GetProperty(defaultValue: DefaultDevSidecarConfigUrl, autoSave: false);
+
+    public const string DefaultDevSidecarConfigUrl = "https://ds-official-config.bestar.de5.net/remote_config.json5";
 
     /// <summary>
     /// 启动加速时是否同步 DevSidecar 配置。
@@ -210,10 +214,40 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: false, autoSave: false);
 
     /// <summary>
+    /// 启用的 DevSidecar 规则组，分号分隔。未选中的组不会参与匹配。
+    /// </summary>
+    public static SerializableProperty<string> DevSidecarRuleGroups { get; }
+        = GetProperty(defaultValue: ProxyRuleGroups.DefaultEnabled, autoSave: false);
+
+    /// <summary>
     /// 启用免证书 SNI 分片（通过本地 sidecar SOCKS5）。
     /// </summary>
     public static SerializableProperty<bool> EnableSniFragment { get; }
         = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// SNI 分片策略：0=固定大小，1=按 SNI 边界拆分，2=按 TLS 记录头拆分。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentStrategy { get; }
+        = GetProperty(defaultValue: SniFragmentStrategySniBoundary, autoSave: false);
+
+    public const int SniFragmentStrategyFixed = 0;
+    public const int SniFragmentStrategySniBoundary = 1;
+    public const int SniFragmentStrategyRecord = 2;
+
+    /// <summary>
+    /// 只对列出的域名做 SNI 分片/改写，分号分隔；为空表示全部域名。
+    /// </summary>
+    public static SerializableProperty<string> SniFragmentDomains { get; }
+        = GetProperty(defaultValue: DefaultSniFragmentDomains, autoSave: false);
+
+    public const string DefaultSniFragmentDomains = "github.com;*.githubusercontent.com;*.githubassets.com;github.dev;huggingface.co;*.huggingface.co;*.hf.co;pixiv.net;*.pixiv.net;*.pixiv.org;pximg.net;*.pximg.net;*.fanbox.cc";
+
+    /// <summary>
+    /// 只对 TLS 连接做分片，非 TLS 直接透传。
+    /// </summary>
+    public static SerializableProperty<bool> SniFragmentOnlyTls { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
 
     /// <summary>
     /// 启用免证书 SNI 改写（实验性，按域名白名单）。
@@ -231,19 +265,33 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 允许做 SNI 改写的域名，分号分隔；默认只包含 GitHub 相关域名。
     /// </summary>
     public static SerializableProperty<string> SniRewriteDomains { get; }
-        = GetProperty(defaultValue: "github.com;api.github.com;github.githubassets.com;avatars.githubusercontent.com;camo.githubusercontent.com;collector.github.com;raw.githubusercontent.com;gist.githubusercontent.com;objects.githubusercontent.com;release-assets.githubusercontent.com;user-images.githubusercontent.com;private-user-images.githubusercontent.com;media.githubusercontent.com", autoSave: false);
+        = GetProperty(defaultValue: DefaultSniRewriteDomains, autoSave: false);
+
+    public const string DefaultSniRewriteDomains = "github.com;api.github.com;github.githubassets.com;avatars.githubusercontent.com;camo.githubusercontent.com;collector.github.com;raw.githubusercontent.com;gist.githubusercontent.com;objects.githubusercontent.com;release-assets.githubusercontent.com;user-images.githubusercontent.com;private-user-images.githubusercontent.com;media.githubusercontent.com";
 
     /// <summary>
-    /// SNI 分片大小（字节）。
+    /// 固定大小分片策略下的分片大小（字节）。
     /// </summary>
     public static SerializableProperty<int> SniFragmentChunkSize { get; }
-        = GetProperty(defaultValue: 2, autoSave: false);
+        = GetProperty(defaultValue: 64, autoSave: false);
 
     /// <summary>
     /// SNI 分片之间的延迟（毫秒）。
     /// </summary>
     public static SerializableProperty<int> SniFragmentDelayMilliseconds { get; }
-        = GetProperty(defaultValue: 5, autoSave: false);
+        = GetProperty(defaultValue: 10, autoSave: false);
+
+    /// <summary>
+    /// 单次 TLS ClientHello 最多缓冲的字节数，防止异常流量占用内存。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentMaxBufferBytes { get; }
+        = GetProperty(defaultValue: 16384, autoSave: false);
+
+    /// <summary>
+    /// 等待剩余 ClientHello 字节的超时时间（毫秒）。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentReadTimeoutMilliseconds { get; }
+        = GetProperty(defaultValue: 300, autoSave: false);
 
     /// <summary>
     /// SNI sidecar 的本地 SOCKS5 端口。
@@ -252,9 +300,59 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: 8869, autoSave: false);
 
     /// <summary>
+    /// 免证书模式下是否通过上游 SOCKS5 中继转发全部流量。
+    /// </summary>
+    public static SerializableProperty<bool> EnableSniUpstreamRelay { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    public static SerializableProperty<string> SniUpstreamRelayHost { get; }
+        = GetProperty(defaultValue: "127.0.0.1", autoSave: false);
+
+    public static SerializableProperty<int> SniUpstreamRelayPort { get; }
+        = GetProperty(defaultValue: 7890, autoSave: false);
+
+    public static SerializableProperty<string> SniUpstreamRelayUserName { get; }
+        = GetProperty(defaultValue: string.Empty, autoSave: false);
+
+    public static SerializableProperty<string> SniUpstreamRelayPassword { get; }
+        = GetProperty(defaultValue: string.Empty, autoSave: false);
+
+    /// <summary>
+    /// 是否使用 DoH 解析域名，避免 DNS 污染。
+    /// </summary>
+    public static SerializableProperty<bool> EnableDoh { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// DoH JSON 接口地址。
+    /// </summary>
+    public static SerializableProperty<string> DohEndpoint { get; }
+        = GetProperty(defaultValue: DefaultDohEndpoint, autoSave: false);
+
+    public const string DefaultDohEndpoint = "https://dns.alidns.com/resolve";
+
+    /// <summary>
+    /// DoH 失败时是否回退到系统 DNS。
+    /// </summary>
+    public static SerializableProperty<bool> DohFallbackToSystem { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
     /// 是否写入代理诊断日志。
     /// </summary>
     public static SerializableProperty<bool> EnableProxyDiagnostics { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// 诊断日志最低级别：0=Info，1=Warn，2=Error。
+    /// </summary>
+    public static SerializableProperty<int> ProxyDiagnosticsMinimumLevel { get; }
+        = GetProperty(defaultValue: 0, autoSave: false);
+
+    /// <summary>
+    /// 日志中是否保留完整主机名。关闭后会把形似域名的文本替换为 ***。
+    /// </summary>
+    public static SerializableProperty<bool> ProxyDiagnosticsIncludeHost { get; }
         = GetProperty(defaultValue: true, autoSave: false);
 
     /// <summary>
@@ -274,6 +372,53 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// </summary>
     public static SerializableProperty<bool> EnableBrowserOnlyVpn { get; }
         = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// 恢复实验性设置的默认值。不会修改代理端口、二级代理等基础设置。
+    /// </summary>
+    public static void RestoreExperimentalDefaults()
+    {
+        EnableDevSidecarRules.Value = false;
+        SyncDevSidecarConfigOnStartup.Value = false;
+        DevSidecarConfigUrl.Value = DefaultDevSidecarConfigUrl;
+        DevSidecarRuleGroups.Value = ProxyRuleGroups.DefaultEnabled;
+
+        IsCertificateLessMode.Value = false;
+
+        EnableSniFragment.Value = false;
+        SniFragmentStrategy.Value = SniFragmentStrategySniBoundary;
+        SniFragmentChunkSize.Value = 64;
+        SniFragmentDelayMilliseconds.Value = 10;
+        SniFragmentMaxBufferBytes.Value = 16384;
+        SniFragmentReadTimeoutMilliseconds.Value = 300;
+        SniFragmentPortId.Value = 8869;
+        SniFragmentDomains.Value = DefaultSniFragmentDomains;
+        SniFragmentOnlyTls.Value = true;
+        EnableSniRewrite.Value = false;
+        SniRewriteHost.Value = "baidu.com";
+        SniRewriteDomains.Value = DefaultSniRewriteDomains;
+
+        EnableSniUpstreamRelay.Value = false;
+        SniUpstreamRelayHost.Value = "127.0.0.1";
+        SniUpstreamRelayPort.Value = 7890;
+        SniUpstreamRelayUserName.Value = string.Empty;
+        SniUpstreamRelayPassword.Value = string.Empty;
+
+        EnableDoh.Value = false;
+        DohEndpoint.Value = DefaultDohEndpoint;
+        DohFallbackToSystem.Value = true;
+
+        EnableProxyDiagnostics.Value = true;
+        ProxyDiagnosticsMinimumLevel.Value = 0;
+        ProxyDiagnosticsIncludeHost.Value = true;
+        ProxyDiagnosticsRetentionDays.Value = 7;
+        ProxyDiagnosticsMaxFileSizeKB.Value = 4096;
+
+        EnableBrowserOnlyVpn.Value = false;
+
+        DohResolver.ClearCache();
+        SettingsHost.Save();
+    }
 
     #endregion
 

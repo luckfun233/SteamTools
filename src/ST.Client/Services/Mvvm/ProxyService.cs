@@ -589,6 +589,12 @@ namespace System.Application.Services
                 ApplySavedStatus(group);
                 ProxyDomains.Insert(0, group);
             }
+            if (!ProxyDomains.Items.Any(x => x.Name == "Pixiv / P站 SNI 加速"))
+            {
+                var group = BuiltInAccelerateProjects.CreatePixivGroup();
+                ApplySavedStatus(group);
+                ProxyDomains.Insert(0, group);
+            }
         }
 
         private Timer? timer;

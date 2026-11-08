@@ -102,7 +102,8 @@ namespace System.Application.ProxyRules
         {
             try
             {
-                using var doc = JsonDocument.Parse(json, new JsonDocumentOptions
+                var normalized = Json5.ToJson(json);
+                using var doc = JsonDocument.Parse(normalized, new JsonDocumentOptions
                 {
                     AllowTrailingCommas = true,
                     CommentHandling = JsonCommentHandling.Skip,
@@ -140,6 +141,8 @@ namespace System.Application.ProxyRules
                     {
                         if (domainItem.Value.ValueKind != JsonValueKind.Object) continue;
 
+                        var group = ProxyRuleGroups.Classify(domainItem.Name);
+
                         foreach (var pathItem in domainItem.Value.EnumerateObject())
                         {
                             if (pathItem.Value.ValueKind != JsonValueKind.Object) continue;
@@ -148,24 +151,22 @@ namespace System.Application.ProxyRules
                             var rule = new ProxyRule
                             {
                                 DomainPattern = domainItem.Name,
+                                Group = group,
                                 PathPattern = pathItem.Name == ".*" ? null : pathItem.Name,
                                 Sni = GetString(action, "sni"),
                                 VerifyHost = GetString(action, "verifyHost"),
                                 Redirect = NormalizeTarget(GetString(action, "redirect")),
                                 Proxy = NormalizeTarget(GetString(action, "proxy")),
+                                BackupProxies = ReadTargetList(action, "backup"),
+                                RequestHeaders = ReadHeaderReplacements(action, "requestReplace"),
+                                ResponseHeaders = ReadHeaderReplacements(action, "responseReplace"),
                                 UnVerifySsl = GetBool(action, "unVerifySsl"),
-                                Description = GetString(action, "desc"),
+                                Description = GetString(action, "desc") ?? GetString(action, "remark"),
                             };
 
                             if (TryGetBool(action, "abort", out var abort) && abort)
                             {
-                                rule = new ProxyRule
-                                {
-                                    DomainPattern = rule.DomainPattern,
-                                    PathPattern = rule.PathPattern,
-                                    Block = true,
-                                    Description = rule.Description,
-                                };
+                                rule = CloneWithBlock(rule);
                             }
 
                             if (rule.RequiresMitm || rule.Block)
@@ -183,6 +184,7 @@ namespace System.Application.ProxyRules
                 {
                     foreach (var item in exclude.EnumerateObject())
                     {
+                        // DevSidecar 里 null/false 表示从排除列表移除，只有 true 才排除。
                         if (item.Value.ValueKind == JsonValueKind.True)
                         {
                             excludes.Add(item.Name);
@@ -191,27 +193,8 @@ namespace System.Application.ProxyRules
                 }
             }
 
-            // 把预置 IP 挂到对应域名的规则上，便于后续多 IP 选择。
-            for (var i = 0; i < rules.Count; i++)
-            {
-                var rule = rules[i];
-                if (rule.PresetIps.Count == 0 && presetIps.TryGetValue(rule.DomainPattern, out var ips))
-                {
-                    rules[i] = new ProxyRule
-                    {
-                        DomainPattern = rule.DomainPattern,
-                        PathPattern = rule.PathPattern,
-                        Sni = rule.Sni,
-                        VerifyHost = rule.VerifyHost,
-                        Redirect = rule.Redirect,
-                        Proxy = rule.Proxy,
-                        Block = rule.Block,
-                        UnVerifySsl = rule.UnVerifySsl,
-                        Description = rule.Description,
-                        PresetIps = ips,
-                    };
-                }
-            }
+            // 预置 IP 在运行时按主机名查询（ProxyRuleSet.GetPresetIps），
+            // 因为 dev-sidecar 的 preSetIpList 键本身也可能是通配符或正则。
 
             // DevSidecar 的 overwall 中继目标先记录为日志，不自动启用第三方中继。
             if (TryGetObject(root, "plugin", out var plugin) &&
@@ -228,6 +211,51 @@ namespace System.Application.ProxyRules
 
             return new ProxyRuleSet(rules, excludes, presetIps);
         }
+
+        static ProxyRule CloneWithBlock(ProxyRule rule) => new()
+        {
+            DomainPattern = rule.DomainPattern,
+            Group = rule.Group,
+            PathPattern = rule.PathPattern,
+            Block = true,
+            Description = rule.Description,
+        };
+
+        static IReadOnlyDictionary<string, string?> ReadHeaderReplacements(JsonElement action, string name)
+        {
+            var result = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            if (!TryGetObject(action, name, out var replace)) return result;
+            if (!TryGetObject(replace, "headers", out var headers)) return result;
+
+            foreach (var header in headers.EnumerateObject())
+            {
+                if (header.Value.ValueKind != JsonValueKind.String) continue;
+                var value = header.Value.GetString();
+                result[header.Name] = string.IsNullOrEmpty(value) ||
+                    string.Equals(value, "[remove]", StringComparison.OrdinalIgnoreCase)
+                        ? null
+                        : value;
+            }
+            return result;
+        }
+
+        static IReadOnlyList<string> ReadTargetList(JsonElement action, string name)
+        {
+            var result = new List<string>();
+            if (!action.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array)
+            {
+                return result;
+            }
+
+            foreach (var item in value.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String) continue;
+                var target = NormalizeTarget(item.GetString());
+                if (!string.IsNullOrEmpty(target)) result.Add(target);
+            }
+            return result;
+        }
+
 
         static IReadOnlyList<string> ReadIpList(JsonElement element)
         {

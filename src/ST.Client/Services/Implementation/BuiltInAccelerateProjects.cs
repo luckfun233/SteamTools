@@ -75,6 +75,34 @@ namespace System.Application.Services.Implementation
             };
         }
 
+        /// <summary>
+        /// Pixiv（P站）图片 CDN 的 SNI 伪装。Pixiv 图片域名被按 SNI 阻断，
+        /// 连接仍然指向 Pixiv 的真实 IP，只把上游 SNI 改成 baidu.com。
+        /// </summary>
+        public static AccelerateProjectGroupDTO CreatePixivGroup()
+        {
+            var items = new List<AccelerateProjectDTO>();
+            void Add(string name, string domain, string ip, string? requestHeaders = null)
+            {
+                items.Add(CreateItem(name, domain, domain, "baidu.com", EProxyType.Local, ip, items.Count, requestHeaders));
+            }
+
+            Add("Pixiv 图片 i.pximg.net", "i.pximg.net", "210.140.139.132", "referer=https://www.pixiv.net/");
+            Add("Pixiv 图片 s.pximg.net", "s.pximg.net", "210.140.139.132", "referer=https://www.pixiv.net/");
+            Add("Pixiv 静态 a.pixiv.org", "a.pixiv.org", "210.140.139.182");
+            Add("Pixiv Fanbox", "www.fanbox.cc", "210.140.139.155");
+            Add("Pixiv API", "api.fanbox.cc", "172.64.146.116");
+
+            return new AccelerateProjectGroupDTO
+            {
+                Name = "Pixiv / P站 SNI 加速",
+                ImageId = Guid.Empty,
+                Enable = false,
+                Order = 950,
+                Items = items,
+            };
+        }
+
         static AccelerateProjectDTO CreateItem(
             string name,
             string domain,
@@ -82,7 +110,8 @@ namespace System.Application.Services.Implementation
             string serverName,
             EProxyType proxyType,
             string? forwardIp,
-            int order) => new()
+            int order,
+            string? requestHeaders = null) => new()
             {
                 Name = name,
                 DomainNames = domain,
@@ -94,6 +123,7 @@ namespace System.Application.Services.Implementation
                 Enable = false,
                 Id = CreateId(domain),
                 Order = order,
+                RequestHeaders = requestHeaders,
             };
 
         static Guid CreateId(string value)
