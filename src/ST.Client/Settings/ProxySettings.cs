@@ -183,11 +183,11 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     }
 
     /// <summary>
-    /// 免证书隧道模式。启用后不进行 MITM，镜像改写和脚本注入不可用。
-    /// Android 7+ 默认开启，其他平台默认关闭。
+    /// 免证书隧道模式。启用后不进行 MITM，镜像改写、SNI 伪装和脚本注入不可用。
+    /// 默认关闭；未安装/未信任根证书时会自动退化为隧道模式。
     /// </summary>
     public static SerializableProperty<bool> IsCertificateLessMode { get; }
-        = GetProperty(defaultValue: OperatingSystem2.IsAndroid(), autoSave: false);
+        = GetProperty(defaultValue: false, autoSave: false);
 
     public static string ToStringByProxyMode(EProxyMode mode) => mode switch
     {

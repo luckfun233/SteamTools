@@ -542,12 +542,33 @@ namespace System.Application.Services
         }
 
         /// <summary>
-        /// 合并不依赖服务端下发的内置加速项目。
+        /// 合并不依赖服务端下发的内置加速项目，并放到最前面优先匹配。
         /// </summary>
         void MergeBuiltInAccelerate()
         {
-            if (ProxyDomains.Items.Any(x => x.Name == "Hugging Face")) return;
-            ProxyDomains.Add(BuiltInAccelerateProjects.CreateHuggingFaceGroup());
+            var status = ProxySettings.SupportProxyServicesStatus.Value;
+
+            void ApplySavedStatus(AccelerateProjectGroupDTO group)
+            {
+                if (group.Items == null) return;
+                foreach (var item in group.Items)
+                {
+                    item.Enable = status?.Contains(item.Id.ToString()) == true;
+                }
+            }
+
+            if (!ProxyDomains.Items.Any(x => x.Name == "GitHub SNI 加速"))
+            {
+                var group = BuiltInAccelerateProjects.CreateGitHubGroup();
+                ApplySavedStatus(group);
+                ProxyDomains.Insert(0, group);
+            }
+            if (!ProxyDomains.Items.Any(x => x.Name == "Hugging Face SNI 镜像"))
+            {
+                var group = BuiltInAccelerateProjects.CreateHuggingFaceGroup();
+                ApplySavedStatus(group);
+                ProxyDomains.Insert(0, group);
+            }
         }
 
         private Timer? timer;

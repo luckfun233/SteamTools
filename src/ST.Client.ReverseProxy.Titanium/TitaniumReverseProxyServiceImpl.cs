@@ -130,9 +130,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
     }
 
     /// <summary>
-    /// 带认证信息或签名参数的请求不能走公共镜像或第三方加速节点，否则私有仓库会 404，凭据也可能泄露。
+    /// 请求是否携带认证、会话 Cookie 或签名参数。
     /// </summary>
-    static bool ShouldBypassAcceleration(Request request)
+    static bool HasSensitiveCredentials(Request request)
     {
         if (request.Headers.GetFirstHeader("Authorization") != null)
             return true;
@@ -149,6 +149,17 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                query.Contains("signature=", StringComparison.OrdinalIgnoreCase) ||
                query.Contains("x-amz-signature", StringComparison.OrdinalIgnoreCase) ||
                query.Contains("jwt=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 带凭证的请求不能走公共镜像或第三方加速节点，否则私有仓库会 404，凭据也可能泄露。
+    /// 但同源 SNI/IP 伪装（Local）仍然允许，因为流量最终仍然到原始站点。
+    /// </summary>
+    static bool ShouldBypassThirdParty(AccelerateProjectDTO item, Request request)
+    {
+        if (!HasSensitiveCredentials(request))
+            return false;
+        return item.Redirect || item.ProxyType == ProxyType.ServerAccelerate;
     }
 
     /// <summary>
@@ -241,10 +252,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             {
                 if (e.HttpClient.Request.RequestUri.AbsoluteUri.IsDomainPattern(host, RegexOptions.IgnoreCase))
                 {
-                    if (ShouldBypassAcceleration(e.HttpClient.Request))
+                    if (ShouldBypassThirdParty(item, e.HttpClient.Request))
                     {
-                        // 带认证、会话 Cookie 或签名参数的请求只允许直连原始主机，
-                        // 避免凭据进入公共镜像或第三方加速节点。
+                        // 镜像/第三方节点不能接触凭证；SNI/IP 伪装仍然可以用于私有仓库。
                         return;
                     }
 
@@ -271,7 +281,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                         var ip = await GetReverseProxyIp(addres, ProxyDNS, item.ForwardDomainIsNameOrIP);
                         if (ip == null || IPAddress.IsLoopback(ip) || ip.Equals(IPAddress.Any))
                             goto exit;
-                        e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, item.PortId);
+                        e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, item.PortId > 0 ? item.PortId : 443);
                     }
 
                     if (!string.IsNullOrEmpty(item.UserAgent))
@@ -291,8 +301,11 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                         if (!string.IsNullOrEmpty(item.ServerName))
                         {
                             var sni = e.HttpClient.ConnectRequest.ClientHelloInfo.Extensions["server_name"];
-                            e.HttpClient.ConnectRequest.ClientHelloInfo.Extensions["server_name"] =
-                                new SslExtension(sni.Value, sni.Name, item.ServerName, sni.Position);
+                            if (sni != null)
+                            {
+                                e.HttpClient.ConnectRequest.ClientHelloInfo.Extensions["server_name"] =
+                                    new SslExtension(sni.Value, sni.Name, item.ServerName, sni.Position);
+                            }
                         }
                         else
                         {
@@ -542,9 +555,10 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
                     if (e.SniHostName.IsDomainPattern(h, RegexOptions.IgnoreCase))
                     {
-                        // IP/服务端中转规则可以在不解密 TLS 的情况下换出口，
-                        // 这样无需安装根证书，Authorization/Cookie 也能端到端保留。
-                        if ((item.ProxyType == ProxyType.Local || item.ProxyType == ProxyType.ServerAccelerate) &&
+                        // 免证书模式下，IP/服务端中转规则可以在不解密 TLS 的情况下换出口。
+                        // 有根证书时不要在这里关闭 MITM，否则 SNI/IP 伪装不会生效。
+                        if (!IsRootCertificateInstalled &&
+                            (item.ProxyType == ProxyType.Local || item.ProxyType == ProxyType.ServerAccelerate) &&
                             !item.ForwardDomainIsNameOrIP &&
                             !string.IsNullOrEmpty(item.ForwardDomainIP))
                         {
@@ -560,11 +574,8 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                             return Task.CompletedTask;
                         }
 
-                        if (!item.Redirect)
-                        {
-                            e.ForwardHttpsHostName = string.IsNullOrEmpty(item.ServerName) ? e.SniHostName : item.ServerName;
-                            e.ForwardHttpsPort = item.PortId > 0 ? item.PortId : 443;
-                        }
+                        // 上游目标与 SNI 伪装统一交给 OnRequest 处理：
+                        // 这样带凭证的请求可以在看到 Authorization/Cookie 后再决定是否走第三方节点。
                         e.DecryptSsl = true;
                         return Task.CompletedTask;
                     }
@@ -601,8 +612,11 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                     var isLocalOrServer = item.ProxyType == ProxyType.Local ||
                                           item.ProxyType == ProxyType.ServerAccelerate;
 
-                    // IP/服务端中转规则不做 MITM，直接换出口，保留原始 SNI 和请求头。
-                    if (isLocalOrServer && !item.ForwardDomainIsNameOrIP && !string.IsNullOrEmpty(item.ForwardDomainIP))
+                    // 免证书模式下，IP/服务端中转规则不做 MITM，直接换出口，保留原始 SNI 和请求头。
+                    if (!IsRootCertificateInstalled &&
+                        isLocalOrServer &&
+                        !item.ForwardDomainIsNameOrIP &&
+                        !string.IsNullOrEmpty(item.ForwardDomainIP))
                     {
                         var ip = await GetReverseProxyIp(item.ForwardDomainIP, ProxyDNS, false);
                         if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
@@ -620,7 +634,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                     }
 
                     e.DecryptSsl = true;
-                    if (isLocalOrServer)
+                    if (item.ProxyType == ProxyType.Local)
                     {
                         var addres = item.ForwardDomainIsNameOrIP ? item.ForwardDomainName : item.ForwardDomainIP;
                         var ip = await GetReverseProxyIp(addres, ProxyDNS, item.ForwardDomainIsNameOrIP);
