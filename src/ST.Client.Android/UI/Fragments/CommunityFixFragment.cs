@@ -53,10 +53,11 @@ namespace System.Application.UI.Fragments
             void SetProxyModeText()
             {
                 var proxyMode = ProxySettings.ProxyModeValue;
+                var certificateLess = ProxySettings.IsCertificateLessMode.Value ? "（免证书模式）" : string.Empty;
                 binding!.tvProxyMode.Text = proxyMode switch
                 {
-                    ProxyMode.ProxyOnly => $"{AppResources.CommunityFix_ProxyMode}：{ProxySettings.ToStringByProxyMode(proxyMode)}{Environment.NewLine}IPEndPoint: {proxyS.ProxyIp}:{proxyS.ProxyPort}",
-                    _ => $"{AppResources.CommunityFix_ProxyMode}：{ProxySettings.ToStringByProxyMode(proxyMode)}",
+                    ProxyMode.ProxyOnly => $"{AppResources.CommunityFix_ProxyMode}：{ProxySettings.ToStringByProxyMode(proxyMode)}{certificateLess}{Environment.NewLine}IPEndPoint: {proxyS.ProxyIp}:{proxyS.ProxyPort}",
+                    _ => $"{AppResources.CommunityFix_ProxyMode}：{ProxySettings.ToStringByProxyMode(proxyMode)}{certificateLess}",
                 };
             }
 
