@@ -361,6 +361,10 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }
 
         //host模式下不启用加速会出现无限循环问题
+        if (ProxyRuleEngine.Current.IsExcluded(e.HttpClient.Request.RequestUri.Host))
+        {
+            return;
+        }
         if (ProxyDomains is null || TwoLevelAgentEnable || (OnlyEnableProxyScript && ProxyMode == ProxyMode.Hosts))
         {
             var hostRule = ProxyRuleEngine.Current.Match(e.HttpClient.Request.RequestUri.Host, e.HttpClient.Request.RequestUri.AbsolutePath);
@@ -674,6 +678,10 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
     Task TransparentProxyEndPoint_BeforeSslAuthenticate(object sender, BeforeSslAuthenticateEventArgs e)
     {
         e.DecryptSsl = false;
+        if (ProxyRuleEngine.Current.IsExcluded(e.SniHostName))
+        {
+            return Task.CompletedTask;
+        }
         if (ProxyDomains is null)
         {
             if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName))
@@ -745,6 +753,11 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
     async Task ExplicitProxyEndPoint_BeforeTunnelConnectRequest(object sender, TunnelConnectSessionEventArgs e)
     {
         e.DecryptSsl = false;
+        if (e.HttpClient?.Request?.Host != null &&
+            ProxyRuleEngine.Current.IsExcluded(e.HttpClient.Request.Host))
+        {
+            return;
+        }
         if (ProxyDomains is null || e.HttpClient?.Request?.Host == null)
         {
             if (e.HttpClient?.Request?.Host != null &&
