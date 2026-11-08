@@ -226,7 +226,7 @@ namespace System.Application.Services.Implementation
         static bool IsRewriteAllowed(string? host)
         {
             if (string.IsNullOrEmpty(host)) return false;
-            foreach (var pattern in ProxySettings.SniRewriteDomains.Value.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var pattern in ProxySettings.SniRewriteDomains.Value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 if (DomainPatternMatcher.IsMatch(host, pattern.Trim())) return true;
             }
