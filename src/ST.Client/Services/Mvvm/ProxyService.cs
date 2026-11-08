@@ -482,6 +482,7 @@ namespace System.Application.Services
             }
 
             LoadOrSaveLocalAccelerate();
+            MergeBuiltInAccelerate();
 
             if (IsLoadImage && ProxyDomains.Items.Any_Nullable())
             {
@@ -538,6 +539,15 @@ namespace System.Application.Services
                         ProxyDomains.AddRange(accelerates!);
                 }
             }
+        }
+
+        /// <summary>
+        /// 合并不依赖服务端下发的内置加速项目。
+        /// </summary>
+        void MergeBuiltInAccelerate()
+        {
+            if (ProxyDomains.Items.Any(x => x.Name == "Hugging Face")) return;
+            ProxyDomains.Add(BuiltInAccelerateProjects.CreateHuggingFaceGroup());
         }
 
         private Timer? timer;
