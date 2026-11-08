@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Android.Runtime;
@@ -194,6 +195,22 @@ namespace System.Application.UI.Activities
         void SetProxySettingsTwoLevelAgent() => binding!.swProxySettingsTwoLevelAgent.Checked = TwoLevelAgentEnable.Value;
 
         void SetIsVpnMode() => binding!.swIsVpnMode.Checked = ProxyModeValue == ProxyMode.VPN;
+
+        public override bool OnCreateOptionsMenu(IMenu? menu)
+        {
+            menu?.Add(0, 1001, 0, "实验性设置");
+            return true;
+        }
+
+        public override bool OnOptionsItemSelected(IMenuItem item)
+        {
+            if (item.ItemId == 1001)
+            {
+                StartActivity(new Intent(this, typeof(ExperimentalSettingsActivity)));
+                return true;
+            }
+            return base.OnOptionsItemSelected(item);
+        }
 
         protected override void OnDestroy()
         {

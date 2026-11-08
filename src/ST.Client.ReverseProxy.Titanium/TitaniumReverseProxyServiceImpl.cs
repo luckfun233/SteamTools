@@ -1,4 +1,5 @@
 using System.Application.Models;
+using System.Application.ProxyRules;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -43,6 +44,12 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
     public IPAddress[] DefaultDnsServers => IDnsAnalysisService.DNS_Alis;
 
     public override ICertificateManager CertificateManager { get; }
+
+    protected override void OnException(Exception exception)
+    {
+        base.OnException(exception);
+        ProxyDiagnostics.Error("Proxy", exception.ToString());
+    }
 
     public override bool ProxyRunning => proxyServer.ProxyRunning;
 
@@ -202,6 +209,123 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }.Uri;
     }
 
+    async Task<bool> TryApplyRuleAsync(SessionEventArgs e, ProxyRule rule)
+    {
+        var request = e.HttpClient.Request;
+        var host = request.RequestUri.Host;
+        var sensitive = HasSensitiveCredentials(request);
+
+        ProxyDiagnostics.Info("Rule", $"{host}{request.RequestUri.PathAndQuery} -> {rule.Description ?? rule.DomainPattern}");
+
+        if (rule.Block)
+        {
+            e.TerminateSession();
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(rule.Redirect))
+        {
+            if (sensitive)
+            {
+                ProxyDiagnostics.Info("Rule", $"跳过镜像（凭证）: {host}");
+                return false;
+            }
+
+            var uri = BuildRuleRedirectUri(request.RequestUri, rule.Redirect);
+            if (uri != null)
+            {
+                request.RequestUri = uri;
+                ProxyDiagnostics.Info("Rule", $"重定向: {host} -> {uri.Host}");
+                return true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(rule.Proxy))
+        {
+            if (sensitive)
+            {
+                ProxyDiagnostics.Info("Rule", $"跳过第三方反代（凭证）: {host}");
+                return false;
+            }
+
+            var proxyHost = GetHost(rule.Proxy);
+            var ip = await GetReverseProxyIp(proxyHost, ProxyDNS, true);
+            if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
+            {
+                e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, 443);
+                ApplySniOverride(e, rule.Sni ?? rule.VerifyHost ?? proxyHost);
+                return true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(rule.Sni) || !string.IsNullOrEmpty(rule.VerifyHost))
+        {
+            var preset = rule.PresetIps.FirstOrDefault();
+            if (!string.IsNullOrEmpty(preset))
+            {
+                var ip = await GetReverseProxyIp(preset, ProxyDNS, false);
+                if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
+                {
+                    e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, 443);
+                }
+            }
+            ApplySniOverride(e, rule.Sni ?? rule.VerifyHost);
+            return true;
+        }
+
+        if (rule.PresetIps.Count > 0 && !sensitive)
+        {
+            var ip = await GetReverseProxyIp(rule.PresetIps[0], ProxyDNS, false);
+            if (ip != null && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any))
+            {
+                e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, 443);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static string GetHost(string value)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri)) return uri.Host;
+        return value.Split('/')[0];
+    }
+
+    static Uri? BuildRuleRedirectUri(Uri original, string target)
+    {
+        if (target.Contains("{path}", StringComparison.Ordinal))
+        {
+            target = target.Replace("{path}", original.AbsolutePath);
+        }
+        if (target.Contains("{args}", StringComparison.Ordinal))
+        {
+            target = target.Replace("{args}", original.Query);
+        }
+        if (!target.Contains("://", StringComparison.Ordinal))
+        {
+            target = "https://" + target.TrimStart('/');
+        }
+        if (!Uri.TryCreate(target, UriKind.Absolute, out var baseUri)) return null;
+        if (target.Contains("{path}", StringComparison.Ordinal) ||
+            target.Contains("{args}", StringComparison.Ordinal))
+        {
+            return baseUri;
+        }
+        var combined = target.TrimEnd('/') + original.PathAndQuery;
+        return Uri.TryCreate(combined, UriKind.Absolute, out var result) ? result : baseUri;
+    }
+
+    static void ApplySniOverride(SessionEventArgs e, string? sni)
+    {
+        if (string.IsNullOrEmpty(sni)) return;
+        var extensions = e.HttpClient.ConnectRequest?.ClientHelloInfo?.Extensions;
+        if (extensions == null) return;
+        var current = extensions["server_name"];
+        if (current == null) return;
+        extensions["server_name"] = new SslExtension(current.Value, current.Name, sni, current.Position);
+    }
+
     async Task OnRequest(object sender, SessionEventArgs e)
     {
 #if DEBUG
@@ -237,7 +361,21 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }
 
         //host模式下不启用加速会出现无限循环问题
-        if (ProxyDomains is null || TwoLevelAgentEnable || (OnlyEnableProxyScript && ProxyMode == ProxyMode.Hosts)) return;
+        if (ProxyDomains is null || TwoLevelAgentEnable || (OnlyEnableProxyScript && ProxyMode == ProxyMode.Hosts))
+        {
+            var hostRule = ProxyRuleEngine.Current.Match(e.HttpClient.Request.RequestUri.Host, e.HttpClient.Request.RequestUri.AbsolutePath);
+            if (hostRule != null && await TryApplyRuleAsync(e, hostRule))
+            {
+                return;
+            }
+            return;
+        }
+
+        var devSidecarRule = ProxyRuleEngine.Current.Match(e.HttpClient.Request.RequestUri.Host, e.HttpClient.Request.RequestUri.AbsolutePath);
+        if (devSidecarRule != null && await TryApplyRuleAsync(e, devSidecarRule))
+        {
+            return;
+        }
 
         //var item = ProxyDomains.FirstOrDefault(f => f.DomainNamesArray.Any(h => e.HttpClient.Request.RequestUri.AbsoluteUri.Contains(h, StringComparison.OrdinalIgnoreCase)));
 
@@ -497,6 +635,10 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
             proxyServer.Start();
 
+            ProxyDiagnostics.Initialize();
+            ProxyDiagnostics.Info("Proxy", $"启动: mode={ProxyMode}, certless={IsCertificateLessMode}, rootCert={IsRootCertificateInstalled}, socks5={Socks5ProxyEnable}, rules={ProxyRuleEngine.Current.Rules.Count}");
+            SniSidecarService.Start();
+
             if (ProxyMode == ProxyMode.System)
             {
                 if (!DesktopBridge.IsRunningAsUwp && OperatingSystem2.IsWindows())
@@ -534,6 +676,10 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         e.DecryptSsl = false;
         if (ProxyDomains is null)
         {
+            if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName))
+            {
+                e.DecryptSsl = true;
+            }
             return Task.CompletedTask;
         }
         if (e.SniHostName.Contains(LocalDomain, StringComparison.OrdinalIgnoreCase) || TwoLevelAgentEnable)
@@ -588,6 +734,11 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         //    e.TerminateSession();
         //    return Task.CompletedTask;
         //}
+        if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName))
+        {
+            e.DecryptSsl = true;
+            ProxyDiagnostics.Info("Rule", $"TLS MITM(DevSidecar): {e.SniHostName}");
+        }
         return Task.CompletedTask;
     }
 
@@ -596,6 +747,12 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         e.DecryptSsl = false;
         if (ProxyDomains is null || e.HttpClient?.Request?.Host == null)
         {
+            if (e.HttpClient?.Request?.Host != null &&
+                IsRootCertificateInstalled &&
+                ProxyRuleEngine.Current.DomainRequiresMitm(e.HttpClient.Request.Host))
+            {
+                e.DecryptSsl = true;
+            }
             return;
         }
         if (e.HttpClient.Request.Host.Contains(LocalDomain, StringComparison.OrdinalIgnoreCase) || TwoLevelAgentEnable || OnlyEnableProxyScript)
@@ -653,6 +810,11 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         //    e.TerminateSession();
         //    return Task.CompletedTask;
         //}
+        if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.HttpClient.Request.Host))
+        {
+            e.DecryptSsl = true;
+            ProxyDiagnostics.Info("Rule", $"TLS MITM(DevSidecar): {e.HttpClient.Request.Host}");
+        }
         return;
     }
 
@@ -668,6 +830,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                 proxyServer.ClientCertificateSelectionCallback -= OnCertificateSelection;
                 proxyServer.Stop();
             }
+
+            SniSidecarService.Stop();
+            ProxyDiagnostics.Info("Proxy", "已停止");
 
             if (ProxyMode == ProxyMode.System)
             {

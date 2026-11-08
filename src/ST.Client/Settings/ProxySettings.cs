@@ -189,6 +189,94 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public static SerializableProperty<bool> IsCertificateLessMode { get; }
         = GetProperty(defaultValue: false, autoSave: false);
 
+    #region 实验性加速设置
+
+    /// <summary>
+    /// 是否加载 DevSidecar 兼容规则（remote_config.json5）。
+    /// </summary>
+    public static SerializableProperty<bool> EnableDevSidecarRules { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// DevSidecar 远程配置地址。
+    /// </summary>
+    public static SerializableProperty<string> DevSidecarConfigUrl { get; }
+        = GetProperty(defaultValue: "https://ds-official-config.bestar.de5.net/remote_config.json5", autoSave: false);
+
+    /// <summary>
+    /// 启动加速时是否同步 DevSidecar 配置。
+    /// </summary>
+    public static SerializableProperty<bool> SyncDevSidecarConfigOnStartup { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// 启用免证书 SNI 分片（通过本地 sidecar SOCKS5）。
+    /// </summary>
+    public static SerializableProperty<bool> EnableSniFragment { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// 启用免证书 SNI 改写（实验性，按域名白名单）。
+    /// </summary>
+    public static SerializableProperty<bool> EnableSniRewrite { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    /// <summary>
+    /// SNI 改写目标，默认 baidu.com。
+    /// </summary>
+    public static SerializableProperty<string> SniRewriteHost { get; }
+        = GetProperty(defaultValue: "baidu.com", autoSave: false);
+
+    /// <summary>
+    /// 允许做 SNI 改写的域名，分号分隔；默认只包含 GitHub 相关域名。
+    /// </summary>
+    public static SerializableProperty<string> SniRewriteDomains { get; }
+        = GetProperty(defaultValue: "github.com;api.github.com;github.githubassets.com;avatars.githubusercontent.com;camo.githubusercontent.com;collector.github.com;raw.githubusercontent.com;gist.githubusercontent.com;objects.githubusercontent.com;release-assets.githubusercontent.com;user-images.githubusercontent.com;private-user-images.githubusercontent.com;media.githubusercontent.com", autoSave: false);
+
+    /// <summary>
+    /// SNI 分片大小（字节）。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentChunkSize { get; }
+        = GetProperty(defaultValue: 2, autoSave: false);
+
+    /// <summary>
+    /// SNI 分片之间的延迟（毫秒）。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentDelayMilliseconds { get; }
+        = GetProperty(defaultValue: 5, autoSave: false);
+
+    /// <summary>
+    /// SNI sidecar 的本地 SOCKS5 端口。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentPortId { get; }
+        = GetProperty(defaultValue: 8869, autoSave: false);
+
+    /// <summary>
+    /// 是否写入代理诊断日志。
+    /// </summary>
+    public static SerializableProperty<bool> EnableProxyDiagnostics { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// 代理诊断日志保留天数。
+    /// </summary>
+    public static SerializableProperty<int> ProxyDiagnosticsRetentionDays { get; }
+        = GetProperty(defaultValue: 7, autoSave: false);
+
+    /// <summary>
+    /// 单个代理诊断日志文件的最大大小（KB），超过后切分。
+    /// </summary>
+    public static SerializableProperty<int> ProxyDiagnosticsMaxFileSizeKB { get; }
+        = GetProperty(defaultValue: 4096, autoSave: false);
+
+    /// <summary>
+    /// 增强模式下仅让浏览器走 VPN/MITM，避免其它应用因证书问题断网。
+    /// </summary>
+    public static SerializableProperty<bool> EnableBrowserOnlyVpn { get; }
+        = GetProperty(defaultValue: false, autoSave: false);
+
+    #endregion
+
     public static string ToStringByProxyMode(EProxyMode mode) => mode switch
     {
         EProxyMode.DNSIntercept => AppResources.ProxyMode_DNSIntercept,

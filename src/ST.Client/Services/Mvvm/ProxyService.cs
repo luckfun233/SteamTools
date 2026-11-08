@@ -4,6 +4,8 @@ using MessagePack;
 using ReactiveUI;
 using System.Application.Models;
 using System.Application.Properties;
+using System.Application.ProxyRules;
+using System.Application.Services.Implementation;
 using System.Application.Settings;
 using System.Application.UI;
 using System.Application.UI.Resx;
@@ -483,6 +485,24 @@ namespace System.Application.Services
 
             LoadOrSaveLocalAccelerate();
             MergeBuiltInAccelerate();
+            if (ProxySettings.EnableDevSidecarRules.Value)
+            {
+                if (ProxySettings.SyncDevSidecarConfigOnStartup.Value)
+                {
+                    await ProxyRuleEngine.ReloadAsync();
+                }
+                else
+                {
+                    ProxyRuleEngine.LoadFromCache();
+                }
+            }
+            else
+            {
+                ProxyRuleEngine.Clear();
+            }
+
+            // 提前启动免证书 SNI sidecar，避免 VPN/tun2socks 启动时端口还没就绪。
+            SniSidecarService.Start();
 
             if (IsLoadImage && ProxyDomains.Items.Any_Nullable())
             {
@@ -870,6 +890,7 @@ namespace System.Application.Services
                 }
             }
             reverseProxyService.Dispose();
+            SniSidecarService.Stop();
         }
 
         public IPAddress ProxyIp => reverseProxyService.ProxyIp;

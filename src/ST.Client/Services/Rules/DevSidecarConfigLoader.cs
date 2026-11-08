@@ -1,0 +1,296 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace System.Application.ProxyRules
+{
+    /// <summary>
+    /// 读取并转换 DevSidecar 的 remote_config.json5（只实现代理相关子集）。
+    /// </summary>
+    public static class DevSidecarConfigLoader
+    {
+        public const string DefaultConfigUrl = "https://ds-official-config.bestar.de5.net/remote_config.json5";
+
+        static readonly HttpClient httpClient = new()
+        {
+            Timeout = TimeSpan.FromSeconds(20),
+        };
+
+        public static string GetCacheFilePath()
+            => Path.Combine(IOPath.AppDataDirectory, "DevSidecar", "remote_config.json5");
+
+        public static async Task<ProxyRuleSet> LoadAsync(
+            string? url = null,
+            CancellationToken cancellationToken = default)
+        {
+            var cachePath = GetCacheFilePath();
+            url = string.IsNullOrWhiteSpace(url) ? DefaultConfigUrl : url.Trim();
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.TryAddWithoutValidation("User-Agent", "WattToolkit-Android-DevSidecarCompat/1.0");
+                using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    throw new InvalidDataException("DevSidecar 配置内容为空");
+                }
+
+                try
+                {
+                    var dir = Path.GetDirectoryName(cachePath);
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var tmp = cachePath + ".tmp";
+                    File.WriteAllText(tmp, json);
+                    if (File.Exists(cachePath)) File.Delete(cachePath);
+                    File.Move(tmp, cachePath);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("DevSidecarConfig", ex, "缓存 DevSidecar 配置失败");
+                }
+
+                var rules = Parse(json);
+                Log.Info("DevSidecarConfig", $"已加载 {rules.Rules.Count} 条规则: {url}");
+                return rules;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("DevSidecarConfig", ex, $"下载 DevSidecar 配置失败，尝试本地缓存: {url}");
+                try
+                {
+                    if (File.Exists(cachePath))
+                    {
+                        var rules = Parse(File.ReadAllText(cachePath));
+                        Log.Info("DevSidecarConfig", $"已加载本地缓存规则 {rules.Rules.Count} 条");
+                        return rules;
+                    }
+                }
+                catch (Exception cacheEx)
+                {
+                    Log.Warn("DevSidecarConfig", cacheEx, "读取 DevSidecar 本地缓存失败");
+                }
+                return ProxyRuleSet.Empty;
+            }
+        }
+
+        public static ProxyRuleSet Parse(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json, new JsonDocumentOptions
+                {
+                    AllowTrailingCommas = true,
+                    CommentHandling = JsonCommentHandling.Skip,
+                    MaxDepth = 64,
+                });
+                return Convert(doc.RootElement);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("DevSidecarConfig", ex, "解析 DevSidecar 配置失败");
+                return ProxyRuleSet.Empty;
+            }
+        }
+
+        static ProxyRuleSet Convert(JsonElement root)
+        {
+            var rules = new List<ProxyRule>();
+            var excludes = new List<string>();
+            var presetIps = new Dictionary<string, IReadOnlyList<string>>();
+
+            if (TryGetObject(root, "server", out var server))
+            {
+                if (TryGetObject(server, "preSetIpList", out var preset))
+                {
+                    foreach (var item in preset.EnumerateObject())
+                    {
+                        var ips = ReadIpList(item.Value);
+                        if (ips.Count > 0) presetIps[item.Name] = ips;
+                    }
+                }
+
+                if (TryGetObject(server, "intercepts", out var intercepts))
+                {
+                    foreach (var domainItem in intercepts.EnumerateObject())
+                    {
+                        if (domainItem.Value.ValueKind != JsonValueKind.Object) continue;
+
+                        foreach (var pathItem in domainItem.Value.EnumerateObject())
+                        {
+                            if (pathItem.Value.ValueKind != JsonValueKind.Object) continue;
+
+                            var action = pathItem.Value;
+                            var rule = new ProxyRule
+                            {
+                                DomainPattern = domainItem.Name,
+                                PathPattern = pathItem.Name == ".*" ? null : pathItem.Name,
+                                Sni = GetString(action, "sni"),
+                                VerifyHost = GetString(action, "verifyHost"),
+                                Redirect = NormalizeTarget(GetString(action, "redirect")),
+                                Proxy = NormalizeTarget(GetString(action, "proxy")),
+                                UnVerifySsl = GetBool(action, "unVerifySsl"),
+                                Description = GetString(action, "desc"),
+                            };
+
+                            if (TryGetBool(action, "abort", out var abort) && abort)
+                            {
+                                rule = new ProxyRule
+                                {
+                                    DomainPattern = rule.DomainPattern,
+                                    PathPattern = rule.PathPattern,
+                                    Block = true,
+                                    Description = rule.Description,
+                                };
+                            }
+
+                            if (rule.RequiresMitm || rule.Block)
+                            {
+                                rules.Add(rule);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (TryGetObject(root, "proxy", out var proxy))
+            {
+                if (TryGetObject(proxy, "excludeIpList", out var exclude))
+                {
+                    foreach (var item in exclude.EnumerateObject())
+                    {
+                        if (item.Value.ValueKind == JsonValueKind.True)
+                        {
+                            excludes.Add(item.Name);
+                        }
+                    }
+                }
+            }
+
+            // 把预置 IP 挂到对应域名的规则上，便于后续多 IP 选择。
+            for (var i = 0; i < rules.Count; i++)
+            {
+                var rule = rules[i];
+                if (rule.PresetIps.Count == 0 && presetIps.TryGetValue(rule.DomainPattern, out var ips))
+                {
+                    rules[i] = new ProxyRule
+                    {
+                        DomainPattern = rule.DomainPattern,
+                        PathPattern = rule.PathPattern,
+                        Sni = rule.Sni,
+                        VerifyHost = rule.VerifyHost,
+                        Redirect = rule.Redirect,
+                        Proxy = rule.Proxy,
+                        Block = rule.Block,
+                        UnVerifySsl = rule.UnVerifySsl,
+                        Description = rule.Description,
+                        PresetIps = ips,
+                    };
+                }
+            }
+
+            // DevSidecar 的 overwall 中继目标先记录为日志，不自动启用第三方中继。
+            if (TryGetObject(root, "plugin", out var plugin) &&
+                TryGetObject(plugin, "overwall", out var overwall) &&
+                TryGetObject(overwall, "targets", out var targets))
+            {
+                var count = 0;
+                foreach (var _ in targets.EnumerateObject()) count++;
+                if (count > 0)
+                {
+                    Log.Info("DevSidecarConfig", $"检测到 overwall 中继目标 {count} 条，当前版本不自动启用");
+                }
+            }
+
+            return new ProxyRuleSet(rules, excludes, presetIps);
+        }
+
+        static IReadOnlyList<string> ReadIpList(JsonElement element)
+        {
+            var result = new List<string>();
+            if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var ip in element.EnumerateArray())
+                {
+                    if (ip.ValueKind == JsonValueKind.String)
+                    {
+                        var value = ip.GetString();
+                        if (!string.IsNullOrWhiteSpace(value)) result.Add(value);
+                    }
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var ip in element.EnumerateObject())
+                {
+                    if (ip.Value.ValueKind == JsonValueKind.True ||
+                        ip.Value.ValueKind == JsonValueKind.Object)
+                    {
+                        result.Add(ip.Name);
+                    }
+                }
+            }
+            return result;
+        }
+
+        static string? NormalizeTarget(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            value = value.Trim();
+            if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Warn("DevSidecarConfig", $"忽略非 HTTPS 目标: {value}");
+                return null;
+            }
+            if (!value.Contains("://", StringComparison.Ordinal))
+            {
+                value = "https://" + value.TrimStart('/');
+            }
+            return value;
+        }
+
+        static bool TryGetObject(JsonElement element, string name, out JsonElement value)
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty(name, out value) &&
+                value.ValueKind == JsonValueKind.Object)
+            {
+                return true;
+            }
+            value = default;
+            return false;
+        }
+
+        static string? GetString(JsonElement element, string name)
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty(name, out var value) &&
+                value.ValueKind == JsonValueKind.String)
+            {
+                return value.GetString();
+            }
+            return null;
+        }
+
+        static bool GetBool(JsonElement element, string name)
+            => TryGetBool(element, name, out var value) && value;
+
+        static bool TryGetBool(JsonElement element, string name, out bool value)
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                element.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.True) { value = true; return true; }
+                if (prop.ValueKind == JsonValueKind.False) { value = false; return true; }
+            }
+            value = false;
+            return false;
+        }
+    }
+}

@@ -29,6 +29,7 @@
   <ItemGroup>
     <PackageReference Include="NLog" />
     <PackageReference Include="NLog.Extensions.Logging" />
+    <PackageReference Include="System.Text.Json" />
     <PackageReference Include="NotifyIcon.Base" />
     <PackageReference Include="SharpZipLib" />
     <!--<PackageReference Include="Titanium.Web.Proxy" />-->

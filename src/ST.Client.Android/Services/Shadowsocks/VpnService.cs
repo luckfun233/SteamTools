@@ -3,6 +3,7 @@ using Android.App;
 using Android.Content;
 using Android.Runtime;
 using System.Application.Services.Implementation;
+using System.Application.Settings;
 using static System.Application.Services.Native.IServiceBase;
 using AndroidX.Core.App;
 using static System.Properties.ThisAssembly;
@@ -98,7 +99,8 @@ namespace System.Application.Services.Native
                     var ip = IPAddress.Any.Equals(s.ProxyIp) || IPAddress.IPv6Any.Equals(s.ProxyIp)
                         ? IPAddress.Loopback
                         : s.ProxyIp;
-                    return $"{ip}:{s.Socks5ProxyPortId}";
+                    var port = SniSidecarService.IsRunning ? SniSidecarService.Port : s.Socks5ProxyPortId;
+                    return $"{ip}:{port}";
                 }
             }
 
@@ -116,7 +118,42 @@ namespace System.Application.Services.Native
                 builder.AddAddress("da26:2626::1", 126);
                 builder.AddRoute("2000::", 3);
                 builder.AddDisallowedApplication(PackageName!);
+
+                if (!ProxySettings.IsCertificateLessMode.Value && ProxySettings.EnableBrowserOnlyVpn.Value)
+                {
+                    var added = 0;
+                    foreach (var package in BrowserPackageNames)
+                    {
+                        try
+                        {
+                            builder.AddAllowedApplication(package);
+                            added++;
+                        }
+                        catch
+                        {
+                            // 未安装的浏览器直接跳过
+                        }
+                    }
+                    if (added > 0)
+                    {
+                        ProxyDiagnostics.Info("Vpn", $"增强模式仅代理浏览器，已加入 {added} 个包");
+                    }
+                }
             }
+
+            static readonly string[] BrowserPackageNames =
+            {
+                "com.android.chrome",
+                "org.mozilla.firefox",
+                "com.microsoft.emmx",
+                "com.brave.browser",
+                "com.opera.browser",
+                "com.sec.android.app.sbrowser",
+                "com.quark.browser",
+                "com.UCMobile",
+                "com.tencent.mtt",
+                "com.android.browser",
+            };
 
             public override IList<string> Tun2socksArgs
             {
