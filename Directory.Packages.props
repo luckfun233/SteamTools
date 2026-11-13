@@ -73,6 +73,10 @@
     <PackageVersion Include="System.Diagnostics.Tracing" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
+    <!-- BCL(All TFM) -->
+    <PackageVersion Include="System.Text.Json" Version="6.0.2" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Microsoft.* -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.4.0" />
     <!--<PackageVersion Include="Microsoft.Windows.CsWinRT" Version="1.4.1" />-->

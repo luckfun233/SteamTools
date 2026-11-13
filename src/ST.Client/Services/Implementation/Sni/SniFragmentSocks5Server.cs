@@ -255,7 +255,7 @@ namespace System.Application.Services.Implementation
                 var presetIp = await ResolveTargetIpAsync(host, port, excluded, cancellationToken).ConfigureAwait(false);
                 if (presetIp != null)
                 {
-                    await target.ConnectAsync(new IPEndPoint(presetIp, port)).ConfigureAwait(false);
+                    await target.ConnectAsync(presetIp.ToString(), port).ConfigureAwait(false);
                 }
                 else
                 {
@@ -861,6 +861,7 @@ namespace System.Application.Services.Implementation
             }
 
             public byte[]? Data { get; }
+
             public bool TimedOut { get; }
         }
 
@@ -890,8 +891,11 @@ namespace System.Application.Services.Implementation
             }
 
             public SocksCommand Command { get; }
+
             public string? HostName { get; }
+
             public IPAddress? Address { get; }
+
             public int Port { get; }
         }
     }

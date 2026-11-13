@@ -26,17 +26,27 @@ namespace System.Application.Services.Implementation
         static readonly ConcurrentDictionary<string, long> hostFallbacks = new(StringComparer.OrdinalIgnoreCase);
 
         public static long Connections => Interlocked.Read(ref connections);
+
         public static long Fragmented => Interlocked.Read(ref fragmented);
+
         public static long Rewritten => Interlocked.Read(ref rewritten);
+
         public static long PresetIp => Interlocked.Read(ref presetIp);
+
         public static long Relayed => Interlocked.Read(ref relayed);
+
         public static long Failures => Interlocked.Read(ref failures);
+
         public static long Fallbacks => Interlocked.Read(ref fallbacks);
+
         public static long Reconnects => Interlocked.Read(ref reconnects);
+
         public static long BytesUp => Interlocked.Read(ref bytesUp);
+
         public static long BytesDown => Interlocked.Read(ref bytesDown);
 
         public static void OnConnection() => Interlocked.Increment(ref connections);
+
         public static void OnFragment() => Interlocked.Increment(ref fragmented);
 
         public static void OnFragment(TlsFragmentStrategy strategy)
@@ -46,12 +56,19 @@ namespace System.Application.Services.Implementation
         }
 
         public static void OnRewrite() => Interlocked.Increment(ref rewritten);
+
         public static void OnPresetIp() => Interlocked.Increment(ref presetIp);
+
         public static void OnRelay() => Interlocked.Increment(ref relayed);
+
         public static void OnFailure() => Interlocked.Increment(ref failures);
+
         public static void OnFallback() => Interlocked.Increment(ref fallbacks);
+
         public static void OnReconnect() => Interlocked.Increment(ref reconnects);
+
         public static void OnBytesUp(long value) => Interlocked.Add(ref bytesUp, value);
+
         public static void OnBytesDown(long value) => Interlocked.Add(ref bytesDown, value);
 
         public static void OnHostFallback(string host)

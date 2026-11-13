@@ -2,7 +2,7 @@ using System.Application.Models;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
-using EProxyType = System.Application.Models.ProxyType;
+using EProxyType = System.Application.ProxyType;
 
 namespace System.Application.Services.Implementation
 {

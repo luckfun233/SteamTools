@@ -109,6 +109,7 @@ namespace System.Application.Services.Implementation
         sealed class CacheItem
         {
             public string Ip { get; init; } = string.Empty;
+
             public DateTime ExpireAt { get; init; }
         }
     }
