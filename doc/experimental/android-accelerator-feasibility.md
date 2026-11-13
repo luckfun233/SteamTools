@@ -144,17 +144,89 @@
 
 ### 5.2 SNI 分片策略
 
-本项目实现三种策略：
+本项目实现六种策略：
 
-| 策略 | 行为 | 说明 |
+| 策略 | 行为 | 适用场景 |
 |---|---|---|
-| 固定大小 | 每 N 字节一个 TCP 段 | 最细，但段数多、开销大 |
-| SNI 边界 | 在 SNI 主机名首字节处拆成三段 | 推荐；任何一段都不含完整域名 |
-| TLS 记录头 | 拆 record header / handshake header | 最温和，强度较弱 |
+| 固定大小 | 每 N 字节一个 TCP 段 | 兼容选项，段数多、开销大 |
+| SNI 边界 | 在 SNI 主机名首字节处拆成三段 | 通用；任何一段都不含完整域名 |
+| TLS 记录头 | 拆 record header / handshake header | 兼容选项，强度较弱 |
+| SNI 多段 | 把域名拆成 2~8 段 | 域名较长、首段 DPI 检查时更稳 |
+| TLS record 拆分 | 重新封装成多个合法 TLS record，并让 SNI 跨 record | 对“重组 TCP 但逐 record 检查”的 DPI 有效 |
+| 随机分片 | 随机大小 TCP 段 | 降低固定长度指纹 |
 
-ClientHello 可能跨多个 TCP 读事件到达。sidecar 会先按 TLS record 长度缓冲完整 ClientHello，再做改写/分片；解析失败则原样转发。
+ClientHello 可能跨多个 TCP 读事件到达。sidecar 会先按 TLS record 长度缓冲完整 ClientHello，再做改写/分片；解析失败则原样转发。TLS record 拆分不是简单切片，而是重新写 record 头；接收端会按 TLS 规范跨 record 重组 handshake。
 
-### 5.3 DoH/DoT
+### 5.3 其他绕过方式对比
+
+| 方式 | 本项目可行性 | 能解决什么 | 主要限制 |
+|---|---|---|---|
+| TCP 分段 | 已实现 | 只检查首包/前几包的 DPI | 会重组 TCP 的 DPI 无效 |
+| TLS record 拆分 | 已实现 | 重组 TCP、逐 record 检查的 DPI | 会重组 handshake 的 DPI 无效 |
+| SNI 改写 | 已实现（实验） | 个别忽略 SNI 的源站 | 证书校验通常失败，不通用 |
+| SNI 伪装（MITM） | 已实现 | 基于 SNI 的阻断 | 需要根证书；pinning 应用不可用 |
+| 镜像/反代 | 已实现 | 公开资源下载 | 不能接触凭证；依赖第三方可用性 |
+| 预置 IP / DoH | 已实现 | DNS 污染、部分 IP 黑洞 | 不解决 SNI/IP 封锁 |
+| 可信 SOCKS5 中继 | 已实现 | IP/SNI 阻断，最稳 | 需要节点；速度取决于节点 |
+| 按应用分流 | 已实现 | 避免误伤不信任证书的应用 | 只能决定是否进 VPN |
+| ECH | 不可由本代理强制 | 加密整个 ClientHello | 需要客户端与服务端都支持 ECH；代理无法替应用发起 |
+| 域前置（domain fronting） | 不可用 | 借 CDN 隐藏目标 | 需要服务端/CDN 配合，主流 CDN 已限制 |
+| TTL 伪造 / 假包 / 乱序 / 序列重叠 | 不可用 | 对抗更复杂的 DPI | 需要 raw socket / NFQUEUE / root；VpnService 用户态 TCP 无法直接改包 |
+| QUIC / HTTP3 中继 | 未实现 | 部分应用的 UDP 流量 | 当前 sidecar 不支持 UDP ASSOCIATE，需要 UDP relay |
+
+结论：在非 root Android 上，应用层能稳定做到的是 **TLS record 拆分 + 延迟抖动 + 自动回退 + 中继**。TTL/假包/乱序属于需要 root 或内核转发的方案，不适合放进当前 VpnService 架构。
+
+### 5.3.1 SNI 分片稳定性实验（2026-11）
+
+测试方法：本机 TLS 1.3 服务器 + 可编程 TCP 代理模拟四种 DPI：
+
+1. `first`：只检查连接的第一个 TCP 段。
+2. `tcp`：等待 150ms，重组客户端 TCP 流后检查。
+3. `record`：重组 TCP 后逐 TLS record 检查 payload。
+4. `handshake`：重组 TLS record 后再拼接 handshake 检查。
+
+ClientHello 517 字节，SNI 偏移 127。分片之间间隔 20ms（模拟 sidecar 默认行为）。
+
+| 策略 | first | tcp | record | handshake |
+|---|---|---|---|---|
+| 不分片 | 阻断 | 阻断 | 阻断 | 阻断 |
+| SNI 边界（TCP 3 段） | 通过 | 阻断 | 阻断 | 阻断 |
+| SNI 多段（3 段） | 通过 | 阻断 | 阻断 | 阻断 |
+| 固定 64B | 通过 | 阻断 | 阻断 | 阻断 |
+| TLS 记录头 | 通过 | 阻断 | 阻断 | 阻断 |
+| **TLS record @SNI** | **通过** | **通过** | **通过** | 阻断 |
+| **TLS record 64B** | **通过** | **通过** | **通过** | 阻断 |
+| 随机 32B | 通过 | 阻断 | 阻断 | 阻断 |
+
+延迟与重组窗口（TCP 重组 DPI，窗口 150ms）：
+
+| 分片间隔 | 结果 |
+|---|---|
+| 0ms | 阻断 |
+| 10ms | 阻断 |
+| 50ms | 阻断 |
+| 100ms | 阻断 |
+| 200ms | 通过（但每次握手额外增加约 400ms） |
+
+分片不友好中间设备 + 自动回退：
+
+| 场景 | 结果 |
+|---|---|
+| 不分片 | 成功 |
+| 分片、无回退 | 失败 |
+| 分片失败后重连不分片 | 成功 |
+
+随机分片：20 次随机 16~96B 分片，对 first-packet DPI 成功 20/20。
+
+结论：
+
+- TCP 分段只能对抗首包 DPI；一旦 DPI 重组 TCP 就失效。
+- TLS record 拆分能同时通过 first / tcp / record 三种模拟，是目前最强的免证书应用层方案。
+- 任何应用层分片都无法对抗会重组 handshake 的 DPI；这类网络只能依赖可信中继。
+- 把分片间隔调到 200ms 可以跨过 150ms 的重组窗口，但延迟代价明显；默认 10ms 更实用。
+- 自动回退对“分片被中间设备丢弃”的网络有效，应默认开启。
+
+### 5.4 DoH/DoT
 
 - DoH 定义见 RFC 8484：<https://www.rfc-editor.org/rfc/rfc8484>
 - 作用：绕过 DNS 污染，拿到干净 IP。
@@ -172,7 +244,7 @@ ClientHello 可能跨多个 TCP 读事件到达。sidecar 会先按 TLS record �
 
 - 可信 SOCKS5 中继是免证书场景下最可靠的 IP/SNI 阻断绕过方式。
 - TLS 仍然端到端；中继看不到 `Authorization`/`Cookie`。
-- 本项目 sidecar 支持 SOCKS5 上游中继，支持无认证和用户名/密码认证。排除列表内的域名不会走中继。
+- 本项目 sidecar 支持 SOCKS5 上游中继，支持无认证和用户名/密码认证。排除列表内的域名不会走中继；还可以用“中继生效域名”限制只有指定域名走中继。
 
 ## 6. 本项目架构
 
@@ -235,26 +307,68 @@ DevSidecar 没有组的概念，本项目按域名关键字归类：
 - **Hugging Face SNI 镜像**：主站、`cdn-lfs*`，上游 `huggingface.cn`。
 - **Pixiv / P站 SNI 加速**：`i.pximg.net`、`s.pximg.net`、`a.pixiv.org`、`www.fanbox.cc`、`api.fanbox.cc`，SNI 伪装为 `baidu.com`；图片请求自动补 `Referer: https://www.pixiv.net/`。
 
-### 6.5 当前代码对应
+### 6.5 自定义规则（与远程规则合并）
+
+自定义规则保存在应用数据目录的 `DevSidecar/custom_rules.json`，格式与 DevSidecar 相同，但可以省略 `server` 包装，也允许 JSON5 注释、单引号和尾随逗号：
+
+```json5
+{
+  intercepts: {
+    "example.com": {
+      ".*": { sni: "baidu.com", desc: "示例" }
+    },
+    "downloads.example.com": {
+      "^/(repo|release)/.*": {
+        redirect: "https://ghp.ci/https://downloads.example.com"
+      }
+    }
+  },
+  preSetIpList: {
+    "example.com": ["1.2.3.4", "5.6.7.8"]
+  },
+  excludeIpList: {
+    "*.local": true
+  }
+}
+```
+
+合并规则：
+
+1. 自定义规则优先于远程规则，同域名/同路径时先命中自定义。
+2. 远程规则仍按规则组过滤；自定义规则不受远程组开关影响，只受“启用自定义规则”总开关控制。
+3. 排除列表取并集；预置 IP 同键时自定义覆盖远程。
+4. 自定义规则支持 `sni`、`verifyHost`、`redirect`、`proxy`、`backup`、`abort`、`desc`、`requestReplace.headers`、`responseReplace.headers`。
+5. 保存前会先解析校验，失败不会覆盖现有文件；保存成功后立即生效，无需重启代理。
+
+设置页提供两种编辑方式：
+
+- 文本编辑器：直接粘贴完整 DevSidecar 规则，支持校验、复制、插入示例、清空。
+- 快速添加/删除：按域名、路径、动作和值生成规则，再回写到编辑器，避免手写 JSON 结构。
+
+### 6.6 当前代码对应
 
 | 模块 | 文件 |
 |---|---|
 | JSON5 规整 | `src/ST.Client/Services/Rules/Json5.cs` |
 | 规则模型/匹配/合并 | `src/ST.Client/Services/Rules/ProxyRule.cs` |
 | 规则组归类 | `src/ST.Client/Services/Rules/ProxyRuleGroups.cs` |
+| 自定义规则存储/序列化 | `src/ST.Client/Services/Rules/CustomProxyRules.cs` |
 | DevSidecar 配置解析 | `src/ST.Client/Services/Rules/DevSidecarConfigLoader.cs` |
-| 规则引擎入口/组过滤 | `src/ST.Client/Services/Rules/ProxyRuleEngine.cs` |
+| 规则引擎入口/组过滤/合并 | `src/ST.Client/Services/Rules/ProxyRuleEngine.cs` |
 | 预置 IP 选路 | `src/ST.Client/Services/Implementation/PresetIpSelector.cs` |
 | DoH 解析 | `src/ST.Client/Services/Implementation/DohResolver.cs` |
 | SNI sidecar | `src/ST.Client/Services/Implementation/Sni/SniFragmentSocks5Server.cs` |
-| SNI 运行统计 | `src/ST.Client/Services/Implementation/Sni/SniSidecarStats.cs` |
-| SNI 自测 | `src/ST.Client/Services/Implementation/Sni/SniConnectivityTester.cs` |
-| TLS ClientHello | `src/ST.Client/Services/Implementation/Sni/TlsClientHello.cs` |
+| SNI 运行统计/回退缓存 | `src/ST.Client/Services/Implementation/Sni/SniSidecarStats.cs` |
+| SNI 自测/策略矩阵 | `src/ST.Client/Services/Implementation/Sni/SniConnectivityTester.cs` |
+| TLS ClientHello/record 拆分 | `src/ST.Client/Services/Implementation/Sni/TlsClientHello.cs` |
+| 实验室测试/报告 | `src/ST.Client/Services/Implementation/AcceleratorLabService.cs` |
 | 诊断日志 | `src/ST.Client/Services/Implementation/ProxyDiagnostics.cs` |
 | 内置加速组 | `src/ST.Client/Services/Implementation/BuiltInAccelerateProjects.cs` |
 | Titanium 接入 | `src/ST.Client.ReverseProxy.Titanium/TitaniumReverseProxyServiceImpl.cs` |
 | VPN 出口选择 | `src/ST.Client.Android/Services/Shadowsocks/VpnService.cs` |
 | 实验设置页 | `src/ST.Client.Android/UI/Activities/ExperimentalSettingsActivity.cs` |
+| 自定义规则页 | `src/ST.Client.Android/UI/Activities/CustomRulesActivity.cs` |
+| 加速实验室页 | `src/ST.Client.Android/UI/Activities/AcceleratorLabActivity.cs` |
 | 实验设置项 | `src/ST.Client/Settings/ProxySettings.cs` |
 
 ## 7. 安全模型
@@ -276,31 +390,56 @@ DevSidecar 没有组的概念，本项目按域名关键字归类：
 - 规则命中：GitHub SNI、Hugging Face `verifyHost`、Pixiv Referer、jsDelivr `backup`、Google `${pre}` 命名组。
 - 域名匹配：通配符、精确匹配、混合 `(*account*|scholar)`、负向前瞻、IPv6。
 - ClientHello：解析 SNI、加长/缩短改写、删除扩展、record/handshake 长度一致。
-- 分片：固定大小、SNI 边界、TLS 记录头三种策略重组后与原始字节完全一致；SNI 边界三段均不含完整主机名。
-- 仓库内 NUnit 测试 6 项全部通过；独立 sidecar 端到端测试 3 种策略握手全部成功。
+- 分片：固定大小、SNI 边界、TLS 记录头、SNI 多段、TLS record 拆分、随机分片；可重组的策略重组后与原始字节完全一致，SNI 相关策略各段均不含完整主机名。
+- 自定义规则：简化/完整格式解析、分组标记、预置 IP/排除合并、优先级覆盖、序列化往返。
+- 仓库内 NUnit 测试 11 项全部通过；独立 sidecar 端到端测试 6 种策略握手全部成功，并验证了分片失败后的自动回退重连。
 
 ### 8.2 SNI 分片实验室结果
 
-测试方法：本机 Python TLS 服务器 + 模拟 DPI 的 TCP 代理。DPI 有两种模式：
+测试方法：本机 Python TLS 1.3 服务器 + 可编程 TCP 代理模拟四种 DPI：
 
-1. **first-packet**：只检查客户端连接的第一个 TCP 段，包含被阻断域名就断开。
-2. **reassembling**：等待 150ms，把客户端发来的所有字节重组成流后再检查。
+1. `first`：只检查客户端连接的第一个 TCP 段。
+2. `tcp`：等待 150ms，重组客户端 TCP 流后检查。
+3. `record`：重组 TCP 后逐 TLS record 检查 payload。
+4. `handshake`：重组 TLS record 后再拼接 handshake 检查。
 
-使用 Python `ssl.MemoryBIO` 生成真实 TLS 1.3 ClientHello（517 字节，SNI 偏移 127），分别用不同策略发送：
+ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 
-| 策略 | first-packet DPI | reassembling DPI | TLS 握手 |
-|---|---|---|---|
-| 不分片 | 被阻断 | 被阻断 | 失败 |
-| SNI 边界（3 段） | 通过 | 被阻断 | 成功 / 失败 |
-| 固定 64B | 通过 | 被阻断 | 成功 / 失败 |
-| 固定 2B | 通过 | 被阻断 | 成功 / 失败 |
-| TLS 记录头（5+4+rest） | 通过 | 被阻断 | 成功 / 失败 |
+| 策略 | first | tcp | record | handshake |
+|---|---|---|---|---|
+| 不分片 | 阻断 | 阻断 | 阻断 | 阻断 |
+| SNI 边界（TCP 3 段） | 通过 | 阻断 | 阻断 | 阻断 |
+| SNI 多段（3 段） | 通过 | 阻断 | 阻断 | 阻断 |
+| 固定 64B | 通过 | 阻断 | 阻断 | 阻断 |
+| TLS 记录头 | 通过 | 阻断 | 阻断 | 阻断 |
+| **TLS record @SNI** | **通过** | **通过** | **通过** | 阻断 |
+| **TLS record 64B** | **通过** | **通过** | **通过** | 阻断 |
+| 随机分片 | 通过 | 阻断 | 阻断 | 阻断 |
+
+延迟与重组窗口（TCP 重组 DPI，窗口 150ms）：
+
+| 分片间隔 | 结果 |
+|---|---|
+| 0 / 10 / 50 / 100ms | 阻断 |
+| 200ms | 通过（每次握手额外约 400ms） |
+
+分片不友好中间设备 + 自动回退：
+
+| 场景 | 结果 |
+|---|---|
+| 不分片 | 成功 |
+| 分片、无回退 | 失败 |
+| 分片失败后重连不分片 | 成功 |
+
+随机分片：20 次随机 16~96B 分片，对 first-packet DPI 成功 20/20。
 
 结论：
 
-- SNI 分片对“只看首包/前几包”的 DPI 有效，且 TLS 握手可以正常完成。
-- 对“会等一小段时间重组 TCP 流”的 DPI 完全无效。
-- 因此不能把 SNI 分片宣传为通用绕过方案；它只是一个低成本、可开关的尝试项。真正稳定的是可信中继。
+- TCP 分段只能对抗首包/前几包 DPI；一旦 DPI 重组 TCP 就失效。
+- TLS record 拆分能同时通过 first / tcp / record 三种模拟，是目前最强的免证书应用层方案。
+- 任何应用层分片都无法对抗会重组 handshake 的 DPI；这类网络只能依赖可信中继。
+- 把分片间隔调到 200ms 可以跨过 150ms 的重组窗口，但延迟代价明显；默认 10ms 更实用。
+- 自动回退对“分片被中间设备丢弃”的网络有效，应默认开启。
 
 ### 8.3 真机验证计划
 
@@ -323,19 +462,38 @@ DevSidecar 没有组的概念，本项目按域名关键字归类：
 - 应用：Git 客户端、GitHub App、Hugging Face 客户端、Pixiv 客户端、普通银行/DRM 应用（验证不被误伤）。
 - 证书：用户 CA、系统 CA（root）、未安装证书三种状态。
 
-### 8.4 应用内自测
+### 8.4 应用内实验室
 
-实验设置页提供“测试 SNI 分片是否有效”：
+实验设置页提供两个入口：
 
-1. 直连目标域名做 TLS 握手（忽略证书校验，只测连通性）。
-2. 通过本地 sidecar 做同样的握手。
-3. 输出成功/失败、耗时、当前策略、DoH/中继状态和运行统计。
+**SNI 快速自测**：输入域名，分别做直连 TLS 和 sidecar TLS 握手，输出结果、耗时、当前策略、DoH/中继状态和运行统计。
+
+**加速实验室**（`AcceleratorLabActivity`）把只能在真机上验证的项目集中到一次运行：
+
+1. 规则集：自定义/远程/排除/预置 IP 数量与错误。
+2. 当前设置快照。
+3. 系统 DNS 解析。
+4. DoH 解析（启用时）。
+5. TCP 443 连接。
+6. 直连 TLS 握手。
+7. Sidecar TLS 握手（当前策略）。
+8. Titanium 代理 HTTP（读取 `github.com/robots.txt`，信任本地根证书）。
+9. UDP 443 探测（仅证明本机可发出 UDP，不能判定是否被阻断）。
+10. 根证书与设备信息（厂商/型号/Android 版本/ABI/VPN 授权）。
+
+额外功能：
+
+- **分片策略矩阵**：依次运行 SNI 边界、SNI 多段、TLS record 拆分、固定大小、TLS 记录头、随机分片，每种重复 1~10 次，输出成功次数、中位耗时和最后错误。
+- **报告导出**：通过系统文件选择器（SAF）导出为 `.txt`，无需存储权限；内容包含设备信息、设置快照、测试结果、运行统计、回退域名和最近诊断日志。
+- **复制报告**：直接写入剪贴板，方便在手机上贴到聊天工具。
+- **清空统计**：同时清空运行统计和分片失败回退缓存。
 
 判读：
 
-- 直连失败 + sidecar 成功：当前策略很可能有效。
+- 直连失败 + Sidecar 成功：当前策略/预置 IP/中继很可能有效；关闭分片复测可进一步区分。
 - 两者都失败：IP 不可达、TLS 被重置，或分片不足以绕过当前 DPI；尝试预置 IP、DoH、中继。
 - 两者都成功：当前网络没有阻断该目标，无法据此判断分片效果。
+- 策略矩阵全部成功：通常说明网络未阻断；部分成功说明策略不稳定。
 
 ### 8.5 成功指标
 
@@ -350,14 +508,17 @@ DevSidecar 没有组的概念，本项目按域名关键字归类：
 实验设置页按组保存，修改后建议停止并重新启动加速：
 
 - **规则组**：GitHub / Hugging Face / Pixiv / Google / YouTube / Wikipedia / Docker / Reddit / Steam / 其它。
+- **自定义规则**：启用开关、管理页（文本编辑、校验、快速添加、删除、示例、复制、清空）。
 - **免证书模式**：VPN 出口切换为 sidecar。
-- **SNI 分片**：开关、策略、生效域名、仅 TLS、固定大小、间隔、最大缓冲、读取超时。
+- **SNI 分片**：开关、六种策略、生效域名、仅 TLS、分片大小、SNI 多段数、间隔、随机抖动、最大缓冲、读取超时。
+- **分片自动回退**：开关、首字节探测超时、跳过分片缓存分钟数。
 - **SNI 改写**：开关、目标域名（`none` 表示删除 SNI）、允许改写的域名。
 - **Sidecar 端口**：仅监听 127.0.0.1。
-- **上游 SOCKS5 中继**：地址、端口、用户名、密码。
+- **上游 SOCKS5 中继**：地址、端口、生效域名、用户名、密码。
 - **DoH**：开关、JSON 接口、失败是否回退系统 DNS。
 - **VPN**：增强模式仅浏览器走 VPN。
 - **日志**：开关、最低级别、是否保留主机名、保留天数、单文件上限、清理与查看目录。
+- **加速实验室**：一键测试、分片策略矩阵、导出/复制报告、清空统计。
 - **恢复默认值**：只重置实验设置，不修改代理端口/二级代理。
 
 ## 10. 已知缺口与路线图
@@ -368,8 +529,12 @@ DevSidecar 没有组的概念，本项目按域名关键字归类：
 4. **脚本/油猴**：`script`/`tampermonkeyScript` 只解析不执行。
 5. **`success`/`options`**：DevSidecar 的本地假响应和 OPTIONS 处理尚未完整实现。
 6. **规则更新签名**：远端配置只做 HTTPS/缓存，尚未做签名校验和回滚策略。
-7. **构建/真机验证**：当前 Linux 沙箱无 Android SDK/Xamarin.Android 12，需要在 macOS/Windows 或 CI 完成。
-8. **SNI 分片对抗升级**：当前实现只对抗首包 DPI；对重组型 DPI 只能依赖中继。
+7. **构建/真机验证**：当前 Linux 沙箱无 Android SDK/Xamarin.Android 12，需要在 macOS/Windows 或 CI 完成；实验室页需要在真机上跑一轮并导出报告。
+8. **分片对抗上限**：TLS record 拆分只能对抗到“逐 record 检查”的 DPI；会重组 handshake 的 DPI 只能依赖中继。
+9. **需要 root 的方案**：TTL 伪造、假包、乱序、TCP 序列重叠需要 raw socket / NFQUEUE / 内核转发，当前 VpnService 用户态架构不实现。
+10. **ECH**：无法由代理替应用发起；需要客户端与服务端协商 ECH，且 Android 17 起才有平台级支持。
+11. **自定义规则的执行范围**：只执行代理相关子集，不支持 DevSidecar 的 Node 脚本、`cacheDays`、`success`/`options`。
+12. **策略矩阵的判定局限**：如果当前网络没有阻断目标，所有策略都会成功，矩阵无法证明分片有效；需要在不阻断/阻断两种网络下对比。
 
 ## 11. 参考资料
 
@@ -386,3 +551,8 @@ DevSidecar 没有组的概念，本项目按域名关键字归类：
 - MPL-2.0：<https://www.mozilla.org/en-US/MPL/2.0/>
 - ByeDPI（SNI 分片/desync 参考实现）：<https://github.com/hufrea/byedpi>
 - GoodbyeDPI（DPI 绕过参考）：<https://github.com/ValdikSS/GoodbyeDPI>
+- GreenTunnel（TCP split 与 `--tls-records` 记录拆分）：<https://www.npmjs.com/package/green-tunnel>
+- Zapret 2 去同步文档（multisplit、seqovl、fake、TTL）：<https://wiki.zapret.moe/Zapret2/desync/>
+- SpoofDPI（首字节拆分实践）：<https://salehgnutux.github.io/GT-NEWSTECH/en/foss/spoofdpi-anti-censorship-tool/>
+- ECH 与 SNI 阻断 2026 指南：<https://vpn.how/en/pages/ech-and-sni-blocking-in-2026-the-complete-guide-to-setup-and-dpi-circumvention.html>
+- Android 17 平台 ECH 支持：<https://www.engadget.com/2245189/google-deploys-support-encrypted-client-hello-on-android-17/>

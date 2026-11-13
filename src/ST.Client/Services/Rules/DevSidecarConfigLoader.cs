@@ -99,7 +99,24 @@ namespace System.Application.ProxyRules
         }
 
         public static ProxyRuleSet Parse(string json)
+            => Parse(json, null);
+
+        public static ProxyRuleSet Parse(string json, string? groupOverride)
         {
+            return TryParse(json, groupOverride, out var rules, out _) ? rules : ProxyRuleSet.Empty;
+        }
+
+        /// <summary>
+        /// 解析配置并返回错误信息，供自定义规则页校验使用。
+        /// </summary>
+        public static bool TryParse(
+            string json,
+            string? groupOverride,
+            out ProxyRuleSet rules,
+            out string? error)
+        {
+            rules = ProxyRuleSet.Empty;
+            error = null;
             try
             {
                 var normalized = Json5.ToJson(json);
@@ -109,92 +126,76 @@ namespace System.Application.ProxyRules
                     CommentHandling = JsonCommentHandling.Skip,
                     MaxDepth = 64,
                 });
-                return Convert(doc.RootElement);
+                rules = Convert(doc.RootElement, groupOverride);
+                if (rules.Rules.Count == 0 &&
+                    rules.PresetIps.Count == 0 &&
+                    rules.ExcludePatterns.Count == 0)
+                {
+                    error = "没有解析到任何规则，请检查 intercepts 的域名和路径结构。";
+                }
+                return true;
             }
             catch (Exception ex)
             {
+                error = ex.Message;
                 Log.Warn("DevSidecarConfig", ex, "解析 DevSidecar 配置失败");
-                return ProxyRuleSet.Empty;
+                return false;
             }
         }
 
-        static ProxyRuleSet Convert(JsonElement root)
+        static ProxyRuleSet Convert(JsonElement root, string? groupOverride)
         {
             var rules = new List<ProxyRule>();
             var excludes = new List<string>();
             var presetIps = new Dictionary<string, IReadOnlyList<string>>();
 
+            JsonElement intercepts = default;
+            var hasIntercepts = false;
+
             if (TryGetObject(root, "server", out var server))
             {
                 if (TryGetObject(server, "preSetIpList", out var preset))
                 {
-                    foreach (var item in preset.EnumerateObject())
-                    {
-                        var ips = ReadIpList(item.Value);
-                        if (ips.Count > 0) presetIps[item.Name] = ips;
-                    }
+                    ReadPresetIps(preset, presetIps);
                 }
-
-                if (TryGetObject(server, "intercepts", out var intercepts))
+                hasIntercepts = TryGetObject(server, "intercepts", out intercepts);
+            }
+            else
+            {
+                // 自定义规则允许省略 server 包装，直接写 intercepts / preSetIpList / excludeIpList。
+                if (TryGetObject(root, "preSetIpList", out var preset))
                 {
-                    foreach (var domainItem in intercepts.EnumerateObject())
-                    {
-                        if (domainItem.Value.ValueKind != JsonValueKind.Object) continue;
-
-                        var group = ProxyRuleGroups.Classify(domainItem.Name);
-
-                        foreach (var pathItem in domainItem.Value.EnumerateObject())
-                        {
-                            if (pathItem.Value.ValueKind != JsonValueKind.Object) continue;
-
-                            var action = pathItem.Value;
-                            var rule = new ProxyRule
-                            {
-                                DomainPattern = domainItem.Name,
-                                Group = group,
-                                PathPattern = pathItem.Name == ".*" ? null : pathItem.Name,
-                                Sni = GetString(action, "sni"),
-                                VerifyHost = GetString(action, "verifyHost"),
-                                Redirect = NormalizeTarget(GetString(action, "redirect")),
-                                Proxy = NormalizeTarget(GetString(action, "proxy")),
-                                BackupProxies = ReadTargetList(action, "backup"),
-                                RequestHeaders = ReadHeaderReplacements(action, "requestReplace"),
-                                ResponseHeaders = ReadHeaderReplacements(action, "responseReplace"),
-                                UnVerifySsl = GetBool(action, "unVerifySsl"),
-                                Description = GetString(action, "desc") ?? GetString(action, "remark"),
-                            };
-
-                            if (TryGetBool(action, "abort", out var abort) && abort)
-                            {
-                                rule = CloneWithBlock(rule);
-                            }
-
-                            if (rule.RequiresMitm || rule.Block)
-                            {
-                                rules.Add(rule);
-                            }
-                        }
-                    }
+                    ReadPresetIps(preset, presetIps);
                 }
+
+                if (TryGetObject(root, "intercepts", out var directIntercepts))
+                {
+                    intercepts = directIntercepts;
+                    hasIntercepts = true;
+                }
+                else if (IsInterceptMap(root))
+                {
+                    intercepts = root;
+                    hasIntercepts = true;
+                }
+            }
+
+            if (hasIntercepts)
+            {
+                ConvertIntercepts(intercepts, groupOverride, rules);
             }
 
             if (TryGetObject(root, "proxy", out var proxy))
             {
                 if (TryGetObject(proxy, "excludeIpList", out var exclude))
                 {
-                    foreach (var item in exclude.EnumerateObject())
-                    {
-                        // DevSidecar 里 null/false 表示从排除列表移除，只有 true 才排除。
-                        if (item.Value.ValueKind == JsonValueKind.True)
-                        {
-                            excludes.Add(item.Name);
-                        }
-                    }
+                    ReadExcludes(exclude, excludes);
                 }
             }
-
-            // 预置 IP 在运行时按主机名查询（ProxyRuleSet.GetPresetIps），
-            // 因为 dev-sidecar 的 preSetIpList 键本身也可能是通配符或正则。
+            else if (TryGetObject(root, "excludeIpList", out var directExclude))
+            {
+                ReadExcludes(directExclude, excludes);
+            }
 
             // DevSidecar 的 overwall 中继目标先记录为日志，不自动启用第三方中继。
             if (TryGetObject(root, "plugin", out var plugin) &&
@@ -210,6 +211,116 @@ namespace System.Application.ProxyRules
             }
 
             return new ProxyRuleSet(rules, excludes, presetIps);
+        }
+
+        static void ConvertIntercepts(
+            JsonElement intercepts,
+            string? groupOverride,
+            List<ProxyRule> rules)
+        {
+            foreach (var domainItem in intercepts.EnumerateObject())
+            {
+                if (IsReservedKey(domainItem.Name)) continue;
+                if (domainItem.Value.ValueKind != JsonValueKind.Object) continue;
+
+                var group = groupOverride ?? ProxyRuleGroups.Classify(domainItem.Name);
+
+                foreach (var pathItem in domainItem.Value.EnumerateObject())
+                {
+                    if (pathItem.Value.ValueKind != JsonValueKind.Object) continue;
+
+                    var action = pathItem.Value;
+                    var rule = new ProxyRule
+                    {
+                        DomainPattern = domainItem.Name,
+                        Group = group,
+                        PathPattern = pathItem.Name == ".*" ? null : pathItem.Name,
+                        Sni = GetString(action, "sni"),
+                        VerifyHost = GetString(action, "verifyHost"),
+                        Redirect = NormalizeTarget(GetString(action, "redirect")),
+                        Proxy = NormalizeTarget(GetString(action, "proxy")),
+                        BackupProxies = ReadTargetList(action, "backup"),
+                        RequestHeaders = ReadHeaderReplacements(action, "requestReplace"),
+                        ResponseHeaders = ReadHeaderReplacements(action, "responseReplace"),
+                        UnVerifySsl = GetBool(action, "unVerifySsl"),
+                        Description = GetString(action, "desc") ?? GetString(action, "remark"),
+                    };
+
+                    if (TryGetBool(action, "abort", out var abort) && abort)
+                    {
+                        rule = CloneWithBlock(rule);
+                    }
+
+                    if (rule.RequiresMitm || rule.Block)
+                    {
+                        rules.Add(rule);
+                    }
+                }
+            }
+        }
+
+        static void ReadPresetIps(
+            JsonElement preset,
+            Dictionary<string, IReadOnlyList<string>> presetIps)
+        {
+            foreach (var item in preset.EnumerateObject())
+            {
+                var ips = ReadIpList(item.Value);
+                if (ips.Count > 0) presetIps[item.Name] = ips;
+            }
+        }
+
+        static void ReadExcludes(JsonElement exclude, List<string> excludes)
+        {
+            foreach (var item in exclude.EnumerateObject())
+            {
+                // DevSidecar 里 null/false 表示从排除列表移除，只有 true 才排除。
+                if (item.Value.ValueKind == JsonValueKind.True)
+                {
+                    excludes.Add(item.Name);
+                }
+            }
+        }
+
+        static readonly string[] reservedKeys =
+        {
+            "server", "proxy", "plugin", "app", "help", "intercepts",
+            "preSetIpList", "excludeIpList", "compatible", "ech",
+        };
+
+        static bool IsReservedKey(string name)
+        {
+            foreach (var key in reservedKeys)
+            {
+                if (string.Equals(name, key, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 判断根对象是否直接就是“域名 → 路径 → 动作”的映射。
+        /// </summary>
+        static bool IsInterceptMap(JsonElement root)
+        {
+            if (root.ValueKind != JsonValueKind.Object) return false;
+
+            var count = 0;
+            foreach (var domain in root.EnumerateObject())
+            {
+                if (IsReservedKey(domain.Name)) continue;
+                if (domain.Value.ValueKind != JsonValueKind.Object) return false;
+
+                foreach (var path in domain.Value.EnumerateObject())
+                {
+                    if (path.Value.ValueKind != JsonValueKind.Object &&
+                        path.Value.ValueKind != JsonValueKind.Null)
+                    {
+                        return false;
+                    }
+                }
+                count++;
+            }
+            return count > 0;
         }
 
         static ProxyRule CloneWithBlock(ProxyRule rule) => new()

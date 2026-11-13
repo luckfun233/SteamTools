@@ -220,6 +220,12 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: ProxyRuleGroups.DefaultEnabled, autoSave: false);
 
     /// <summary>
+    /// 是否启用用户自定义规则。自定义规则与远程规则合并，且优先匹配。
+    /// </summary>
+    public static SerializableProperty<bool> EnableCustomRules { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
     /// 启用免证书 SNI 分片（通过本地 sidecar SOCKS5）。
     /// </summary>
     public static SerializableProperty<bool> EnableSniFragment { get; }
@@ -234,6 +240,39 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public const int SniFragmentStrategyFixed = 0;
     public const int SniFragmentStrategySniBoundary = 1;
     public const int SniFragmentStrategyRecord = 2;
+    public const int SniFragmentStrategySniPieces = 3;
+    public const int SniFragmentStrategyTlsRecordSplit = 4;
+    public const int SniFragmentStrategyRandom = 5;
+
+    /// <summary>
+    /// SNI 多段分片时把域名拆成几段。
+    /// </summary>
+    public static SerializableProperty<int> SniSplitPieces { get; }
+        = GetProperty(defaultValue: 3, autoSave: false);
+
+    /// <summary>
+    /// 分片之间的随机抖动上限（毫秒），0 表示固定延迟。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentJitterMilliseconds { get; }
+        = GetProperty(defaultValue: 0, autoSave: false);
+
+    /// <summary>
+    /// 分片后如果上游立刻断开，自动重连并改用不分组重试一次。
+    /// </summary>
+    public static SerializableProperty<bool> EnableSniFragmentFallback { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// 分片后等待上游首字节的时间（毫秒），用于判断是否被重置。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentFallbackProbeMilliseconds { get; }
+        = GetProperty(defaultValue: 1200, autoSave: false);
+
+    /// <summary>
+    /// 分片失败后，对该域名跳过自动分片的缓存时间（分钟）。
+    /// </summary>
+    public static SerializableProperty<int> SniFragmentFallbackCacheMinutes { get; }
+        = GetProperty(defaultValue: 10, autoSave: false);
 
     /// <summary>
     /// 只对列出的域名做 SNI 分片/改写，分号分隔；为空表示全部域名。
@@ -311,6 +350,12 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public static SerializableProperty<int> SniUpstreamRelayPort { get; }
         = GetProperty(defaultValue: 7890, autoSave: false);
 
+    /// <summary>
+    /// 只让列出的域名走中继，分号分隔；为空表示全部（排除列表除外）。
+    /// </summary>
+    public static SerializableProperty<string> SniUpstreamRelayDomains { get; }
+        = GetProperty(defaultValue: string.Empty, autoSave: false);
+
     public static SerializableProperty<string> SniUpstreamRelayUserName { get; }
         = GetProperty(defaultValue: string.Empty, autoSave: false);
 
@@ -382,6 +427,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         SyncDevSidecarConfigOnStartup.Value = false;
         DevSidecarConfigUrl.Value = DefaultDevSidecarConfigUrl;
         DevSidecarRuleGroups.Value = ProxyRuleGroups.DefaultEnabled;
+        EnableCustomRules.Value = true;
 
         IsCertificateLessMode.Value = false;
 
@@ -389,6 +435,11 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         SniFragmentStrategy.Value = SniFragmentStrategySniBoundary;
         SniFragmentChunkSize.Value = 64;
         SniFragmentDelayMilliseconds.Value = 10;
+        SniSplitPieces.Value = 3;
+        SniFragmentJitterMilliseconds.Value = 0;
+        EnableSniFragmentFallback.Value = true;
+        SniFragmentFallbackProbeMilliseconds.Value = 1200;
+        SniFragmentFallbackCacheMinutes.Value = 10;
         SniFragmentMaxBufferBytes.Value = 16384;
         SniFragmentReadTimeoutMilliseconds.Value = 300;
         SniFragmentPortId.Value = 8869;
@@ -401,6 +452,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         EnableSniUpstreamRelay.Value = false;
         SniUpstreamRelayHost.Value = "127.0.0.1";
         SniUpstreamRelayPort.Value = 7890;
+        SniUpstreamRelayDomains.Value = string.Empty;
         SniUpstreamRelayUserName.Value = string.Empty;
         SniUpstreamRelayPassword.Value = string.Empty;
 

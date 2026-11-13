@@ -14,6 +14,15 @@ namespace System.Application.Services.Implementation
 
         /// <summary>按 TLS record 头和 handshake 头拆分。</summary>
         Record = 2,
+
+        /// <summary>把 SNI 拆成多段，每段单独发送。</summary>
+        SniPieces = 3,
+
+        /// <summary>把 ClientHello 重新封装成多个 TLS record，并让 SNI 跨 record。</summary>
+        TlsRecordSplit = 4,
+
+        /// <summary>随机大小分片。</summary>
+        Random = 5,
     }
 
     /// <summary>
@@ -162,11 +171,173 @@ namespace System.Application.Services.Implementation
             };
         }
 
-        public static IReadOnlyList<byte[]> Fragment(ReadOnlySpan<byte> data, TlsFragmentStrategy strategy, int chunkSize)
+        /// <summary>
+        /// 把 SNI 拆成多段，每段单独一个 TCP 段。段数越多，单段越难包含完整域名，但握手延迟越高。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentBySniPieces(ReadOnlySpan<byte> data, int pieces)
+        {
+            if (!TryGetSniRange(data, out var offset, out var length) || length < 2)
+            {
+                return Fragment(data, Math.Max(1, Math.Min(64, data.Length)));
+            }
+
+            pieces = Math.Max(2, Math.Min(Math.Min(8, length), pieces));
+            var result = new List<byte[]>(pieces + 1)
+            {
+                data.Slice(0, offset).ToArray(),
+            };
+
+            var baseSize = length / pieces;
+            var remainder = length % pieces;
+            var position = offset;
+            for (var i = 0; i < pieces; i++)
+            {
+                var size = baseSize + (i < remainder ? 1 : 0);
+                // 最后一段把 SNI 之后的剩余字节一起带走，减少段数。
+                var end = i == pieces - 1 ? data.Length : position + size;
+                result.Add(data.Slice(position, end - position).ToArray());
+                position = end;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 把 ClientHello 重新封装成多个 TLS record，并让 SNI 跨越 record 边界。
+        /// TLS 允许 handshake 消息跨 record，因此服务端可以正常重组；只按 record 检查的 DPI
+        /// 看不到完整域名。这是比纯 TCP 分片更强的一层拆分。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentToTlsRecords(ReadOnlySpan<byte> data)
+        {
+            if (!TryGetSniRange(data, out var sniOffset, out var sniLength) || sniLength < 2)
+            {
+                return FragmentToTlsRecordsFixed(data, 64);
+            }
+
+            // SNI 偏移是相对整个 record 的，转成 record payload 偏移。
+            var payloadOffset = sniOffset - 5;
+            var segments = new List<(int Start, int Length)>();
+            AddRecordSegment(segments, 0, payloadOffset);
+            AddRecordSegment(segments, payloadOffset, 1);
+            AddRecordSegment(segments, payloadOffset + 1, -1);
+            return BuildTlsRecords(data, segments);
+        }
+
+        /// <summary>
+        /// 按固定大小把第一个 record 的 handshake 负载切成多个 TLS record。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentToTlsRecordsFixed(ReadOnlySpan<byte> data, int chunkSize)
+        {
+            if (data.Length < 5 || data[0] != HandshakeContentType) return new[] { data.ToArray() };
+            if (chunkSize < 1) chunkSize = 1;
+
+            var recordLength = ReadUInt16(data, 3);
+            var recordEnd = 5 + recordLength;
+            if (recordEnd > data.Length || recordLength < 1) return new[] { data.ToArray() };
+
+            var segments = new List<(int Start, int Length)>();
+            for (var offset = 0; offset < recordLength; offset += chunkSize)
+            {
+                var length = Math.Min(chunkSize, recordLength - offset);
+                AddRecordSegment(segments, offset, length);
+            }
+            return BuildTlsRecords(data, segments);
+        }
+
+        public static IReadOnlyList<byte[]> FragmentRandom(ReadOnlySpan<byte> data, int maxChunkSize, Random? random = null)
+        {
+            maxChunkSize = Math.Max(1, maxChunkSize);
+            var result = new List<byte[]>();
+            var offset = 0;
+            while (offset < data.Length)
+            {
+                var size = random == null ? NextSharedRandom(maxChunkSize) : random.Next(1, maxChunkSize + 1);
+                var length = Math.Min(size, data.Length - offset);
+                result.Add(data.Slice(offset, length).ToArray());
+                offset += length;
+            }
+            return result;
+        }
+
+        static readonly Random sharedRandom = new();
+        static readonly object sharedRandomLock = new();
+
+        static int NextSharedRandom(int maxExclusive)
+        {
+            lock (sharedRandomLock) return sharedRandom.Next(1, maxExclusive + 1);
+        }
+
+        static void AddRecordSegment(List<(int Start, int Length)> segments, int start, int length)
+        {
+            const int maxRecordPayload = 16384;
+
+            // -1 表示一直延伸到 record payload 末尾。
+            if (length < 0)
+            {
+                segments.Add((start, -1));
+                return;
+            }
+
+            while (length > maxRecordPayload)
+            {
+                segments.Add((start, maxRecordPayload));
+                start += maxRecordPayload;
+                length -= maxRecordPayload;
+            }
+            if (length > 0) segments.Add((start, length));
+        }
+
+        static IReadOnlyList<byte[]> BuildTlsRecords(ReadOnlySpan<byte> data, List<(int Start, int Length)> segments)
+        {
+            if (data.Length < 5 || data[0] != HandshakeContentType) return new[] { data.ToArray() };
+
+            var recordLength = ReadUInt16(data, 3);
+            var recordEnd = 5 + recordLength;
+            if (recordEnd > data.Length || recordLength < 1) return new[] { data.ToArray() };
+
+            var versionMajor = data[1];
+            var versionMinor = data[2];
+            var result = new List<byte[]>(segments.Count + 1);
+
+            for (var i = 0; i < segments.Count; i++)
+            {
+                var (start, length) = segments[i];
+                var end = length < 0 ? recordLength : Math.Min(recordLength, start + length);
+                if (end <= start) continue;
+
+                var payloadLength = end - start;
+                var record = new byte[5 + payloadLength];
+                record[0] = HandshakeContentType;
+                record[1] = versionMajor;
+                record[2] = versionMinor;
+                record[3] = (byte)(payloadLength >> 8);
+                record[4] = (byte)payloadLength;
+                data.Slice(5 + start, payloadLength).CopyTo(record.AsSpan(5));
+                result.Add(record);
+            }
+
+            // 第一个 record 之后如果还有其它 record，原样保留。
+            if (recordEnd < data.Length)
+            {
+                result.Add(data.Slice(recordEnd).ToArray());
+            }
+
+            return result;
+        }
+
+        public static IReadOnlyList<byte[]> Fragment(
+            ReadOnlySpan<byte> data,
+            TlsFragmentStrategy strategy,
+            int chunkSize,
+            int pieces = 3,
+            Random? random = null)
             => strategy switch
             {
                 TlsFragmentStrategy.SniBoundary => FragmentBySni(data),
                 TlsFragmentStrategy.Record => FragmentByRecord(data),
+                TlsFragmentStrategy.SniPieces => FragmentBySniPieces(data, pieces),
+                TlsFragmentStrategy.TlsRecordSplit => FragmentToTlsRecords(data),
+                TlsFragmentStrategy.Random => FragmentRandom(data, chunkSize, random),
                 _ => Fragment(data, chunkSize),
             };
 

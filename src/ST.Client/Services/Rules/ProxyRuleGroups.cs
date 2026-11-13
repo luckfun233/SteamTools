@@ -40,6 +40,11 @@ namespace System.Application.ProxyRules
         public const string Steam = "steam";
         public const string Other = "other";
 
+        /// <summary>
+        /// 用户自定义规则的组 ID。该组不属于远程配置，始终参与匹配。
+        /// </summary>
+        public const string Custom = "custom";
+
         public const string DefaultEnabled = GitHub + ";" + HuggingFace + ";" + Pixiv;
 
         public static IReadOnlyList<ProxyRuleGroupInfo> All { get; } = new[]

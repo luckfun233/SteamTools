@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Android.App;
+using Android.Content;
 using Android.Content.Res;
 using Android.Graphics;
 using Android.OS;
@@ -76,11 +77,13 @@ namespace System.Application.UI.Activities
         {
             base.OnResume();
             RefreshStatus();
+            RefreshGroupCounts();
         }
 
         protected override void OnPause()
         {
             SettingsHost.Save();
+            ProxyRuleEngine.Rebuild();
             base.OnPause();
         }
 
@@ -157,19 +160,45 @@ namespace System.Application.UI.Activities
                 ShowToast("统计已重置");
             }, false), WeightedButtonParams());
             card.AddView(row);
+
+            var labButton = CreateButton("打开加速实验室（一键测试 + 导出日志）", () =>
+            {
+                StartActivity(new Intent(this, typeof(AcceleratorLabActivity)));
+            }, true);
+            labButton.LayoutParameters = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, Dp(44));
+            card.AddView(labButton);
         }
 
         void BuildDevSidecarSection()
         {
             var card = AddSection(
                 "DevSidecar 兼容规则",
-                "读取官方 remote_config.json5，只执行代理相关子集：域名/路径匹配、SNI、镜像、反代、预置 IP、请求/响应头替换。不会执行它的 Node 脚本。");
+                "读取官方 remote_config.json5，只执行代理相关子集：域名/路径匹配、SNI、镜像、反代、预置 IP、请求/响应头替换。不会执行它的 Node 脚本。自定义规则会和远程规则合并，并优先匹配。");
 
-            AddSwitch(card, "启用 DevSidecar 规则", "总开关。关闭后完全使用内置加速项目。", ProxySettings.EnableDevSidecarRules);
+            AddSwitch(card, "启用 DevSidecar 规则", "总开关。关闭后仍可使用自定义规则和内置加速项目。", ProxySettings.EnableDevSidecarRules);
             AddSwitch(card, "启动时同步配置", "启动加速时重新下载；关闭则优先使用本地缓存。", ProxySettings.SyncDevSidecarConfigOnStartup);
             AddText(card, "配置地址", "仅支持 HTTPS，修改后点“立即同步”。", ProxySettings.DevSidecarConfigUrl, false, InputTypes.ClassText | InputTypes.TextVariationUri);
 
-            AddSubTitle(card, "规则组");
+            AddSubTitle(card, "自定义规则");
+            AddSwitch(card, "启用自定义规则", "与远程规则合并，优先匹配；关闭后自定义规则不参与任何链路。", ProxySettings.EnableCustomRules);
+            AddParagraphTo(card, "使用 DevSidecar 的 intercepts 格式，可省略 server 包装。支持 SNI、镜像、反代、阻断、请求/响应头替换和预置 IP。");
+
+            var customRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            customRow.AddView(CreateButton("管理自定义规则", () =>
+            {
+                StartActivity(new Intent(this, typeof(CustomRulesActivity)));
+            }, true), WeightedButtonParams());
+            customRow.AddView(CreateButton("重新加载", () =>
+            {
+                ProxyRuleEngine.ReloadCustom();
+                RefreshStatus();
+                RefreshGroupCounts();
+                ShowToast($"已加载 {ProxyRuleEngine.CustomRuleCount} 条自定义规则");
+            }, false), WeightedButtonParams());
+            card.AddView(customRow);
+
+            AddSubTitle(card, "远程规则组");
             AddParagraphTo(card, "未选中的组不会参与匹配，也不会使用该组的预置 IP。至少保留一个组。");
 
             foreach (var group in ProxyRuleGroups.All)
@@ -228,17 +257,25 @@ namespace System.Application.UI.Activities
             AddParagraphTo(card, "只有免证书模式或系统未安装根证书时，VPN 才会使用 sidecar；已安装根证书且关闭免证书模式时，流量仍走 Titanium 的 MITM/规则链路，此时 SNI 分片设置不会生效。");
 
             AddSwitch(card, "启用 SNI 分片", "只对下方列出的域名做分片，其它流量原样转发。", ProxySettings.EnableSniFragment);
-            AddChoice(card, "分片策略", "SNI 边界：在域名首字节处拆成三段，推荐。固定大小：按字节数拆分。TLS 记录头：仅拆 record/handshake 头，强度较弱。",
-                new[] { "固定大小", "SNI 边界（推荐）", "TLS 记录头" },
+            AddChoice(card, "分片策略", "SNI 边界：在域名首字节拆三段，兼容性最好。SNI 多段：把域名拆成多段。TLS record 拆分：重封装成多个 TLS record，可绕过重组 TCP 但仍按 record 检查的 DPI。随机：随机大小，降低指纹。固定大小/TLS 记录头为兼容选项。",
+                new[] { "固定大小", "SNI 边界（推荐）", "TLS 记录头", "SNI 多段", "TLS record 拆分", "随机分片" },
                 ProxySettings.SniFragmentStrategy.Value,
                 value => ProxySettings.SniFragmentStrategy.Value = value);
 
-            AddNumber(card, "固定分片大小（字节）", "仅固定大小策略生效。过小会产生大量 TCP 段并明显变慢。", ProxySettings.SniFragmentChunkSize, 1, 4096);
-            AddNumber(card, "分片间隔（毫秒）", "每段之间的延迟。0 表示不等待；10~30ms 通常足够。", ProxySettings.SniFragmentDelayMilliseconds, 0, 1000);
+            AddNumber(card, "SNI 多段数", "仅 SNI 多段策略生效。段数越多越难包含完整域名，但握手延迟越高。", ProxySettings.SniSplitPieces, 2, 8);
+            AddNumber(card, "固定分片大小（字节）", "固定大小和随机分片策略使用。过小会产生大量 TCP 段并明显变慢。", ProxySettings.SniFragmentChunkSize, 1, 4096);
+            AddNumber(card, "分片间隔（毫秒）", "每段之间的延迟。0 表示不等待；10~30ms 通常足够。增加延迟可能跨过 DPI 的重组窗口，但会变慢。", ProxySettings.SniFragmentDelayMilliseconds, 0, 1000);
+            AddNumber(card, "随机抖动（毫秒）", "在固定间隔上再加 0~N ms 的随机等待，降低时序指纹。", ProxySettings.SniFragmentJitterMilliseconds, 0, 500);
             AddNumber(card, "ClientHello 最大缓冲（字节）", "超过后不再等待剩余字节，直接按已有内容转发。", ProxySettings.SniFragmentMaxBufferBytes, 1024, 65536);
             AddNumber(card, "等待剩余字节超时（毫秒）", "ClientHello 被拆到多个 TCP 包时，等待剩余部分的超时。", ProxySettings.SniFragmentReadTimeoutMilliseconds, 50, 3000);
             AddText(card, "分片生效域名", "分号分隔，支持 * 通配符。留空表示全部域名。", ProxySettings.SniFragmentDomains, false);
             AddSwitch(card, "只对 TLS 连接分片", "建议开启，避免影响普通 HTTP 和自定义协议。", ProxySettings.SniFragmentOnlyTls);
+
+            AddSubTitle(card, "分片失败自动回退");
+            AddParagraphTo(card, "分片后如果上游立刻断开，sidecar 会换一条连接、改用不分片方式重试一次，并在一段时间内对该域名跳过分片，避免每次连接都先失败。");
+            AddSwitch(card, "启用自动回退", "对分片不友好的网络/中间设备更稳定。", ProxySettings.EnableSniFragmentFallback);
+            AddNumber(card, "首字节探测超时（毫秒）", "分片后等待上游响应的最长时间；超时但没有断开时不视为失败。", ProxySettings.SniFragmentFallbackProbeMilliseconds, 100, 5000);
+            AddNumber(card, "跳过分片缓存（分钟）", "失败后对该域名暂停自动分片的时间。", ProxySettings.SniFragmentFallbackCacheMinutes, 1, 1440);
 
             AddSubTitle(card, "SNI 改写（实验）");
             AddParagraphTo(card, "直接改 ClientHello 里的域名。客户端仍按原域名校验证书，只有源站忽略 SNI 或返回原域名证书时才成立，不能作为通用方案。");
@@ -258,6 +295,7 @@ namespace System.Application.UI.Activities
             AddSwitch(card, "启用上游 SOCKS5 中继", "所有 TCP 流量先到中继，再由中继连接目标；支持用户名/密码认证。", ProxySettings.EnableSniUpstreamRelay);
             AddText(card, "中继地址", "IP 或域名。", ProxySettings.SniUpstreamRelayHost, false);
             AddNumber(card, "中继端口", "常见本地代理端口：7890、1080、10808。", ProxySettings.SniUpstreamRelayPort, 1, 65535);
+            AddText(card, "中继生效域名", "分号分隔，支持 * 通配符；留空表示全部（排除列表除外）。", ProxySettings.SniUpstreamRelayDomains, false);
             AddText(card, "中继用户名", "没有认证时留空。", ProxySettings.SniUpstreamRelayUserName, false);
             AddText(card, "中继密码", "没有认证时留空。", ProxySettings.SniUpstreamRelayPassword, true);
 
@@ -373,9 +411,9 @@ namespace System.Application.UI.Activities
             SettingsHost.Save();
             if (ProxySettings.EnableDevSidecarRules.Value)
             {
-                if (ProxyRuleEngine.All.Rules.Count > 0)
+                if (ProxyRuleEngine.Remote.Rules.Count > 0)
                 {
-                    ProxyRuleEngine.Apply(ProxyRuleEngine.All);
+                    ProxyRuleEngine.Apply(ProxyRuleEngine.Remote);
                 }
                 else
                 {
@@ -399,16 +437,16 @@ namespace System.Application.UI.Activities
 
             ProxySettings.DevSidecarRuleGroups.Value = ProxyRuleGroups.ToStorage(enabled);
             SettingsHost.Save();
-            if (ProxyRuleEngine.All.Rules.Count > 0)
+            if (ProxyRuleEngine.Remote.Rules.Count > 0)
             {
-                ProxyRuleEngine.Apply(ProxyRuleEngine.All);
+                ProxyRuleEngine.Apply(ProxyRuleEngine.Remote);
             }
             RefreshStatus();
         }
 
         void RefreshGroupCounts()
         {
-            var allCount = ProxyRuleEngine.All.Rules.Count;
+            var allCount = ProxyRuleEngine.Remote.Rules.Count;
             foreach (var row in groupRows)
             {
                 var count = ProxyRuleEngine.GetRuleCount(row.Id);
@@ -433,15 +471,20 @@ namespace System.Application.UI.Activities
                     : "未同步";
                 var error = string.IsNullOrEmpty(ProxyRuleEngine.LastError)
                     ? string.Empty
-                    : $"\n错误: {ProxyRuleEngine.LastError}";
+                    : $"\n远程错误: {ProxyRuleEngine.LastError}";
+                var customError = string.IsNullOrEmpty(ProxyRuleEngine.LastCustomError)
+                    ? string.Empty
+                    : $"\n自定义错误: {ProxyRuleEngine.LastCustomError}";
 
                 statusView.Text =
                     $"Sidecar: {sidecar}\n" +
                     $"根证书: {cert}\n" +
                     $"规则组: {ProxySettings.DevSidecarRuleGroups.Value}\n" +
-                    $"规则: 启用 {ProxyRuleEngine.Current.Rules.Count} / 共 {ProxyRuleEngine.All.Rules.Count} 条\n" +
-                    $"上次同步: {sync}{error}\n" +
-                    $"统计: {SniSidecarStats.ToDisplayString()}";
+                    $"自定义: {(ProxySettings.EnableCustomRules.Value ? "启用" : "关闭")}，{ProxyRuleEngine.CustomRuleCount} 条\n" +
+                    $"规则: 实际启用 {ProxyRuleEngine.Current.Rules.Count} / 远程 {ProxyRuleEngine.Remote.Rules.Count} 条\n" +
+                    $"上次同步: {sync}{error}{customError}\n" +
+                    $"统计: {SniSidecarStats.ToDisplayString()}\n" +
+                    $"回退缓存: {FragmentFallbackCache.Count} 个域名";
             }
             catch (Exception ex)
             {

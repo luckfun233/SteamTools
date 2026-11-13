@@ -1,5 +1,6 @@
 using System;
 using System.Application.Settings;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Security;
@@ -38,7 +39,7 @@ namespace System.Application.Services.Implementation
             report.AppendLine($"上游中继: {(ProxySettings.EnableSniUpstreamRelay.Value ? $"{ProxySettings.SniUpstreamRelayHost.Value}:{ProxySettings.SniUpstreamRelayPort.Value}" : "未开启")}");
             report.AppendLine();
 
-            var direct = await TryDirectAsync(host, port, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+            var direct = await ProbeDirectAsync(host, port, timeoutSeconds, cancellationToken).ConfigureAwait(false);
             report.AppendLine($"直连 TLS: {direct}");
 
             var wasRunning = SniSidecarService.IsRunning;
@@ -47,10 +48,10 @@ namespace System.Application.Services.Implementation
                 SniSidecarService.Start(force: true);
             }
 
-            SniTestResult? viaSidecar = null;
+            SniProbeResult? viaSidecar = null;
             if (SniSidecarService.IsRunning)
             {
-                viaSidecar = await TryViaSidecarAsync(
+                viaSidecar = await ProbeViaSidecarAsync(
                     host,
                     port,
                     SniSidecarService.ActivePort,
@@ -72,20 +73,117 @@ namespace System.Application.Services.Implementation
             report.AppendLine(GetConclusion(direct.Success, viaSidecar?.Success == true));
             report.AppendLine();
             report.AppendLine("运行统计: " + SniSidecarStats.ToDisplayString());
+            report.AppendLine("策略命中: " + SniSidecarStats.GetStrategySummary());
+            report.AppendLine("回退域名: " + SniSidecarStats.GetHostFallbackSummary());
             report.AppendLine("说明: 若直连失败而 Sidecar 成功，SNI 分片/预置 IP/中继很可能在当前网络生效；");
             report.AppendLine("若两者都成功，说明当前网络没有阻断该目标，无法据此判断分片是否绕过 DPI。");
 
             return report.ToString();
         }
 
+        /// <summary>
+        /// 在当前网络下依次尝试每种分片策略，每种跑多次，用于比较稳定性和延迟。
+        /// 会临时修改全局策略设置，结束后恢复。
+        /// </summary>
+        public static async Task<string> RunStrategyMatrixAsync(
+            string host,
+            int port = 443,
+            int timeoutSeconds = 8,
+            int runs = 3,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(host)) return "请输入要测试的域名。";
+            host = host.Trim();
+            if (port <= 0 || port > 65535) port = 443;
+            timeoutSeconds = Math.Max(2, Math.Min(30, timeoutSeconds));
+            runs = Math.Max(1, Math.Min(10, runs));
+
+            var wasRunning = SniSidecarService.IsRunning;
+            var originalStrategy = ProxySettings.SniFragmentStrategy.Value;
+            var originalEnabled = ProxySettings.EnableSniFragment.Value;
+
+            if (!wasRunning) SniSidecarService.Start(force: true);
+            if (!SniSidecarService.IsRunning) return "无法启动本地 sidecar，请检查端口是否被占用。";
+
+            var report = new StringBuilder();
+            report.AppendLine($"分片策略矩阵: {host}:{port}，每种 {runs} 次");
+            report.AppendLine($"DoH: {(ProxySettings.EnableDoh.Value ? ProxySettings.DohEndpoint.Value : "未开启")}；中继: {(ProxySettings.EnableSniUpstreamRelay.Value ? "开启" : "关闭")}");
+            report.AppendLine();
+
+            try
+            {
+                ProxySettings.EnableSniFragment.Value = true;
+
+                var baseline = await ProbeViaSidecarAsync(
+                    host, port, SniSidecarService.ActivePort, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+                report.AppendLine($"不分片基准: {FormatProbe(baseline)}");
+
+                foreach (var strategy in new[]
+                {
+                    TlsFragmentStrategy.SniBoundary,
+                    TlsFragmentStrategy.SniPieces,
+                    TlsFragmentStrategy.TlsRecordSplit,
+                    TlsFragmentStrategy.Fixed,
+                    TlsFragmentStrategy.Record,
+                    TlsFragmentStrategy.Random,
+                })
+                {
+                    ProxySettings.SniFragmentStrategy.Value = (int)strategy;
+
+                    var successes = 0;
+                    var times = new List<long>();
+                    string? lastError = null;
+                    for (var i = 0; i < runs; i++)
+                    {
+                        var result = await ProbeViaSidecarAsync(
+                            host, port, SniSidecarService.ActivePort, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+                        if (result.Success)
+                        {
+                            successes++;
+                            times.Add(result.ElapsedMs);
+                        }
+                        else
+                        {
+                            lastError = result.Error;
+                        }
+                    }
+
+                    times.Sort();
+                    var median = times.Count == 0 ? 0 : times[times.Count / 2];
+                    report.AppendLine(
+                        $"{GetStrategyName((int)strategy),-16} 成功 {successes}/{runs} 中位 {median}ms" +
+                        (lastError == null ? string.Empty : $"，最后错误: {lastError}"));
+                }
+            }
+            finally
+            {
+                ProxySettings.SniFragmentStrategy.Value = originalStrategy;
+                ProxySettings.EnableSniFragment.Value = originalEnabled;
+                if (!wasRunning) SniSidecarService.Stop();
+            }
+
+            report.AppendLine();
+            report.AppendLine("运行统计: " + SniSidecarStats.ToDisplayString());
+            report.AppendLine("策略命中: " + SniSidecarStats.GetStrategySummary());
+            report.AppendLine("说明: 全部成功通常说明当前网络没有阻断该目标；部分成功说明策略不稳定；");
+            report.AppendLine("记录型 DPI 只能被 TLS record 分片或中继绕过，TCP 分段对它无效。");
+            return report.ToString();
+        }
+
+        static string FormatProbe(SniProbeResult result)
+            => result.Success ? $"成功 ({result.ElapsedMs}ms)" : $"失败: {result.Error}";
+
         public static string GetStrategyName(int value) => value switch
         {
             ProxySettings.SniFragmentStrategyFixed => "固定大小",
             ProxySettings.SniFragmentStrategyRecord => "TLS 记录头",
+            ProxySettings.SniFragmentStrategySniPieces => "SNI 多段",
+            ProxySettings.SniFragmentStrategyTlsRecordSplit => "TLS record 拆分",
+            ProxySettings.SniFragmentStrategyRandom => "随机分片",
             _ => "SNI 边界",
         };
 
-        static async Task<SniTestResult> TryDirectAsync(
+        public static async Task<SniProbeResult> ProbeDirectAsync(
             string host,
             int port,
             int timeoutSeconds,
@@ -99,17 +197,17 @@ namespace System.Application.Services.Implementation
                 await ConnectWithTimeoutAsync(client, host, port, timeout.Token).ConfigureAwait(false);
                 if (!await HandshakeAsync(client.GetStream(), host, timeoutSeconds, cancellationToken).ConfigureAwait(false))
                 {
-                    return SniTestResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
                 }
-                return SniTestResult.Ok(sw.ElapsedMilliseconds);
+                return SniProbeResult.Ok(sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                return SniTestResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
+                return SniProbeResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
             }
         }
 
-        static async Task<SniTestResult> TryViaSidecarAsync(
+        public static async Task<SniProbeResult> ProbeViaSidecarAsync(
             string host,
             int port,
             int sidecarPort,
@@ -126,18 +224,18 @@ namespace System.Application.Services.Implementation
 
                 if (!await SocksConnectAsync(stream, host, port, timeout.Token).ConfigureAwait(false))
                 {
-                    return SniTestResult.Fail(sw.ElapsedMilliseconds, "SOCKS5 连接被拒绝");
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "SOCKS5 连接被拒绝");
                 }
 
                 if (!await HandshakeAsync(stream, host, timeoutSeconds, cancellationToken).ConfigureAwait(false))
                 {
-                    return SniTestResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
                 }
-                return SniTestResult.Ok(sw.ElapsedMilliseconds);
+                return SniProbeResult.Ok(sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                return SniTestResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
+                return SniProbeResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
             }
         }
 
@@ -274,9 +372,9 @@ namespace System.Application.Services.Implementation
             return ex.Message;
         }
 
-        sealed class SniTestResult
+        public sealed class SniProbeResult
         {
-            SniTestResult(bool success, long elapsedMs, string? error)
+            SniProbeResult(bool success, long elapsedMs, string? error)
             {
                 Success = success;
                 ElapsedMs = elapsedMs;
@@ -287,9 +385,9 @@ namespace System.Application.Services.Implementation
             public long ElapsedMs { get; }
             public string? Error { get; }
 
-            public static SniTestResult Ok(long elapsedMs) => new(true, elapsedMs, null);
+            public static SniProbeResult Ok(long elapsedMs) => new(true, elapsedMs, null);
 
-            public static SniTestResult Fail(long elapsedMs, string error) => new(false, elapsedMs, error);
+            public static SniProbeResult Fail(long elapsedMs, string error) => new(false, elapsedMs, error);
 
             public override string ToString()
                 => Success ? $"成功 ({ElapsedMs}ms)" : $"失败 ({ElapsedMs}ms): {Error}";

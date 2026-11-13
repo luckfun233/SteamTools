@@ -501,6 +501,9 @@ namespace System.Application.Services
                 ProxyRuleEngine.Clear();
             }
 
+            // 自定义规则与远程规则合并，远程规则关闭时也要加载。
+            ProxyRuleEngine.ReloadCustom();
+
             // 提前启动免证书 SNI sidecar，避免 VPN/tun2socks 启动时端口还没就绪。
             SniSidecarService.Start();
 

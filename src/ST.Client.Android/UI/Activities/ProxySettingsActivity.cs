@@ -199,6 +199,7 @@ namespace System.Application.UI.Activities
         public override bool OnCreateOptionsMenu(IMenu? menu)
         {
             menu?.Add(0, 1001, 0, "实验性设置（规则组/SNI）");
+            menu?.Add(0, 1002, 1, "自定义规则");
             return true;
         }
 
@@ -207,6 +208,11 @@ namespace System.Application.UI.Activities
             if (item.ItemId == 1001)
             {
                 StartActivity(new Intent(this, typeof(ExperimentalSettingsActivity)));
+                return true;
+            }
+            if (item.ItemId == 1002)
+            {
+                StartActivity(new Intent(this, typeof(CustomRulesActivity)));
                 return true;
             }
             return base.OnOptionsItemSelected(item);

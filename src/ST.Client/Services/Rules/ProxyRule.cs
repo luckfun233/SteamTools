@@ -174,6 +174,15 @@ namespace System.Application.ProxyRules
 
             if (matches == null) return null;
             if (matches.Count == 1) return matches[0];
+
+            // 自定义规则命中时不再合并远程规则，避免远程的 redirect/proxy 覆盖用户意图。
+            var customMatches = matches.Where(x =>
+                string.Equals(x.Group, ProxyRuleGroups.Custom, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (customMatches.Count > 0)
+            {
+                return customMatches.Count == 1 ? customMatches[0] : Merge(customMatches);
+            }
+
             return Merge(matches);
         }
 
@@ -267,7 +276,51 @@ namespace System.Application.ProxyRules
         }
 
         /// <summary>
-        /// 只保留指定规则组。未分类的规则始终保留。
+        /// 合并两个规则集，前者的规则优先匹配。用于把用户自定义规则叠加在远程规则之上。
+        /// </summary>
+        public static ProxyRuleSet Combine(ProxyRuleSet highPriority, ProxyRuleSet lowPriority)
+        {
+            if (highPriority.Rules.Count == 0 &&
+                highPriority.ExcludePatterns.Count == 0 &&
+                highPriority.PresetIps.Count == 0)
+            {
+                return lowPriority;
+            }
+            if (lowPriority.Rules.Count == 0 &&
+                lowPriority.ExcludePatterns.Count == 0 &&
+                lowPriority.PresetIps.Count == 0)
+            {
+                return highPriority;
+            }
+
+            var rules = new List<ProxyRule>(highPriority.Rules.Count + lowPriority.Rules.Count);
+            rules.AddRange(highPriority.Rules);
+            rules.AddRange(lowPriority.Rules);
+
+            var excludes = new List<string>(highPriority.ExcludePatterns);
+            foreach (var pattern in lowPriority.ExcludePatterns)
+            {
+                if (!excludes.Contains(pattern, StringComparer.OrdinalIgnoreCase))
+                {
+                    excludes.Add(pattern);
+                }
+            }
+
+            var presetIps = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in lowPriority.PresetIps)
+            {
+                presetIps[item.Key] = item.Value;
+            }
+            foreach (var item in highPriority.PresetIps)
+            {
+                presetIps[item.Key] = item.Value;
+            }
+
+            return new ProxyRuleSet(rules, excludes, presetIps);
+        }
+
+        /// <summary>
+        /// 只保留指定规则组。未分类和自定义规则始终保留。
         /// </summary>
         public ProxyRuleSet FilterGroups(ISet<string> enabledGroups)
         {
@@ -276,7 +329,9 @@ namespace System.Application.ProxyRules
             var rules = new List<ProxyRule>();
             foreach (var rule in Rules)
             {
-                if (string.IsNullOrEmpty(rule.Group) || enabledGroups.Contains(rule.Group))
+                if (string.IsNullOrEmpty(rule.Group) ||
+                    string.Equals(rule.Group, ProxyRuleGroups.Custom, StringComparison.OrdinalIgnoreCase) ||
+                    enabledGroups.Contains(rule.Group))
                 {
                     rules.Add(rule);
                 }

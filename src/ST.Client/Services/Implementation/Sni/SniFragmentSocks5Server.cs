@@ -82,6 +82,7 @@ namespace System.Application.Services.Implementation
             {
                 client.NoDelay = true;
                 var connectionCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+                TcpClient? target = null;
                 try
                 {
                     using var clientStream = client.GetStream();
@@ -110,7 +111,6 @@ namespace System.Application.Services.Implementation
                     var rules = ProxyRuleEngine.Current;
                     var excluded = rules.IsExcluded(host);
 
-                    TcpClient target;
                     try
                     {
                         target = await ConnectAsync(host, req.Port, excluded, connectionCts.Token).ConfigureAwait(false);
@@ -123,21 +123,84 @@ namespace System.Application.Services.Implementation
                         return;
                     }
 
-                    using (target)
+                    target.NoDelay = true;
+                    var targetStream = target.GetStream();
+                    await WriteReplyAsync(clientStream, SocksReply.Succeeded).ConfigureAwait(false);
+
+                    // 先拿到客户端的第一个负载；TLS 客户端会立即发送 ClientHello。
+                    // 对 SMTP/IMAP 等“服务器先说”的协议，等一小段时间后按普通双向转发处理。
+                    var firstPayload = await ReadFirstPayloadAsync(
+                        clientStream,
+                        Math.Max(100, ProxySettings.SniFragmentReadTimeoutMilliseconds.Value),
+                        connectionCts.Token).ConfigureAwait(false);
+
+                    if (firstPayload.Data == null)
                     {
-                        target.NoDelay = true;
-                        await WriteReplyAsync(clientStream, SocksReply.Succeeded).ConfigureAwait(false);
+                        if (!firstPayload.TimedOut) return;
 
-                        using var targetStream = target.GetStream();
-                        var upstream = PumpClientToTargetAsync(clientStream, targetStream, host, req.Port, excluded, connectionCts.Token);
-                        var downstream = PumpAsync(targetStream, clientStream, connectionCts.Token);
-
-                        await Task.WhenAny(upstream, downstream).ConfigureAwait(false);
+                        // 没有等到客户端数据：按普通 SOCKS5 隧道转发，不尝试分片。
+                        var up = PumpClientToTargetAsync(clientStream, targetStream, connectionCts.Token);
+                        var down = PumpAsync(targetStream, clientStream, connectionCts.Token);
+                        await Task.WhenAny(up, down).ConfigureAwait(false);
                         connectionCts.Cancel();
-
-                        await AwaitQuietlyAsync(upstream).ConfigureAwait(false);
-                        await AwaitQuietlyAsync(downstream).ConfigureAwait(false);
+                        await AwaitQuietlyAsync(up).ConfigureAwait(false);
+                        await AwaitQuietlyAsync(down).ConfigureAwait(false);
+                        return;
                     }
+
+                    var payload = MaybeRewriteSni(firstPayload.Data, host);
+
+                    var fragment = ShouldFragment(host, payload, excluded) &&
+                                   !FragmentFallbackCache.ShouldSkip(host);
+
+                    var probe = await SendFirstPayloadAsync(
+                        targetStream,
+                        payload,
+                        fragment,
+                        host,
+                        req.Port,
+                        connectionCts.Token).ConfigureAwait(false);
+
+                    if (probe.Closed && fragment && ProxySettings.EnableSniFragmentFallback.Value)
+                    {
+                        // 分片被重置：记住该域名，换一条连接用不分片方式重试一次。
+                        FragmentFallbackCache.Duration = TimeSpan.FromMinutes(
+                            Math.Max(1, ProxySettings.SniFragmentFallbackCacheMinutes.Value));
+                        FragmentFallbackCache.MarkFailure(host);
+                        SniSidecarStats.OnFallback();
+                        ProxyDiagnostics.Warn("SniSidecar", $"分片握手被重置，回退直连重试: {host}");
+
+                        target.Dispose();
+                        try
+                        {
+                            target = await ConnectAsync(host, req.Port, excluded, connectionCts.Token).ConfigureAwait(false);
+                            target.NoDelay = true;
+                            targetStream = target.GetStream();
+                            probe = await SendFirstPayloadAsync(
+                                targetStream,
+                                payload,
+                                fragment: false,
+                                host,
+                                req.Port,
+                                connectionCts.Token).ConfigureAwait(false);
+                            SniSidecarStats.OnReconnect();
+                        }
+                        catch (Exception ex)
+                        {
+                            SniSidecarStats.OnFailure();
+                            ProxyDiagnostics.Warn("SniSidecar", $"回退重试失败: {host}: {ex.Message}");
+                            return;
+                        }
+                    }
+
+                    var upstream = PumpClientToTargetAsync(clientStream, targetStream, connectionCts.Token);
+                    var downstream = PumpAsync(targetStream, clientStream, connectionCts.Token, probe.Data);
+
+                    await Task.WhenAny(upstream, downstream).ConfigureAwait(false);
+                    connectionCts.Cancel();
+
+                    await AwaitQuietlyAsync(upstream).ConfigureAwait(false);
+                    await AwaitQuietlyAsync(downstream).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (!cts.IsCancellationRequested)
                 {
@@ -146,6 +209,7 @@ namespace System.Application.Services.Implementation
                 }
                 finally
                 {
+                    target?.Dispose();
                     connectionCts.Dispose();
                 }
             }
@@ -153,7 +217,8 @@ namespace System.Application.Services.Implementation
 
         async Task<TcpClient> ConnectAsync(string host, int port, bool excluded, CancellationToken cancellationToken)
         {
-            if (ProxySettings.EnableSniUpstreamRelay.Value && !excluded)
+            if (ProxySettings.EnableSniUpstreamRelay.Value && !excluded &&
+                IsDomainAllowed(host, ProxySettings.SniUpstreamRelayDomains.Value))
             {
                 var relayHost = ProxySettings.SniUpstreamRelayHost.Value?.Trim();
                 var relayPort = ProxySettings.SniUpstreamRelayPort.Value;
@@ -459,34 +524,46 @@ namespace System.Application.Services.Implementation
         async Task PumpClientToTargetAsync(
             NetworkStream client,
             NetworkStream target,
-            string host,
-            int port,
-            bool excluded,
             CancellationToken cancellationToken)
         {
             var buffer = new byte[32 * 1024];
-            var first = true;
             while (!cancellationToken.IsCancellationRequested)
             {
                 var read = await client.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
                 if (read <= 0) return;
 
-                if (first)
-                {
-                    first = false;
-                    var payload = await PrepareFirstPayloadAsync(client, buffer, read, cancellationToken).ConfigureAwait(false);
-                    if (!excluded)
-                    {
-                        payload = MaybeRewriteSni(payload, host);
-                    }
-                    await WritePayloadAsync(target, payload, host, port, excluded, cancellationToken).ConfigureAwait(false);
-                    SniSidecarStats.OnBytesUp(payload.Length);
-                    continue;
-                }
-
                 await target.WriteAsync(buffer, 0, read, cancellationToken).ConfigureAwait(false);
                 SniSidecarStats.OnBytesUp(read);
             }
+        }
+
+        /// <summary>
+        /// 读取客户端的第一个有效负载。TLS 连接会等 ClientHello 完整到齐，避免分片位置算错。
+        /// 超时表示客户端暂时没有发送数据（例如服务器先说话的协议）。
+        /// </summary>
+        static async Task<FirstPayloadResult> ReadFirstPayloadAsync(
+            NetworkStream client,
+            int timeoutMilliseconds,
+            CancellationToken cancellationToken)
+        {
+            var buffer = new byte[32 * 1024];
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(Math.Max(50, timeoutMilliseconds));
+
+            int read;
+            try
+            {
+                read = await client.ReadAsync(buffer, 0, buffer.Length, timeoutCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return new FirstPayloadResult(null, timedOut: true);
+            }
+
+            if (read <= 0) return new FirstPayloadResult(null, timedOut: false);
+
+            var payload = await PrepareFirstPayloadAsync(client, buffer, read, cancellationToken).ConfigureAwait(false);
+            return new FirstPayloadResult(payload, timedOut: false);
         }
 
         static async Task<byte[]> PrepareFirstPayloadAsync(
@@ -552,6 +629,79 @@ namespace System.Application.Services.Implementation
             return data.ToArray();
         }
 
+        static bool ShouldFragment(string host, byte[] payload, bool excluded)
+        {
+            if (excluded || payload.Length == 0) return false;
+            if (!ProxySettings.EnableSniFragment.Value) return false;
+
+            var isTls = payload[0] == 0x16;
+            if (ProxySettings.SniFragmentOnlyTls.Value && !isTls) return false;
+
+            return IsDomainAllowed(host, ProxySettings.SniFragmentDomains.Value);
+        }
+
+        async Task<ProbeResult> SendFirstPayloadAsync(
+            NetworkStream target,
+            byte[] payload,
+            bool fragment,
+            string host,
+            int port,
+            CancellationToken cancellationToken)
+        {
+            bool fragmented;
+            try
+            {
+                fragmented = await WritePayloadAsync(
+                    target,
+                    payload,
+                    fragment,
+                    host,
+                    port,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (fragment && IsConnectionReset(ex))
+            {
+                // 写到一半就被重置：把它当作“分片失败”，交给上层回退重试。
+                return new ProbeResult(true, null);
+            }
+
+            SniSidecarStats.OnBytesUp(payload.Length);
+
+            if (!fragmented) return new ProbeResult(false, null);
+
+            // 分片后等首字节：如果上游直接 EOF/RST，说明分片可能被中间设备丢弃，触发回退。
+            var probeMs = Math.Max(100, ProxySettings.SniFragmentFallbackProbeMilliseconds.Value);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(probeMs);
+
+            var buffer = new byte[16 * 1024];
+            try
+            {
+                var read = await target.ReadAsync(buffer, 0, buffer.Length, timeoutCts.Token).ConfigureAwait(false);
+                if (read <= 0) return new ProbeResult(true, null);
+
+                var data = new byte[read];
+                Buffer.BlockCopy(buffer, 0, data, 0, read);
+                return new ProbeResult(false, data);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // 上游只是慢，没有断开，不触发回退。
+                return new ProbeResult(false, null);
+            }
+            catch (IOException)
+            {
+                return new ProbeResult(true, null);
+            }
+            catch (SocketException)
+            {
+                return new ProbeResult(true, null);
+            }
+        }
+
+        static bool IsConnectionReset(Exception ex)
+            => ex is IOException || ex is SocketException || ex.InnerException is SocketException;
+
         byte[] MaybeRewriteSni(byte[] payload, string host)
         {
             if (!ProxySettings.EnableSniRewrite.Value) return payload;
@@ -567,46 +717,50 @@ namespace System.Application.Services.Implementation
             return rewritten;
         }
 
-        async Task WritePayloadAsync(
+        async Task<bool> WritePayloadAsync(
             NetworkStream target,
             byte[] payload,
+            bool fragment,
             string host,
             int port,
-            bool excluded,
             CancellationToken cancellationToken)
         {
-            var isTls = payload.Length > 0 && payload[0] == 0x16;
-            var fragment = !excluded &&
-                           ProxySettings.EnableSniFragment.Value &&
-                           (!ProxySettings.SniFragmentOnlyTls.Value || isTls) &&
-                           IsDomainAllowed(host, ProxySettings.SniFragmentDomains.Value);
-
             if (!fragment || payload.Length == 0)
             {
                 await target.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-                return;
+                return false;
             }
 
             var strategy = (TlsFragmentStrategy)ProxySettings.SniFragmentStrategy.Value;
             var chunkSize = Math.Max(1, ProxySettings.SniFragmentChunkSize.Value);
             var delay = Math.Max(0, ProxySettings.SniFragmentDelayMilliseconds.Value);
-            var chunks = TlsClientHello.Fragment(payload, strategy, chunkSize);
+            var jitter = Math.Max(0, ProxySettings.SniFragmentJitterMilliseconds.Value);
+            var pieces = Math.Max(2, ProxySettings.SniSplitPieces.Value);
+            var chunks = TlsClientHello.Fragment(payload, strategy, chunkSize, pieces);
 
-            if (chunks.Count <= 1 || (strategy == TlsFragmentStrategy.SniBoundary && chunks.Count == 1))
+            if (chunks.Count <= 1)
             {
                 await target.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-                return;
+                return false;
             }
 
-            foreach (var chunk in chunks)
+            var random = jitter > 0 ? new Random(Guid.NewGuid().GetHashCode()) : null;
+            for (var i = 0; i < chunks.Count; i++)
             {
+                var chunk = chunks[i];
                 await target.WriteAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
-                if (delay > 0) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+
+                if (i < chunks.Count - 1)
+                {
+                    var wait = delay + (random == null ? 0 : random.Next(0, jitter + 1));
+                    if (wait > 0) await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+                }
             }
 
-            SniSidecarStats.OnFragment();
+            SniSidecarStats.OnFragment(strategy);
             ProxyDiagnostics.Info("SniSidecar",
-                $"分片: {host}:{port} 策略={strategy} 段数={chunks.Count} 大小={payload.Length}");
+                $"分片: {host}:{port} 策略={strategy} 段数={chunks.Count} 大小={payload.Length} 延迟={delay}ms 抖动={jitter}ms");
+            return true;
         }
 
         static bool IsDomainAllowed(string host, string? patterns)
@@ -619,8 +773,18 @@ namespace System.Application.Services.Implementation
             return false;
         }
 
-        static async Task PumpAsync(NetworkStream from, NetworkStream to, CancellationToken cancellationToken)
+        static async Task PumpAsync(
+            NetworkStream from,
+            NetworkStream to,
+            CancellationToken cancellationToken,
+            byte[]? initial = null)
         {
+            if (initial != null && initial.Length > 0)
+            {
+                await to.WriteAsync(initial, 0, initial.Length, cancellationToken).ConfigureAwait(false);
+                SniSidecarStats.OnBytesDown(initial.Length);
+            }
+
             var buffer = new byte[16 * 1024];
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -686,6 +850,33 @@ namespace System.Application.Services.Implementation
             GeneralFailure = 0x01,
             HostUnreachable = 0x04,
             CommandNotSupported = 0x07,
+        }
+
+        readonly struct FirstPayloadResult
+        {
+            public FirstPayloadResult(byte[]? data, bool timedOut)
+            {
+                Data = data;
+                TimedOut = timedOut;
+            }
+
+            public byte[]? Data { get; }
+            public bool TimedOut { get; }
+        }
+
+        readonly struct ProbeResult
+        {
+            public ProbeResult(bool closed, byte[]? data)
+            {
+                Closed = closed;
+                Data = data;
+            }
+
+            /// <summary>上游在没有返回任何字节的情况下关闭/重置。</summary>
+            public bool Closed { get; }
+
+            /// <summary>探测时提前读到的下游数据。</summary>
+            public byte[]? Data { get; }
         }
 
         readonly struct SocksRequest

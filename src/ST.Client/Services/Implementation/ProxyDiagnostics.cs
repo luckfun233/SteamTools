@@ -1,5 +1,6 @@
 using System;
 using System.Application.Settings;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -143,6 +144,56 @@ namespace System.Application.Services.Implementation
         {
             if (string.IsNullOrEmpty(message)) return string.Empty;
             return sensitiveQueryRegex.Replace(message, "$1=***");
+        }
+
+        /// <summary>
+        /// 读取最近的诊断日志，用于实验室导出。
+        /// </summary>
+        public static string GetRecentLogText(int maxLines = 400)
+        {
+            try
+            {
+                if (!Directory.Exists(LogDirectory)) return string.Empty;
+
+                var files = Directory.GetFiles(LogDirectory, "proxy-*.log");
+                if (files.Length == 0) return string.Empty;
+
+                Array.Sort(files, (a, b) => File.GetLastWriteTime(b).CompareTo(File.GetLastWriteTime(a)));
+
+                var remaining = Math.Max(20, maxLines);
+                var blocks = new List<string>();
+
+                foreach (var file in files)
+                {
+                    if (remaining <= 0) break;
+
+                    try
+                    {
+                        var lines = new List<string>();
+                        foreach (var line in File.ReadLines(file)) lines.Add(line);
+                        if (lines.Count == 0) continue;
+
+                        var take = Math.Min(remaining, lines.Count);
+                        var start = lines.Count - take;
+                        var block = new StringBuilder();
+                        block.AppendLine($"--- {Path.GetFileName(file)} ---");
+                        for (var i = start; i < lines.Count; i++) block.AppendLine(lines[i]);
+                        blocks.Add(block.ToString());
+                        remaining -= take;
+                    }
+                    catch
+                    {
+                        // 单个文件读取失败时继续尝试其它文件
+                    }
+                }
+
+                blocks.Reverse();
+                return string.Join(Environment.NewLine, blocks);
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

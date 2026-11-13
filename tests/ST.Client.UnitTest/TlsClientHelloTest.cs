@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using System.Application.Services.Implementation;
+using System.Linq;
 using System.Text;
 
 namespace System.Application;
@@ -51,6 +52,53 @@ public class TlsClientHelloTest
 
         var recordChunks = TlsClientHello.FragmentByRecord(hello);
         Assert.That(Join(recordChunks), Is.EqualTo(hello));
+    }
+
+    [Test]
+    public void SniPieces_Reassemble_And_Hide_Host()
+    {
+        var hello = CreateClientHello("github.com", 200);
+        var chunks = TlsClientHello.FragmentBySniPieces(hello, 4);
+
+        Assert.That(chunks, Has.Count.EqualTo(5));
+        Assert.That(Join(chunks), Is.EqualTo(hello));
+        foreach (var chunk in chunks)
+        {
+            Assert.That(Encoding.ASCII.GetString(chunk).Contains("github.com", StringComparison.Ordinal), Is.False);
+        }
+    }
+
+    [Test]
+    public void TlsRecordSplit_Produces_Valid_Records()
+    {
+        var hello = CreateClientHello("github.com", 200);
+        var records = TlsClientHello.FragmentToTlsRecords(hello);
+
+        Assert.That(records.Count, Is.GreaterThan(1));
+        foreach (var record in records)
+        {
+            Assert.That(record[0], Is.EqualTo(0x16));
+            var length = (record[3] << 8) | record[4];
+            Assert.That(length, Is.EqualTo(record.Length - 5));
+            Assert.That(Encoding.ASCII.GetString(record).Contains("github.com", StringComparison.Ordinal), Is.False);
+        }
+
+        var payloads = records.Select(x => x.Skip(5).ToArray()).ToArray();
+        Assert.That(Join(payloads), Is.EqualTo(hello.Skip(5).ToArray()));
+
+        var fixedRecords = TlsClientHello.FragmentToTlsRecordsFixed(hello, 64);
+        var fixedPayloads = fixedRecords.Select(x => x.Skip(5).ToArray()).ToArray();
+        Assert.That(Join(fixedPayloads), Is.EqualTo(hello.Skip(5).ToArray()));
+    }
+
+    [Test]
+    public void Random_Fragment_Reassembles()
+    {
+        var hello = CreateClientHello("github.com", 500);
+        var chunks = TlsClientHello.FragmentRandom(hello, 96, new Random(1234));
+
+        Assert.That(chunks.Count, Is.GreaterThan(1));
+        Assert.That(Join(chunks), Is.EqualTo(hello));
     }
 
     static byte[] Join(System.Collections.Generic.IReadOnlyList<byte[]> chunks)
