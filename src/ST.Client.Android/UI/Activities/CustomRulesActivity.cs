@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
+using Android.OS;
 using Android.Content.Res;
 using Android.Runtime;
 using Android.Text;
@@ -31,15 +33,15 @@ namespace System.Application.UI.Activities
         {
             base.OnCreate(savedInstanceState);
 
-            var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-            root.SetBackgroundColor(ResColor(Resource.Color.grey_window_background));
+            var root = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            root.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.grey_window_background)));
             AddHeader(root);
 
             var scroll = new ScrollView(this)
             {
                 LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f),
             };
-            var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var container = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             container.SetPadding(Dp(14), 0, Dp(14), Dp(28));
             scroll.AddView(container);
             root.AddView(scroll);
@@ -51,10 +53,10 @@ namespace System.Application.UI.Activities
 
         void AddHeader(LinearLayout root)
         {
-            var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var header = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             header.SetGravity(GravityFlags.CenterVertical);
             header.SetPadding(Dp(14), Dp(12), Dp(14), Dp(12));
-            header.SetBackgroundColor(ResColor(Resource.Color.grey_window_background));
+            header.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.grey_window_background)));
 
             var back = new TextView(this)
             {
@@ -98,17 +100,17 @@ namespace System.Application.UI.Activities
                 "支持：sni、verifyHost、redirect、proxy、backup、abort、desc、requestReplace.headers、responseReplace.headers。\n" +
                 "自定义规则始终叠加在远程规则之前；带 Authorization/Cookie 的请求不会进入第三方镜像。");
 
-            var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var actions = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             actions.AddView(CreateButton("校验", ValidateRules, false), WeightedButtonParams());
             actions.AddView(CreateButton("快速添加", ShowQuickAdd, true), WeightedButtonParams());
             info.AddView(actions);
 
-            var actions2 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var actions2 = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             actions2.AddView(CreateButton("删除规则", ShowDeleteRule, false), WeightedButtonParams());
             actions2.AddView(CreateButton("插入示例", InsertSample, false), WeightedButtonParams());
             info.AddView(actions2);
 
-            var actions3 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var actions3 = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             actions3.AddView(CreateButton("复制", CopyText, false), WeightedButtonParams());
             actions3.AddView(CreateButton("清空文件", ClearFile, false), WeightedButtonParams());
             info.AddView(actions3);
@@ -121,10 +123,10 @@ namespace System.Application.UI.Activities
                 Gravity = GravityFlags.Top,
                 Typeface = Android.Graphics.Typeface.Monospace,
                 Hint = "在此粘贴 DevSidecar 规则…",
-                MinLines = 12,
             };
+            editor.SetMinLines(12);
             editor.SetTextColor(ResColor(Resource.Color.text_primary));
-            editor.SetHintTextColor(ResColor(Resource.Color.text_secondary));
+            editor.SetHintTextColor(Android.Content.Res.ColorStateList.ValueOf(new Android.Graphics.Color(ResColor(Resource.Color.text_secondary))));
             editor.SetSingleLine(false);
             editor.SetTextIsSelectable(true);
             editorCard.AddView(editor);
@@ -229,8 +231,8 @@ namespace System.Application.UI.Activities
             if (editor == null) return;
             try
             {
-                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                clipboard?.SetText(editor.Text ?? string.Empty);
+                var clipboard = (Android.Content.ClipboardManager?)GetSystemService(ClipboardService);
+                if (clipboard != null) clipboard.PrimaryClip = Android.Content.ClipData.NewPlainText("steamtools", editor.Text ?? string.Empty);
                 ToastShow("已复制");
             }
             catch (Exception ex)
@@ -248,7 +250,7 @@ namespace System.Application.UI.Activities
                 return;
             }
 
-            var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var layout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             layout.SetPadding(Dp(20), Dp(8), Dp(20), Dp(8));
 
             var domain = AddDialogInput(layout, "域名（支持 * 通配符）", "example.com");
@@ -455,7 +457,7 @@ namespace System.Application.UI.Activities
             descView.SetPadding(Dp(4), 0, Dp(4), Dp(8));
             container.AddView(descView);
 
-            var card = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var card = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             var background = new Android.Graphics.Drawables.GradientDrawable();
             background.SetColor(IsNightMode
                 ? Android.Graphics.Color.ParseColor("#1E1E1E")
@@ -518,7 +520,7 @@ namespace System.Application.UI.Activities
         }
 
         void ToastShow(string message)
-            => Toast.MakeText(this, message, ToastLength.Short)?.Show();
+            => Android.Widget.Toast.MakeText(this, message, Android.Widget.ToastLength.Short)?.Show();
 
         bool IsNightMode
             => (Resources.Configuration.UiMode & UiMode.NightMask) == UiMode.NightYes;

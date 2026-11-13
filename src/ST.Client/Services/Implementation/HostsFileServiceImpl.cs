@@ -694,7 +694,7 @@ namespace System.Application.Services.Implementation
                     if (result.ResultType == OperationResultType.Success)
                     {
                         var lines = result.AppendData;
-                        if (lines.Reverse().Any(x => x.StartsWith(MarkEnd)))
+                        if (((IEnumerable<string>)lines).Reverse().Any(x => x.StartsWith(MarkEnd)))
                         {
                             return true;
                         }

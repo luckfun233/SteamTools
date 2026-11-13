@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Content.Res;
 using Android.OS;
 using Android.Runtime;
@@ -46,15 +47,15 @@ namespace System.Application.UI.Activities
         {
             base.OnCreate(savedInstanceState);
 
-            var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-            root.SetBackgroundColor(ResColor(Resource.Color.grey_window_background));
+            var root = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            root.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.grey_window_background)));
             AddHeader(root);
 
             var scroll = new ScrollView(this)
             {
                 LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f),
             };
-            container = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            container = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             container.SetPadding(Dp(14), 0, Dp(14), Dp(28));
             scroll.AddView(container);
             root.AddView(scroll);
@@ -66,10 +67,10 @@ namespace System.Application.UI.Activities
 
         void AddHeader(LinearLayout root)
         {
-            var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var header = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             header.SetGravity(GravityFlags.CenterVertical);
             header.SetPadding(Dp(14), Dp(12), Dp(14), Dp(12));
-            header.SetBackgroundColor(ResColor(Resource.Color.grey_window_background));
+            header.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.grey_window_background)));
 
             var back = new TextView(this)
             {
@@ -120,17 +121,17 @@ namespace System.Application.UI.Activities
             AddTextRow(testCard, "测试域名", out hostInput, AcceleratorLabService.DefaultHost);
             AddTextRow(testCard, "策略矩阵次数", out runsInput, "3", InputTypes.ClassNumber);
 
-            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var row = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             row.AddView(CreateButton("运行全部", RunAllAsync, true), WeightedButtonParams());
             row.AddView(CreateButton("分片策略矩阵", RunMatrixAsync, false), WeightedButtonParams());
             testCard.AddView(row);
 
-            var row2 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var row2 = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             row2.AddView(CreateButton("导出报告", ExportReport, true), WeightedButtonParams());
             row2.AddView(CreateButton("复制报告", CopyReport, false), WeightedButtonParams());
             testCard.AddView(row2);
 
-            var row3 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var row3 = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             row3.AddView(CreateButton("清空统计", () =>
             {
                 SniSidecarStats.Reset();
@@ -399,8 +400,8 @@ namespace System.Application.UI.Activities
 
             try
             {
-                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                clipboard?.SetText(report);
+                var clipboard = (Android.Content.ClipboardManager?)GetSystemService(ClipboardService);
+                if (clipboard != null) clipboard.PrimaryClip = Android.Content.ClipData.NewPlainText("steamtools", report);
                 ToastShow("报告已复制到剪贴板");
             }
             catch (Exception ex)
@@ -469,7 +470,7 @@ namespace System.Application.UI.Activities
             descView.SetPadding(Dp(4), 0, Dp(4), Dp(8));
             container.AddView(descView);
 
-            var card = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var card = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             var background = new Android.Graphics.Drawables.GradientDrawable();
             background.SetColor(IsNightMode
                 ? Android.Graphics.Color.ParseColor("#1E1E1E")
@@ -505,7 +506,7 @@ namespace System.Application.UI.Activities
             string defaultValue,
             InputTypes inputType = InputTypes.ClassText)
         {
-            var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var layout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             layout.SetPadding(0, Dp(8), 0, Dp(6));
 
             var titleView = new TextView(this) { Text = title, TextSize = 13 };
@@ -550,7 +551,7 @@ namespace System.Application.UI.Activities
         }
 
         void ToastShow(string message)
-            => Toast.MakeText(this, message, ToastLength.Short)?.Show();
+            => Android.Widget.Toast.MakeText(this, message, Android.Widget.ToastLength.Short)?.Show();
 
         bool IsNightMode
             => (Resources.Configuration.UiMode & UiMode.NightMask) == UiMode.NightYes;

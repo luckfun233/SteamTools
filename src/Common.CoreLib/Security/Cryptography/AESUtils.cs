@@ -611,7 +611,7 @@ public static class AESUtils
             if (KeyByteArray == null) throw new NullReferenceException(nameof(KeyByteArray));
             return BitConverter.GetBytes((ushort)ModeAndPadding)
                 .Concat(IVByteArray)
-                .Concat(KeyByteArray.Reverse())
+                .Concat(((IEnumerable<byte>)KeyByteArray).Reverse())
                 .ToArray();
         }
 

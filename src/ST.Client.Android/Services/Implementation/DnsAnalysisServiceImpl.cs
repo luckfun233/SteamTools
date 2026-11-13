@@ -4,6 +4,7 @@ using System.Application.Services;
 using System.Application.Services.Implementation;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using XEPlatform = Xamarin.Essentials.Platform;
 
@@ -43,9 +44,10 @@ namespace System.Application.Services.Implementation
         //    return endPoints;
         //}
 
-        public int AnalysisHostnameTime(string url)
+        public Task<int> AnalysisHostnameTime(string url, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            // Android 平台暂不支持 Ping 延时探测
+            return Task.FromResult(0);
         }
     }
 }

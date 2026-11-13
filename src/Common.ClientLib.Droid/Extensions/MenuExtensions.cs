@@ -32,7 +32,7 @@ namespace System
             {
                 var item = menuBuilder.GetItem(i);
                 var actionItem = menuIdResToEnum(item.ItemId);
-                if (actionItem.IsDefined())
+                if (Enum.IsDefined(typeof(TEnum), actionItem))
                 {
                     item.SetTitle(getString(actionItem));
                 }

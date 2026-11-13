@@ -4,8 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Content.Res;
 using Android.Graphics;
+using Android.Graphics.Drawables;
 using Android.OS;
 using Android.Text;
 using Android.Util;
@@ -42,7 +44,9 @@ namespace System.Application.UI.Activities
             }
 
             public string Id { get; }
+
             public string Name { get; }
+
             public CheckBox Box { get; }
         }
 
@@ -50,8 +54,8 @@ namespace System.Application.UI.Activities
         {
             base.OnCreate(savedInstanceState);
 
-            var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-            root.SetBackgroundColor(ResColor(Resource.Color.grey_window_background));
+            var root = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
+            root.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.grey_window_background)));
             AddHeader(root);
 
             var scroll = new ScrollView(this)
@@ -61,7 +65,7 @@ namespace System.Application.UI.Activities
                     0,
                     1f),
             };
-            container = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            container = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             container.SetPadding(Dp(14), 0, Dp(14), Dp(28));
             scroll.AddView(container);
             root.AddView(scroll);
@@ -89,10 +93,10 @@ namespace System.Application.UI.Activities
 
         void AddHeader(LinearLayout root)
         {
-            var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var header = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             header.SetGravity(GravityFlags.CenterVertical);
             header.SetPadding(Dp(14), Dp(12), Dp(14), Dp(12));
-            header.SetBackgroundColor(ResColor(Resource.Color.grey_window_background));
+            header.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.grey_window_background)));
 
             var back = new TextView(this)
             {
@@ -147,7 +151,7 @@ namespace System.Application.UI.Activities
             var card = AddSection("运行状态", "这里显示当前进程内的真实状态，不会访问外部服务。");
             statusView = AddInfoText(card, "正在读取…");
 
-            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var row = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             row.AddView(CreateButton("刷新状态", () =>
             {
                 RefreshStatus();
@@ -184,7 +188,7 @@ namespace System.Application.UI.Activities
             AddSwitch(card, "启用自定义规则", "与远程规则合并，优先匹配；关闭后自定义规则不参与任何链路。", ProxySettings.EnableCustomRules);
             AddParagraphTo(card, "使用 DevSidecar 的 intercepts 格式，可省略 server 包装。支持 SNI、镜像、反代、阻断、请求/响应头替换和预置 IP。");
 
-            var customRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var customRow = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             customRow.AddView(CreateButton("管理自定义规则", () =>
             {
                 StartActivity(new Intent(this, typeof(CustomRulesActivity)));
@@ -227,7 +231,7 @@ namespace System.Application.UI.Activities
                 groupRows.Add(new GroupRow(group.Id, group.Name, box));
             }
 
-            var groupButtons = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var groupButtons = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             groupButtons.AddView(CreateButton("全选", () =>
             {
                 foreach (var row in groupRows) row.Box.Checked = true;
@@ -241,7 +245,7 @@ namespace System.Application.UI.Activities
             }, false), WeightedButtonParams());
             card.AddView(groupButtons);
 
-            var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var actions = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             actions.AddView(CreateButton("立即同步并应用", SyncRulesAsync, true), WeightedButtonParams());
             actions.AddView(CreateButton("重新应用本地规则", ApplyRules, false), WeightedButtonParams());
             card.AddView(actions);
@@ -319,7 +323,7 @@ namespace System.Application.UI.Activities
             AddNumber(card, "日志保留天数", "启动时会清理超过天数的 proxy-*.log。", ProxySettings.ProxyDiagnosticsRetentionDays, 1, 365);
             AddNumber(card, "单文件上限（KB）", "超过后写入新的时间戳文件。", ProxySettings.ProxyDiagnosticsMaxFileSizeKB, 64, 1048576);
 
-            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var row = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             row.AddView(CreateButton("清理日志", () =>
             {
                 ProxyDiagnostics.Clear();
@@ -327,7 +331,7 @@ namespace System.Application.UI.Activities
             }, false), WeightedButtonParams());
             row.AddView(CreateButton("日志目录", () =>
             {
-                Toast.MakeText(this, ProxyDiagnostics.LogDirectory, ToastLength.Long)?.Show();
+                Android.Widget.Toast.MakeText(this, ProxyDiagnostics.LogDirectory, Android.Widget.ToastLength.Long)?.Show();
             }, false), WeightedButtonParams());
             card.AddView(row);
         }
@@ -418,7 +422,7 @@ namespace System.Application.UI.Activities
                 else
                 {
                     // 本地还没有缓存时直接同步一次，避免“开关打开了但一条规则都没有”。
-                    _ = SyncRulesAsync();
+                    SyncRulesAsync();
                     return;
                 }
             }
@@ -579,7 +583,7 @@ namespace System.Application.UI.Activities
             descView.SetPadding(Dp(4), 0, Dp(4), Dp(8));
             container.AddView(descView);
 
-            var card = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var card = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             var background = new GradientDrawable();
             background.SetColor(IsNightMode ? Color.ParseColor("#1E1E1E") : Color.White);
             background.SetCornerRadius(Dp(12));
@@ -599,13 +603,13 @@ namespace System.Application.UI.Activities
             string description,
             SerializableProperty<bool> property)
         {
-            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            var row = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
             row.SetGravity(GravityFlags.CenterVertical);
             row.SetPadding(0, Dp(10), 0, Dp(10));
             row.Clickable = true;
             row.Focusable = true;
 
-            var textLayout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var textLayout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             var titleView = new TextView(this) { Text = title, TextSize = 14 };
             titleView.SetTextColor(ResColor(Resource.Color.text_primary));
             textLayout.AddView(titleView);
@@ -646,7 +650,7 @@ namespace System.Application.UI.Activities
             bool password,
             InputTypes inputType = InputTypes.ClassText)
         {
-            var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var layout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             layout.SetPadding(0, Dp(10), 0, Dp(6));
 
             var titleView = new TextView(this) { Text = title, TextSize = 13 };
@@ -661,7 +665,7 @@ namespace System.Application.UI.Activities
             };
             input.SetSingleLine(true);
             input.SetTextColor(ResColor(Resource.Color.text_primary));
-            input.SetHintTextColor(ResColor(Resource.Color.text_secondary));
+            input.SetHintTextColor(Android.Content.Res.ColorStateList.ValueOf(new Android.Graphics.Color(ResColor(Resource.Color.text_secondary))));
             input.InputType = password
                 ? InputTypes.ClassText | InputTypes.TextVariationPassword
                 : inputType;
@@ -684,7 +688,7 @@ namespace System.Application.UI.Activities
             int min,
             int max)
         {
-            var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var layout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             layout.SetPadding(0, Dp(10), 0, Dp(6));
 
             var titleView = new TextView(this) { Text = $"{title}（{min}~{max}）", TextSize = 13 };
@@ -727,7 +731,7 @@ namespace System.Application.UI.Activities
             int selected,
             Action<int> changed)
         {
-            var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var layout = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Vertical };
             layout.SetPadding(0, Dp(10), 0, Dp(6));
 
             var titleView = new TextView(this) { Text = title, TextSize = 13 };
@@ -808,7 +812,7 @@ namespace System.Application.UI.Activities
         void AddDivider(LinearLayout parent)
         {
             var view = new View(this);
-            view.SetBackgroundColor(ResColor(Resource.Color.bg_divider));
+            view.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.bg_divider)));
             var layout = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(1));
             layout.TopMargin = Dp(8);
             layout.BottomMargin = Dp(8);
@@ -818,7 +822,7 @@ namespace System.Application.UI.Activities
         void AddRowDivider(LinearLayout parent)
         {
             var view = new View(this);
-            view.SetBackgroundColor(ResColor(Resource.Color.bg_divider));
+            view.SetBackgroundColor(new Android.Graphics.Color(ResColor(Resource.Color.bg_divider)));
             parent.AddView(view, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MatchParent, Dp(1)));
         }
@@ -852,7 +856,7 @@ namespace System.Application.UI.Activities
         }
 
         void ShowToast(string message)
-            => Toast.MakeText(this, message, ToastLength.Short)?.Show();
+            => Android.Widget.Toast.MakeText(this, message, Android.Widget.ToastLength.Short)?.Show();
 
         bool IsNightMode
             => (Resources.Configuration.UiMode & UiMode.NightMask) == UiMode.NightYes;
