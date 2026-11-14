@@ -61,7 +61,9 @@ namespace System.Application.UI.Activities
             fragments = new (Type fragmentType, Func<string> getTitle, int menuId, TabItemViewModel.TabItemId tabItemId)[]
             {
                  (typeof(LocalAuthFragment), () => LocalAuthPageViewModel.DisplayName, Resource.Id.navigation_local_auth, TabItemViewModel.TabItemId.LocalAuth),
+#if !EXCLUDE_ASF
                  (typeof(ASFPlusFragment), () => ArchiSteamFarmPlusPageViewModel.DisplayName, Resource.Id.navigation_asf_plus, TabItemViewModel.TabItemId.ArchiSteamFarmPlus),
+#endif
                  (typeof(CommunityFixFragment), () => AppResources.CommunityFix, Resource.Id.navigation_community_fix, TabItemViewModel.TabItemId.CommunityProxy),
                  (typeof(MyFragment), () => MyPageViewModel.DisplayName, Resource.Id.navigation_my, default),
             };

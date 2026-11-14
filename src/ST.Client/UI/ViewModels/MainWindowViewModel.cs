@@ -45,7 +45,9 @@ namespace System.Application.UI.ViewModels
 
         public SteamIdlePageViewModel SteamIdlePage => GetTabItemVM<SteamIdlePageViewModel>();
 
+#if !EXCLUDE_ASF
         public ArchiSteamFarmPlusPageViewModel ASFPage => GetTabItemVM<ArchiSteamFarmPlusPageViewModel>();
+#endif
 
         public GameRelatedPageViewModel GameRelatedPage => GetTabItemVM<GameRelatedPageViewModel>();
 
@@ -143,6 +145,7 @@ namespace System.Application.UI.ViewModels
                         {
                             await ProxyService.Current.Initialize();
                         }
+#if !EXCLUDE_ASF
                         if (ASFSettings.AutoRunArchiSteamFarm.Value)
                         {
                             if (platformService.UsePlatformForegroundService)
@@ -154,6 +157,7 @@ namespace System.Application.UI.ViewModels
                                 await ASFService.Current.InitASF();
                             }
                         }
+#endif
                     });
 
                     if (IApplication.IsDesktopPlatform)

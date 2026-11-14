@@ -1,5 +1,7 @@
+#if !EXCLUDE_ASF
 using ArchiSteamFarm;
 using ArchiSteamFarm.Library;
+#endif
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Application;
 using System.Application.Entities;
@@ -67,6 +69,7 @@ namespace Microsoft.Extensions.DependencyInjection
             return services;
         }
 
+#if !EXCLUDE_ASF
         /// <summary>
         /// 添加 ArchiSteamFarm 服务
         /// </summary>
@@ -78,6 +81,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddSingleton<IArchiSteamFarmHelperService>(s => s.GetRequiredService<IArchiSteamFarmService>());
             return services;
         }
+#endif
 
         /// <summary>
         /// 尝试添加使用 <see cref="ToastService"/> 实现的 <see cref="IToast"/>

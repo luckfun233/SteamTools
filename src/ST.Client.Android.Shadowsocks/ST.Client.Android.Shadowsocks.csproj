@@ -1,37 +1,33 @@
-<Project Sdk="MSBuild.Sdk.Extras">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!--<TargetFrameworks>MonoAndroid12.0;net6.0-android</TargetFrameworks>-->
-    <TargetFrameworks>MonoAndroid12.0</TargetFrameworks>
+    <TargetFramework>net6.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
     <IsBindingProject>true</IsBindingProject>
+    <AndroidClassParser>class-parse</AndroidClassParser>
+    <AndroidCodegenTarget>XAJavaInterop1</AndroidCodegenTarget>
     <!--<GeneratePackageOnBuild>true</GeneratePackageOnBuild>-->
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <Version>1.0.0</Version>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/AigioL/xamarin-bindings</PackageProjectUrl>
     <RepositoryUrl>https://github.com/AigioL/xamarin-bindings.git</RepositoryUrl>
-    <PackageTags>Shadowsocks Shadowsocks-Android Xamarin Plugin Binding Xamarin.Android</PackageTags>
+    <PackageTags>Shadowsocks Shadowsocks-Android Xamarin Plugin Binding</PackageTags>
     <Product>Shadowsocks</Product>
     <Company />
     <PackageId>XAB.Shadowsocks</PackageId>
-    <Title>Xamarin Android Binding Library - Shadowsocks</Title>
+    <Title>Android Binding Library - Shadowsocks</Title>
     <Authors>https://github.com/AigioL</Authors>
     <Description>
-      Shadowsocks Binding for Xamarin Android. https://github.com/shadowsocks/shadowsocks-android
+      Shadowsocks Binding for Android. https://github.com/shadowsocks/shadowsocks-android
 
       Commonly Used Types:
-      com.github.shadowsocks -&gt; Shadowsocks
+      net.steampp.app.shadowsocks -&gt; Shadowsocks
     </Description>
-    <!--<GenerateDocumentationFile>true</GenerateDocumentationFile>-->
-    <!--<AllowUnsafeBlocks>true</AllowUnsafeBlocks>-->
-    <!--<PublishRepositoryUrl>true</PublishRepositoryUrl>-->
-    <!--<EmbedUntrackedSources>true</EmbedUntrackedSources>-->
-    <!--<IncludeSymbols>true</IncludeSymbols>-->
-    <!--<SymbolPackageFormat>snupkg</SymbolPackageFormat>-->
   </PropertyGroup>
 
   <ItemGroup>
-    <LibraryProjectZip Include="Jars\*.aar" />
+    <AndroidLibrary Include="Jars\*.aar" Bind="true" />
     <TransformFile Include="Transforms\*.xml" />
     <None Remove="Transforms\*.xml" />
   </ItemGroup>
@@ -40,6 +36,5 @@
     <PackageReference Include="Xamarin.AndroidX.AppCompat" />
     <PackageReference Include="Xamarin.KotlinX.Coroutines.Core" />
     <PackageReference Include="Xamarin.KotlinX.Coroutines.Android" />
-    <!--<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />-->
   </ItemGroup>
 </Project>

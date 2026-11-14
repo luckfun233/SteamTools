@@ -1,3 +1,4 @@
+#if !EXCLUDE_ASF
 using Android.OS;
 using Android.Runtime;
 using Android.Views;
@@ -144,3 +145,4 @@ namespace System.Application.UI.Fragments
         };
     }
 }
+#endif

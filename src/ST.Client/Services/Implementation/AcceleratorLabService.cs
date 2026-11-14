@@ -24,9 +24,13 @@ namespace System.Application.Services.Implementation
         }
 
         public string Name { get; }
+
         public bool Success { get; }
+
         public long ElapsedMs { get; }
+
         public string Detail { get; }
+
         public bool Informational { get; }
 
         public string ToLine()

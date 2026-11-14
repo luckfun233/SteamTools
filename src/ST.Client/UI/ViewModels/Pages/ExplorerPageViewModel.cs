@@ -1,4 +1,6 @@
+#if !EXCLUDE_ASF
 using ArchiSteamFarm;
+#endif
 using ICSharpCode.SharpZipLib.GZip;
 using ICSharpCode.SharpZipLib.Tar;
 using ICSharpCode.SharpZipLib.Zip.Compression;
@@ -43,8 +45,12 @@ namespace System.Application.UI.ViewModels
 
                 if (isChangePath)
                 {
+#if !EXCLUDE_ASF
                     if (_CurrentAbsolutePath.StartsWith(SharedInfo.ConfigDirectory) ||
                      _CurrentAbsolutePath.StartsWith(SharedInfo.PluginsDirectory))
+#else
+                    if (false)
+#endif
                     {
                         // 允许添加与删除的目录
                         IsSupportFileDelete = IsSupportFileCreate = true;

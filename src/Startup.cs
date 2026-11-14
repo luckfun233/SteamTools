@@ -453,7 +453,9 @@ namespace System.Application.UI
                 services.AddSteamGridDBWebApiService();
 
                 // ASF Service
+#if !EXCLUDE_ASF
                 services.AddArchiSteamFarmService();
+#endif
                 if (isTrace) StartWatchTrace.Record("DI.D.Steam");
             }
 #if !CONSOLEAPP
@@ -568,7 +570,9 @@ namespace System.Application.UI
                 if (isTrace) StartWatchTrace.Record(dispose: true);
             }
 
+#if !EXCLUDE_ASF
             ArchiSteamFarm.Web.WebBrowser.CreateHttpHandlerDelegate = CreateHttpHandler;
+#endif
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using System.Application.Services;
 using System.Application.Services.Implementation;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using XEPlatform = Xamarin.Essentials.Platform;
 
@@ -43,9 +44,21 @@ namespace System.Application.Services.Implementation
         //    return endPoints;
         //}
 
-        public int AnalysisHostnameTime(string url)
+        public async Task<int> AnalysisHostnameTime(string url, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrWhiteSpace(url)) return 0;
+            try
+            {
+                var host = url;
+                if (Uri.TryCreate(url, UriKind.Absolute, out var uri)) host = uri.Host;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
+                return (int)sw.ElapsedMilliseconds;
+            }
+            catch
+            {
+                return -1;
+            }
         }
     }
 }

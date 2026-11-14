@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Content.Res;
 using Android.OS;
 using Android.Runtime;
@@ -15,6 +16,9 @@ using Android.Text;
 using Android.Util;
 using Android.Views;
 using Android.Widget;
+using ClipboardManager = Android.Content.ClipboardManager;
+using Color = Android.Graphics.Color;
+using Orientation = Android.Widget.Orientation;
 using System.Application.ProxyRules;
 using System.Application.Services;
 using System.Application.Services.Implementation;
@@ -399,8 +403,7 @@ namespace System.Application.UI.Activities
 
             try
             {
-                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                clipboard?.SetText(report);
+                _ = Xamarin.Essentials.Clipboard.SetTextAsync(report);
                 ToastShow("报告已复制到剪贴板");
             }
             catch (Exception ex)
@@ -550,20 +553,25 @@ namespace System.Application.UI.Activities
         }
 
         void ToastShow(string message)
-            => Toast.MakeText(this, message, ToastLength.Short)?.Show();
+            => Android.Widget.Toast.MakeText(this, new Java.Lang.String(message), Android.Widget.ToastLength.Short)?.Show();
 
         bool IsNightMode
             => (Resources.Configuration.UiMode & UiMode.NightMask) == UiMode.NightYes;
 
-        int ResColor(int resourceId)
+        Color ResColor(int resourceId)
         {
+            int value;
             if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
             {
-                return Resources.GetColor(resourceId, Theme);
+                value = Resources.GetColor(resourceId, Theme);
             }
+            else
+            {
 #pragma warning disable CA1422
-            return Resources.GetColor(resourceId);
+                value = Resources.GetColor(resourceId);
 #pragma warning restore CA1422
+            }
+            return new Color(value);
         }
 
         int Dp(int value)

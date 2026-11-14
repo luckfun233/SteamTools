@@ -1,3 +1,4 @@
+#if !EXCLUDE_ASF
 using Android.Views;
 using Binding;
 using ReactiveUI;
@@ -20,3 +21,4 @@ namespace System.Application.UI.Fragments
         }
     }
 }
+#endif

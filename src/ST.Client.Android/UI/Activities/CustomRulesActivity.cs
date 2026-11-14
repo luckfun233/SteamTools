@@ -3,12 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Content.Res;
+using Android.OS;
 using Android.Runtime;
 using Android.Text;
 using Android.Util;
 using Android.Views;
 using Android.Widget;
+using ClipboardManager = Android.Content.ClipboardManager;
+using Color = Android.Graphics.Color;
+using Orientation = Android.Widget.Orientation;
 using System.Application.ProxyRules;
 using System.Application.Services.Implementation;
 
@@ -121,11 +126,11 @@ namespace System.Application.UI.Activities
                 Gravity = GravityFlags.Top,
                 Typeface = Android.Graphics.Typeface.Monospace,
                 Hint = "在此粘贴 DevSidecar 规则…",
-                MinLines = 12,
             };
             editor.SetTextColor(ResColor(Resource.Color.text_primary));
             editor.SetHintTextColor(ResColor(Resource.Color.text_secondary));
             editor.SetSingleLine(false);
+            editor.SetMinLines(12);
             editor.SetTextIsSelectable(true);
             editorCard.AddView(editor);
 
@@ -229,8 +234,7 @@ namespace System.Application.UI.Activities
             if (editor == null) return;
             try
             {
-                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                clipboard?.SetText(editor.Text ?? string.Empty);
+                _ = Xamarin.Essentials.Clipboard.SetTextAsync(editor.Text ?? string.Empty);
                 ToastShow("已复制");
             }
             catch (Exception ex)
@@ -518,20 +522,25 @@ namespace System.Application.UI.Activities
         }
 
         void ToastShow(string message)
-            => Toast.MakeText(this, message, ToastLength.Short)?.Show();
+            => Android.Widget.Toast.MakeText(this, new Java.Lang.String(message), Android.Widget.ToastLength.Short)?.Show();
 
         bool IsNightMode
             => (Resources.Configuration.UiMode & UiMode.NightMask) == UiMode.NightYes;
 
-        int ResColor(int resourceId)
+        Color ResColor(int resourceId)
         {
+            int value;
             if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
             {
-                return Resources.GetColor(resourceId, Theme);
+                value = Resources.GetColor(resourceId, Theme);
             }
+            else
+            {
 #pragma warning disable CA1422
-            return Resources.GetColor(resourceId);
+                value = Resources.GetColor(resourceId);
 #pragma warning restore CA1422
+            }
+            return new Color(value);
         }
 
         int Dp(int value)

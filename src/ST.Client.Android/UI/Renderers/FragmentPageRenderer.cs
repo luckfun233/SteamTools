@@ -11,9 +11,11 @@ using n = System.Application.UI.Views.Native;
 [assembly: ExportRenderer(
     typeof(n.LocalAuthPage),
     typeof(FragmentPageRenderer<LocalAuthFragment>))]
+#if !EXCLUDE_ASF
 [assembly: ExportRenderer(
     typeof(n.ArchiSteamFarmPlusPage),
     typeof(FragmentPageRenderer<ASFPlusFragment>))]
+#endif
 [assembly: ExportRenderer(
     typeof(n.MyPage),
     typeof(FragmentPageRenderer<MyFragment>))]

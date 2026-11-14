@@ -12,7 +12,11 @@ namespace System.Application.Services
         {
             get
             {
+#if !EXCLUDE_ASF
                 return ArchiSteamFarm.Core.OS.IsRunningAsRoot();
+#else
+                return false;
+#endif
             }
         }
     }

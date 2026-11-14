@@ -861,6 +861,7 @@ namespace System.Application.Services.Implementation
             }
 
             public byte[]? Data { get; }
+
             public bool TimedOut { get; }
         }
 
@@ -890,8 +891,11 @@ namespace System.Application.Services.Implementation
             }
 
             public SocksCommand Command { get; }
+
             public string? HostName { get; }
+
             public IPAddress? Address { get; }
+
             public int Port { get; }
         }
     }

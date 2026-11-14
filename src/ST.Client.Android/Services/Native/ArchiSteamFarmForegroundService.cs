@@ -1,3 +1,4 @@
+#if !EXCLUDE_ASF
 using Android.App;
 using Android.Runtime;
 using System.Application.UI.Resx;
@@ -42,3 +43,4 @@ namespace System.Application.Services.Native
             => nameof(TabItemViewModel.TabItemId.ArchiSteamFarmPlus);
     }
 }
+#endif

@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+#if !EXCLUDE_ASF
 using ASF_FS = System.Application.Services.Native.ArchiSteamFarmForegroundService;
+#endif
 using XEPlatform = Xamarin.Essentials.Platform;
 using Android.App;
 using System.Application.Services.Native;
@@ -16,6 +18,7 @@ namespace System.Application.Services.Implementation
         {
             switch (serviceName)
             {
+#if !EXCLUDE_ASF
                 case nameof(ASFService):
                     var s = ASFService.Current;
                     if (s.IsASFRunOrStoping) return;
@@ -23,6 +26,7 @@ namespace System.Application.Services.Implementation
                     if (isASFRuning == startOrStop) return;
                     activity.StartOrStopForegroundService<ASF_FS>(!isASFRuning);
                     break;
+#endif
                 case nameof(ProxyService):
                     if (!startOrStop.HasValue) startOrStop = !ProxyService.Current.ProxyStatus;
                     ProxyForegroundService.StartOrStop(activity, startOrStop.Value);

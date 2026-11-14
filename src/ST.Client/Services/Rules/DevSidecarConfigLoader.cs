@@ -203,7 +203,7 @@ namespace System.Application.ProxyRules
                 TryGetObject(overwall, "targets", out var targets))
             {
                 var count = 0;
-                foreach (var _ in targets.EnumerateObject()) count++;
+                foreach (var ignore in targets.EnumerateObject()) count++;
                 if (count > 0)
                 {
                     Log.Info("DevSidecarConfig", $"检测到 overwall 中继目标 {count} 条，当前版本不自动启用");
@@ -366,7 +366,6 @@ namespace System.Application.ProxyRules
             }
             return result;
         }
-
 
         static IReadOnlyList<string> ReadIpList(JsonElement element)
         {

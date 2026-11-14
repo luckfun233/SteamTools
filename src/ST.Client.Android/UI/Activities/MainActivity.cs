@@ -86,7 +86,9 @@ namespace System.Application.UI.Activities
             R.Subscribe(() =>
             {
                 SetSubPageTitle(Resource.Id.navigation_local_auth, LocalAuthPageViewModel.DisplayName);
+#if !EXCLUDE_ASF
                 SetSubPageTitle(Resource.Id.navigation_asf_plus, ArchiSteamFarmPlusPageViewModel.DisplayName);
+#endif
                 SetSubPageTitle(Resource.Id.navigation_my, MyPageViewModel.DisplayName);
                 SetSubPageTitle(Resource.Id.navigation_community_fix, AppResources.CommunityFix);
                 //SetSubPageTitle(Resource.Id.navigation_game_list, AppResources.GameList);
@@ -110,7 +112,9 @@ namespace System.Application.UI.Activities
                     {
                         TabItemViewModel.TabItemId.CommunityProxy => Resource.Id.navigation_community_fix,
                         TabItemViewModel.TabItemId.LocalAuth => Resource.Id.navigation_local_auth,
+#if !EXCLUDE_ASF
                         TabItemViewModel.TabItemId.ArchiSteamFarmPlus => Resource.Id.navigation_asf_plus,
+#endif
                         _ => navController.CurrentDestination.Id,
                     };
                     if (id != navController.CurrentDestination.Id)

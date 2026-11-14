@@ -1,6 +1,8 @@
+#if !EXCLUDE_ASF
 using ArchiSteamFarm;
 using ArchiSteamFarm.Library;
 using ArchiSteamFarm.NLog.Targets;
+#endif
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NLog.Config;
@@ -9,7 +11,9 @@ using NLog.Targets;
 using System.Application.Services;
 using System.IO;
 using System.Properties;
+#if !EXCLUDE_ASF
 using ASFNLogManager = ArchiSteamFarm.LogManager;
+#endif
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using NInternalLogger = NLog.Common.InternalLogger;
 using NLogLevel = NLog.LogLevel;
@@ -203,6 +207,7 @@ namespace System.Application.UI
             if (isTrace) StartWatchTrace.Record("InitLogDir.CreateCfg");
             NLogManager.Configuration = objConfig;
 
+#if !EXCLUDE_ASF
             LogDirPathASF = ASFPathHelper.GetLogDirectory(logDirPath_);
             IArchiSteamFarmService.InitCoreLoggers = () =>
             {
@@ -231,6 +236,7 @@ namespace System.Application.UI
                 InitializeTarget(config, historyTarget, NLogLevel.Debug);
                 ASFNLogManager.Configuration = config;
             };
+#endif
 
             LogDirPath = logDirPath;
             static void InitializeTarget(LoggingConfiguration config, Target target, NLogLevel minLevel)

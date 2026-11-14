@@ -258,7 +258,11 @@ namespace System.Application.UI
                     const string f = "yy-MM-dd HH:mm:ss";
                     const string f2 = "HH:mm:ss";
                     const string f3 = "dd HH:mm:ss";
+#if !EXCLUDE_ASF
                     var starttime = ArchiSteamFarm.Core.OS.ProcessStartTime;
+#else
+                    var starttime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+#endif
                     starttime = starttime.ToLocalTime();
                     var utc_time = starttime.ToUniversalTime();
                     var local = TimeZoneInfo.Local;

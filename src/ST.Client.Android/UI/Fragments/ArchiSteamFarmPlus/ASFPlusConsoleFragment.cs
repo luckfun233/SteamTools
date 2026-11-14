@@ -1,3 +1,4 @@
+#if !EXCLUDE_ASF
 using Android.Util;
 using Android.Views;
 using Android.Views.InputMethods;
@@ -100,3 +101,4 @@ namespace System.Application.UI.Fragments
         }
     }
 }
+#endif
