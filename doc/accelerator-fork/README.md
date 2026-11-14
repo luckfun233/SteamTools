@@ -100,6 +100,15 @@ git submodule update --init --recursive
 
 上传的是匿名临时空间，链接可能过期；过期后按上面的脚本自行构建即可。
 
+启动验证（Xvfb 无头环境，45 秒）：
+
+- 主进程没有崩溃，正常进入 Avalonia UI 初始化；
+- `~/.local/share/Steam++/Plugins/GameAccount/` 等插件数据目录被创建，说明 `modules` 插件加载成功；
+- `~/.net/Steam++.Accelerator/` 出现单文件解包目录，说明加速插件成功拉起了反代子进程。
+
+未做真实桌面下的点击级验证（加速开关、证书安装、实际代理链路）。
+
+
 
 ## 7. 常见问题
 
