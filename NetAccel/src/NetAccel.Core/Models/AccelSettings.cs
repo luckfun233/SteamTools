@@ -41,7 +41,7 @@ public sealed class AccelSettings
 
     // ---- SNI 分片 ----
     public bool EnableSniFragment { get; set; } = true;
-    public TlsFragmentStrategy FragmentStrategy { get; set; } = TlsFragmentStrategy.SniBoundary;
+    public TlsFragmentStrategy FragmentStrategy { get; set; } = TlsFragmentStrategy.Auto;
     public int FragmentChunkSize { get; set; } = 64;
     public int SplitPieces { get; set; } = 3;
     public int FragmentDelayMs { get; set; } = 10;
@@ -62,10 +62,19 @@ public sealed class AccelSettings
     // ---- DNS ----
     public bool EnableDoh { get; set; } = true;
     public string DohEndpoint { get; set; } = "https://dns.alidns.com/resolve";
+
+    /// <summary>主 DoH 失败后依次尝试的备用地址，分号分隔。</summary>
+    public string DohFallbackEndpoints { get; set; } =
+        "https://dns.google/resolve;https://cloudflare-dns.com/dns-query";
+
     public bool DohFallbackToSystem { get; set; } = true;
+
+    /// <summary>DoH 请求通过上游中继发送，适合直连 DoH 被阻断但中继可用的网络。</summary>
+    public bool DohViaRelay { get; set; } = false;
 
     // ---- 上游中继 ----
     public bool EnableUpstreamRelay { get; set; } = false;
+    public RelayType RelayType { get; set; } = RelayType.Socks5;
     public string RelayHost { get; set; } = "127.0.0.1";
     public int RelayPort { get; set; } = 7890;
     public string RelayUserName { get; set; } = string.Empty;
@@ -143,6 +152,12 @@ public sealed class AccelSettings
         if (!Enum.IsDefined(FragmentStrategy))
         {
             FragmentStrategy = TlsFragmentStrategy.SniBoundary;
+            changed = true;
+        }
+
+        if (!Enum.IsDefined(RelayType))
+        {
+            RelayType = RelayType.Socks5;
             changed = true;
         }
 

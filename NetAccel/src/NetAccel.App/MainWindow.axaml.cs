@@ -95,9 +95,12 @@ public partial class MainWindow : Window
     readonly TextBox rewriteDomainsBox;
     readonly CheckBox dohEnableCheck;
     readonly TextBox dohEndpointBox;
+    readonly TextBox dohFallbackBox;
     readonly CheckBox dohFallbackCheck;
+    readonly CheckBox dohViaRelayCheck;
 
     readonly CheckBox relayEnableCheck;
+    readonly ComboBox relayTypeCombo;
     readonly TextBox relayHostBox;
     readonly NumericUpDown relayPortBox;
     readonly TextBox relayUserBox;
@@ -190,9 +193,12 @@ public partial class MainWindow : Window
         rewriteDomainsBox = C<TextBox>("RewriteDomainsBox");
         dohEnableCheck = C<CheckBox>("DohEnableCheck");
         dohEndpointBox = C<TextBox>("DohEndpointBox");
+        dohFallbackBox = C<TextBox>("DohFallbackBox");
         dohFallbackCheck = C<CheckBox>("DohFallbackCheck");
+        dohViaRelayCheck = C<CheckBox>("DohViaRelayCheck");
 
         relayEnableCheck = C<CheckBox>("RelayEnableCheck");
+        relayTypeCombo = C<ComboBox>("RelayTypeCombo");
         relayHostBox = C<TextBox>("RelayHostBox");
         relayPortBox = C<NumericUpDown>("RelayPortBox");
         relayUserBox = C<TextBox>("RelayUserBox");
@@ -347,9 +353,12 @@ public partial class MainWindow : Window
             rewriteDomainsBox.Text = settings.RewriteDomains;
             dohEnableCheck.IsChecked = settings.EnableDoh;
             dohEndpointBox.Text = settings.DohEndpoint;
+            dohFallbackBox.Text = settings.DohFallbackEndpoints;
             dohFallbackCheck.IsChecked = settings.DohFallbackToSystem;
+            dohViaRelayCheck.IsChecked = settings.DohViaRelay;
 
             relayEnableCheck.IsChecked = settings.EnableUpstreamRelay;
+            relayTypeCombo.SelectedIndex = settings.RelayType == RelayType.Http ? 1 : 0;
             relayHostBox.Text = settings.RelayHost;
             relayPortBox.Value = settings.RelayPort;
             relayUserBox.Text = settings.RelayUserName;
@@ -394,7 +403,7 @@ public partial class MainWindow : Window
         settings.BypassLocalhost = bypassLocalCheck.IsChecked == true;
 
         settings.EnableSniFragment = fragmentEnableCheck.IsChecked == true;
-        settings.FragmentStrategy = (TlsFragmentStrategy)Math.Clamp(strategyCombo.SelectedIndex, 0, 5);
+        settings.FragmentStrategy = (TlsFragmentStrategy)Math.Clamp(strategyCombo.SelectedIndex, 0, 7);
         settings.FragmentChunkSize = ToInt(chunkBox, settings.FragmentChunkSize);
         settings.SplitPieces = ToInt(piecesBox, settings.SplitPieces);
         settings.FragmentDelayMs = ToInt(delayBox, settings.FragmentDelayMs);
@@ -412,9 +421,12 @@ public partial class MainWindow : Window
         settings.RewriteDomains = rewriteDomainsBox.Text?.Trim() ?? string.Empty;
         settings.EnableDoh = dohEnableCheck.IsChecked == true;
         settings.DohEndpoint = dohEndpointBox.Text?.Trim() ?? string.Empty;
+        settings.DohFallbackEndpoints = dohFallbackBox.Text?.Trim() ?? string.Empty;
         settings.DohFallbackToSystem = dohFallbackCheck.IsChecked == true;
+        settings.DohViaRelay = dohViaRelayCheck.IsChecked == true;
 
         settings.EnableUpstreamRelay = relayEnableCheck.IsChecked == true;
+        settings.RelayType = relayTypeCombo.SelectedIndex == 1 ? RelayType.Http : RelayType.Socks5;
         settings.RelayHost = relayHostBox.Text?.Trim() ?? "127.0.0.1";
         settings.RelayPort = ToInt(relayPortBox, settings.RelayPort);
         settings.RelayUserName = relayUserBox.Text ?? string.Empty;
@@ -530,7 +542,7 @@ public partial class MainWindow : Window
             if (settings.EnableSocks5) modes.Add("SOCKS5");
             if (settings.EnableHttp) modes.Add("HTTP");
             statusDetail.Text = $"{string.Join(" + ", modes)} 已监听 · " +
-                                $"分片 {(settings.EnableSniFragment ? settings.FragmentStrategy.ToString() : "关")} · " +
+                                $"分片 {(settings.EnableSniFragment ? AccelerationLab.GetStrategyName(settings.FragmentStrategy) : "关")} · " +
                                 $"DoH {(settings.EnableDoh ? "开" : "关")}";
         }
         else

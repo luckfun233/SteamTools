@@ -22,6 +22,18 @@ public enum TlsFragmentStrategy
 
     /// <summary>随机大小分片。</summary>
     Random = 5,
+
+    /// <summary>
+    /// TCP OOB（URG）拆分：利用带外字节制造乱序，参考 byedpi 的 --oob。
+    /// 需要完整保留字节流，失败时自动回退普通分片。
+    /// </summary>
+    OobSplit = 6,
+
+    /// <summary>
+    /// 自动模式：默认 TLS record 拆分，失败后依次尝试 SNI 边界与不分片，
+    /// 并按域名记住成功的策略。参考 byedpi 的 --auto 思路。
+    /// </summary>
+    Auto = 7,
 }
 
 /// <summary>

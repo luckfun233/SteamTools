@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NetAccel.Android</RootNamespace>
+    <AssemblyName>NetAccel.Android</AssemblyName>
+
+    <ApplicationId>com.netaccel.android</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <ApplicationLabel>NetAccel</ApplicationLabel>
+
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+    <PublishTrimmed>false</PublishTrimmed>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <AndroidFastDeploymentType>None</AndroidFastDeploymentType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NetAccel.Core\NetAccel.Core.csproj" />
+  </ItemGroup>
+</Project>

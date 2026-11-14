@@ -6,6 +6,7 @@ using NetAccel.Core.Logging;
 using NetAccel.Core.Models;
 using NetAccel.Core.Proxy;
 using NetAccel.Core.Tls;
+using ERelayType = NetAccel.Core.Models.RelayType;
 
 namespace NetAccel.Cli;
 
@@ -325,11 +326,13 @@ NetAccel 网络加速器 (命令行)
   --socks-port <port>     覆盖 SOCKS5 端口
   --http-port <port>      覆盖 HTTP 端口
   --host <host>           实验室测试目标（默认 github.com）
-  --strategy <name>       sni|fixed|record|pieces|record-split|random
+  --strategy <name>       auto|sni|fixed|record|pieces|record-split|random|oob
   --no-fragment           关闭 SNI 分片
   --no-doh                关闭 DoH
+  --doh-via-relay         DoH 通过上游中继发送
   --system-proxy          启动时设置系统代理
-  --relay <host:port>     启用上游 SOCKS5 中继
+  --relay <host:port>     启用上游代理中继
+  --relay-type <type>     socks5|http（默认 socks5）
   --verbose               输出详细信息
 """);
     }
@@ -411,8 +414,10 @@ internal sealed class CliOptions
     public int? SocksPort { get; private set; }
     public int? HttpPort { get; private set; }
     public string? Strategy { get; private set; }
+    public string? RelayType { get; private set; }
     public bool DisableFragment { get; private set; }
     public bool DisableDoh { get; private set; }
+    public bool DohViaRelay { get; private set; }
     public bool SystemProxy { get; private set; }
     public string? Relay { get; private set; }
 
@@ -448,11 +453,17 @@ internal sealed class CliOptions
                 case "--strategy":
                     options.Strategy = Next(args, ref i);
                     break;
+                case "--relay-type":
+                    options.RelayType = Next(args, ref i);
+                    break;
                 case "--no-fragment":
                     options.DisableFragment = true;
                     break;
                 case "--no-doh":
                     options.DisableDoh = true;
+                    break;
+                case "--doh-via-relay":
+                    options.DohViaRelay = true;
                     break;
                 case "--system-proxy":
                     options.SystemProxy = true;
@@ -485,6 +496,7 @@ internal sealed class CliOptions
         if (HttpPort is > 0 and <= 65535) settings.HttpPort = HttpPort.Value;
         if (DisableFragment) settings.EnableSniFragment = false;
         if (DisableDoh) settings.EnableDoh = false;
+        if (DohViaRelay) settings.DohViaRelay = true;
         if (SystemProxy) settings.SetSystemProxy = true;
 
         if (!string.IsNullOrWhiteSpace(Strategy))
@@ -496,8 +508,17 @@ internal sealed class CliOptions
                 "pieces" or "sni-pieces" => TlsFragmentStrategy.SniPieces,
                 "record-split" or "tls-record" => TlsFragmentStrategy.TlsRecordSplit,
                 "random" => TlsFragmentStrategy.Random,
+                "oob" or "oob-split" => TlsFragmentStrategy.OobSplit,
+                "auto" => TlsFragmentStrategy.Auto,
                 _ => TlsFragmentStrategy.SniBoundary,
             };
+        }
+
+        if (!string.IsNullOrWhiteSpace(RelayType))
+        {
+            settings.RelayType = RelayType.Equals("http", StringComparison.OrdinalIgnoreCase)
+                ? ERelayType.Http
+                : ERelayType.Socks5;
         }
 
         if (!string.IsNullOrWhiteSpace(Relay))

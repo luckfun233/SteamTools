@@ -51,8 +51,8 @@ public sealed class UpstreamConnector
         bool excluded,
         CancellationToken cancellationToken)
     {
-        // 本机/内网与排除列表命中时始终直连，不参与分片、DoH 或中继。
-        if (NetUtil.IsLocalHost(host) || excluded)
+        // 本机/内网默认直连；关闭 BypassLocalhost 时也允许本机流量走分片/中继，便于自测。
+        if (excluded || (settings.BypassLocalhost && NetUtil.IsLocalHost(host)))
         {
             var direct = await ConnectTcpAsync(host, port, cancellationToken).ConfigureAwait(false);
             return new UpstreamConnection(direct, false, null);
@@ -160,13 +160,27 @@ public sealed class UpstreamConnector
             cts.CancelAfter(ConnectTimeout);
             await relay.ConnectAsync(settings.RelayHost, settings.RelayPort, cts.Token).ConfigureAwait(false);
             relay.NoDelay = true;
-            await Socks5Client.ConnectAsync(
-                relay.GetStream(),
-                host,
-                port,
-                settings.RelayUserName,
-                settings.RelayPassword,
-                cts.Token).ConfigureAwait(false);
+
+            if (settings.RelayType == RelayType.Http)
+            {
+                await HttpConnectClient.ConnectAsync(
+                    relay.GetStream(),
+                    host,
+                    port,
+                    settings.RelayUserName,
+                    settings.RelayPassword,
+                    cts.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                await Socks5Client.ConnectAsync(
+                    relay.GetStream(),
+                    host,
+                    port,
+                    settings.RelayUserName,
+                    settings.RelayPassword,
+                    cts.Token).ConfigureAwait(false);
+            }
             return relay;
         }
         catch

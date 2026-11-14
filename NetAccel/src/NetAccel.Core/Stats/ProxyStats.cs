@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using NetAccel.Core.Tls;
 
 namespace NetAccel.Core.Stats;
 
@@ -122,6 +123,7 @@ public sealed class ProxyStats
 public sealed class FragmentFallbackCache
 {
     readonly Dictionary<string, DateTimeOffset> cache = new(StringComparer.OrdinalIgnoreCase);
+    readonly Dictionary<string, StrategyPreference> strategies = new(StringComparer.OrdinalIgnoreCase);
     readonly object sync = new();
 
     public TimeSpan Duration { get; set; } = TimeSpan.FromMinutes(10);
@@ -148,16 +150,64 @@ public sealed class FragmentFallbackCache
         }
     }
 
+    /// <summary>
+    /// 自动模式下按域名记住有效的策略；<paramref name="strategy"/> 为 null 表示不分片。
+    /// </summary>
+    public void RememberStrategy(string host, TlsFragmentStrategy? strategy)
+    {
+        if (string.IsNullOrEmpty(host)) return;
+        lock (sync)
+        {
+            if (strategies.Count > 2048) strategies.Clear();
+            strategies[host] = new StrategyPreference(strategy, DateTimeOffset.UtcNow.Add(Duration));
+        }
+    }
+
+    public bool TryGetPreferredStrategy(string host, out TlsFragmentStrategy? strategy)
+    {
+        strategy = null;
+        if (string.IsNullOrEmpty(host)) return false;
+
+        lock (sync)
+        {
+            if (!strategies.TryGetValue(host, out var preference)) return false;
+            if (preference.ExpireAt <= DateTimeOffset.UtcNow)
+            {
+                strategies.Remove(host);
+                return false;
+            }
+
+            strategy = preference.Strategy;
+            return true;
+        }
+    }
+
     public void Clear()
     {
-        lock (sync) cache.Clear();
+        lock (sync)
+        {
+            cache.Clear();
+            strategies.Clear();
+        }
     }
 
     public int Count
     {
         get
         {
-            lock (sync) return cache.Count;
+            lock (sync) return cache.Count + strategies.Count;
         }
+    }
+
+    sealed class StrategyPreference
+    {
+        public StrategyPreference(TlsFragmentStrategy? strategy, DateTimeOffset expireAt)
+        {
+            Strategy = strategy;
+            ExpireAt = expireAt;
+        }
+
+        public TlsFragmentStrategy? Strategy { get; }
+        public DateTimeOffset ExpireAt { get; }
     }
 }

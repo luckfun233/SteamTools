@@ -58,14 +58,18 @@ internal static class NetUtil
         return true;
     }
 
+    /// <summary>
+    /// 构造 SOCKS5 的 ATYP + 地址 + 端口部分（不含 3 字节的 VER/CMD/RSV）。
+    /// 调用方在前面补上 0x05/0x01/0x00 即可。
+    /// </summary>
     public static byte[] BuildSocks5Address(string host, int port)
     {
         if (IPAddress.TryParse(host, out var ip))
         {
             var address = ip.GetAddressBytes();
-            var result = new byte[4 + address.Length];
-            result[3] = ip.AddressFamily == AddressFamily.InterNetworkV6 ? (byte)0x04 : (byte)0x01;
-            address.CopyTo(result, 4);
+            var result = new byte[1 + address.Length + 2];
+            result[0] = ip.AddressFamily == AddressFamily.InterNetworkV6 ? (byte)0x04 : (byte)0x01;
+            address.CopyTo(result, 1);
             result[^2] = (byte)(port >> 8);
             result[^1] = (byte)(port & 0xFF);
             return result;
@@ -74,10 +78,10 @@ internal static class NetUtil
         var hostBytes = System.Text.Encoding.ASCII.GetBytes(host);
         if (hostBytes.Length > 255) throw new IOException("域名过长");
 
-        var buffer = new byte[5 + hostBytes.Length];
-        buffer[3] = 0x03;
-        buffer[4] = (byte)hostBytes.Length;
-        hostBytes.CopyTo(buffer, 5);
+        var buffer = new byte[1 + 1 + hostBytes.Length + 2];
+        buffer[0] = 0x03;
+        buffer[1] = (byte)hostBytes.Length;
+        hostBytes.CopyTo(buffer, 2);
         buffer[^2] = (byte)(port >> 8);
         buffer[^1] = (byte)(port & 0xFF);
         return buffer;

@@ -11,10 +11,10 @@
 - **规则组**：GitHub、Hugging Face、Pixiv、Google、YouTube、Wikipedia、Docker、Reddit、Steam、其它；未勾选的组不参与匹配。
 - **自定义规则**：与远程规则合并且优先匹配；文本编辑器 + 快速添加（SNI 伪装 / 移除 SNI / 阻断 / 预置 IP / 直连排除）。
 - **内置加速数据**：不依赖远程配置也会给 GitHub / Pixiv 使用常用预置 IP。
-- **六种 SNI 分片策略**：固定大小、SNI 边界、TLS 记录头、SNI 多段、TLS record 拆分、随机分片；支持分片间隔、随机抖动、失败自动回退与域名缓存。
-- **DoH**：JSON 接口（默认阿里 DoH），失败可回退系统 DNS；DoH 请求强制绕过系统代理，避免递归。
-- **上游 SOCKS5 中继**：支持无认证与用户名/密码认证，可按域名限制生效范围。
-- **加速实验室**：规则 / 设置 / 端口 / 系统 DNS / DoH / TCP / 直连 TLS / 代理 TLS / HTTP 代理 / UDP 环境检查，支持六种策略矩阵、复制与导出报告。
+- **七种 SNI 分片策略 + 自动模式**：固定大小、SNI 边界、TLS 记录头、SNI 多段、TLS record 拆分、随机分片、OOB 拆分；自动模式默认先 TLS record 拆分，失败后回退并按域名记住有效策略。
+- **DoH**：JSON 与 RFC 8484 二进制接口、主/备地址自动切换、A/AAAA 回退、TTL 缓存；支持通过上游中继发送 DoH，解决“直连 DoH 被阻断”的场景。
+- **上游中继**：SOCKS5 与 HTTP CONNECT 两种协议，支持无认证与用户名/密码认证，可按域名限制生效范围。
+- **加速实验室**：规则 / 设置 / 端口 / 系统 DNS / DoH / DNS 污染对比 / TCP / 直连 TLS / 代理 TLS / HTTP 代理 / UDP 环境检查，支持七种策略矩阵、复制与导出报告。
 - **诊断日志**：按天归档、单文件上限、敏感参数脱敏、可隐藏主机名，不记录 Cookie / Authorization / 请求体。
 - **系统代理**：Windows 注册表、GNOME gsettings、KDE、macOS networksetup；开启前保存原值，关闭应用时尽量恢复。
 
@@ -42,10 +42,14 @@ dotnet test tests/NetAccel.Core.Tests
 
 ```bash
 # 指定端口与分片策略
-netaccel run --socks-port 7891 --http-port 7892 --strategy record-split
+netaccel run --socks-port 7891 --http-port 7892 --strategy auto
 
 # 只测某个域名并输出实验室报告
 netaccel check --host github.com
+
+# 经公司/沙箱 HTTP 代理访问，并让 DoH 也走中继
+netaccel check --host github.com \
+  --relay 127.0.0.1:7890 --relay-type http --doh-via-relay
 
 # 同步远程 DevSidecar 规则
 netaccel sync
@@ -88,6 +92,27 @@ dotnet run --project tools/NetAccel.UiPreview -- ./ui-preview
 ```
 
 使用 `Avalonia.Headless + Skia` 真实渲染窗口，逐页输出截图并检查关键控件尺寸，不需要安装 Xvfb，适合 CI 和远程沙箱。
+
+### Android APK
+
+```bash
+export JAVA_HOME=/path/to/jdk17
+export ANDROID_HOME=/path/to/android-sdk   # 需要 platforms;android-34 与 build-tools;34.0.0
+dotnet workload install android
+./packaging/build-apk.sh
+```
+
+产物：`artifacts/NetAccel-android-arm64-1.0.0.apk`（arm64-v8a、minSdk 26、约 23 MB、使用本地演示证书签名）。
+
+Android 版本的行为与桌面版一致：在 `127.0.0.1` 上启动 SOCKS5 + HTTP 代理，使用同一套规则、分片、DoH 与中继。由于 Android 不允许普通应用静默修改全局代理，需要手动配置：
+
+1. 安装并打开 NetAccel，点击「启动加速」；
+2. 打开 WiFi 设置 → 当前网络 → 代理 → 手动；
+3. 填写 `127.0.0.1` 和界面显示的 HTTP 端口（默认 8869）。
+
+也可以在支持代理设置的浏览器（如 Firefox）里直接填写 SOCKS5 或 HTTP 地址。APK 不创建 VPN，因此未配置代理的应用不会自动走加速；这是与带 VpnService 的 Android 客户端的本质区别。
+
+> 当前 Linux 沙箱可以完整构建、签名并校验 APK，但没有 Android 真机/模拟器，因此安装后的运行验证需要你在手机上完成。若启动异常，可用 `adb logcat | grep -i netaccel` 查看日志。
 
 ## 使用方式
 
@@ -152,8 +177,29 @@ dotnet run --project tools/NetAccel.UiPreview -- ./ui-preview
 | SNI 多段 | 把域名拆成 2~8 段 | 长域名更稳 |
 | TLS record 拆分 | 重新封装成多个合法 TLS record，让 SNI 跨 record | 最强，可过逐 record 检查 |
 | 随机分片 | 随机大小 TCP 段 | 降低固定长度指纹 |
+| OOB 拆分 | 用 TCP 带外字节制造乱序 | 实验性，参考 byedpi `--oob` |
+| 自动 | 先 TLS record 拆分，失败后回退并记忆 | 推荐默认，参考 byedpi `--auto` |
 
 按文档中的模拟结果：TCP 分段只能对抗首包 DPI；TLS record 拆分能通过 first / tcp / record 三类检查；会重组 handshake 的 DPI 只能依赖上游中继。分片间隔调到 200ms 可跨过 150ms 的重组窗口，但握手延迟明显增加，默认仍为 10ms。
+
+## 开源方案参考
+
+本项目在用户态做 TCP 转发，不能使用 raw socket / NFQUEUE / WinDivert，因此只采用可移植的应用层手段：
+
+| 方案 | 做法 | 本项目对应 |
+|---|---|---|
+| [byedpi](https://github.com/hufrea/byedpi) | `--split` / `--disorder` / `--oob` / `--tlsrec` / `--auto` | SNI 边界、固定/随机分片、TLS record 拆分、OOB 拆分、自动回退 |
+| [zapret](https://github.com/bol-van/zapret) | `--dpi-desync=split/disorder/fake` + TTL/MD5 伪造包 | 采用 split 与 TLS record 思路；fake/TTL 需要改包能力，未实现 |
+| [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI) | WinDivert 驱动 + TCP 分段/伪造 | 采用分段思路；驱动方案不便移植到 Android/Avalonia |
+| [SpoofDPI](https://github.com/xvzc/SpoofDPI) / [GreenTunnel](https://github.com/SadeghHayeri/GreenTunnel) | 首字节/ClientHello 拆分 | SNI 边界与固定分片 |
+| [dev-sidecar](https://github.com/docmirror/dev-sidecar) / [FastGithub](https://github.com/dotnetcore/FastGithub) | 预置 IP + SNI 伪装（MITM）+ DNS 处理 | 预置 IP、DoH、规则与按域名分流；不做 MITM |
+| [RFC 8484 DoH](https://www.rfc-editor.org/rfc/rfc8484) | HTTPS 承载 DNS | JSON + 二进制接口、备用地址、A/AAAA |
+
+没有实现的：
+
+- **fake / TTL / MD5 伪造包、IP 分片与序列重叠**需要 raw socket 或内核转发，在 Windows/macOS/Android 上不可移植，且容易误伤正常连接；本项目的 OOB 只使用标准 TCP URG 带外字节，失败会自动回退。
+- **ECH** 由客户端与服务端协商，代理无法替应用发起；只能退回 IP 规则或整条中继。
+- **QUIC/HTTP3** 需要 UDP relay 或 VPN 内阻断，本地 SOCKS/HTTP 代理只处理 TCP。
 
 ## 安全模型
 
@@ -171,10 +217,13 @@ NetAccel/
 ├── src/
 │   ├── NetAccel.Core/       规则、TLS、DNS、代理服务、系统代理、实验室
 │   ├── NetAccel.App/        Avalonia 桌面界面
+│   ├── NetAccel.Android/    Android 前台服务 + 原生界面
 │   └── NetAccel.Cli/        命令行与服务端自检
 ├── tests/NetAccel.Core.Tests/
 ├── tools/NetAccel.UiPreview/ 无显示器界面截图与布局冒烟测试
-└── packaging/build.sh
+└── packaging/
+    ├── build.sh             Linux/Windows 自包含打包
+    └── build-apk.sh         Android APK 打包
 ```
 
 ## 关于“打包后打开就闪退”
@@ -195,10 +244,12 @@ NetAccel/
 
 - 不包含 MITM，因此镜像重定向、请求/响应头替换、`verifyHost` 不会执行。
 - 不对 UDP/QUIC 做代理；SOCKS5 的 UDP ASSOCIATE 会明确拒绝。
+- OOB 拆分依赖平台对 TCP URG 的处理，部分网络会失败并自动回退；默认策略仍是自动/TLS record 拆分。
 - 不处理证书固定（pinning）的应用。
 - 不会自动启用 DevSidecar 的 `overwall` 中继。
-- 不含 Android/iOS 工程；本仓库聚焦桌面端独立应用。
+- Android 版本不创建 VPN，必须手动配置 WiFi/浏览器代理；未配置代理的应用不会自动走加速。
 - 分片能否绕过 DPI 取决于具体网络，必须结合实验室与真实环境验证。
+- `--strategy` 的 fake/TTL/raw-socket 方案未实现，原因见上文「开源方案参考」。
 
 ## 与原项目的关系
 

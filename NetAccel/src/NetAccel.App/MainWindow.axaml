@@ -408,6 +408,8 @@
                       <ComboBoxItem Content="SNI 多段" />
                       <ComboBoxItem Content="TLS record 拆分（较强）" />
                       <ComboBoxItem Content="随机分片" />
+                      <ComboBoxItem Content="OOB 拆分（实验）" />
+                      <ComboBoxItem Content="自动（推荐）" />
                     </ComboBox>
                   </Grid>
 
@@ -465,13 +467,27 @@
                     <TextBlock Text="DoH 地址" Classes="muted" VerticalAlignment="Center" />
                     <TextBox x:Name="DohEndpointBox" Grid.Column="1" />
                   </Grid>
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="备用 DoH" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="DohFallbackBox" Grid.Column="1" TextWrapping="Wrap"
+                             Watermark="分号分隔，例如 https://dns.google/resolve;https://cloudflare-dns.com/dns-query" />
+                  </Grid>
                   <CheckBox x:Name="DohFallbackCheck" Content="DoH 失败时回退系统 DNS" />
+                  <CheckBox x:Name="DohViaRelayCheck" Content="DoH 通过上游中继发送（直连 DoH 被阻断时使用）" />
                 </StackPanel>
               </Expander>
 
               <Expander Header="上游中继">
                 <StackPanel Spacing="10" Margin="14,4,14,14">
-                  <CheckBox x:Name="RelayEnableCheck" Content="把流量转交给上游 SOCKS5（例如 Clash / V2Ray 的 7890 端口）" />
+                  <CheckBox x:Name="RelayEnableCheck" Content="把流量转交给上游代理（Clash / V2Ray / 公司 HTTP 代理等）" />
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="中继协议" Classes="muted" VerticalAlignment="Center" />
+                    <ComboBox x:Name="RelayTypeCombo" Grid.Column="1" SelectedIndex="0" Width="220"
+                              HorizontalAlignment="Left">
+                      <ComboBoxItem Content="SOCKS5" />
+                      <ComboBoxItem Content="HTTP CONNECT" />
+                    </ComboBox>
+                  </Grid>
                   <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
                     <TextBlock Text="中继地址" Classes="muted" VerticalAlignment="Center" />
                     <TextBox x:Name="RelayHostBox" Grid.Column="1" Text="127.0.0.1" />

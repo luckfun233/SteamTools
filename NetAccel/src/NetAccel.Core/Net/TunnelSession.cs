@@ -76,40 +76,73 @@ public sealed class TunnelSession
 
             var excluded = rules.Current.IsExcluded(host);
             var payload = ApplyRuleSniRewrite(first.Data, host, excluded);
-            var shouldFragment = ShouldFragment(host, payload, excluded);
+            var attempts = BuildStrategyAttempts(host, payload, excluded);
 
-            var probe = await SendFirstPayloadAsync(
-                current.Stream, payload, shouldFragment, host, port, cts.Token).ConfigureAwait(false);
+            var probe = default(ProbeResult);
+            var succeeded = false;
 
-            if (probe.Closed && shouldFragment && settings.EnableFragmentFallback)
+            for (var i = 0; i < attempts.Count; i++)
             {
-                // 分片被重置：记住域名，换一条连接不分片重试一次。
-                fallbackCache.Duration = TimeSpan.FromMinutes(settings.FallbackCacheMinutes);
-                fallbackCache.MarkFailure(host);
+                var attempt = attempts[i];
+
+                if (i > 0)
+                {
+                    try
+                    {
+                        current.Client.Dispose();
+                        current = await connector.ConnectAsync(host, port, excluded, cts.Token).ConfigureAwait(false);
+                        stats.OnReconnect();
+                        log.Info("Tunnel", $"换连接重试: {host} 策略={Describe(attempt)}");
+                    }
+                    catch (Exception ex) when (!cts.IsCancellationRequested)
+                    {
+                        stats.OnFailure();
+                        log.Warn("Tunnel", $"重连失败 {host}: {ex.Message}");
+                        return;
+                    }
+                }
+
+                probe = await SendFirstPayloadAsync(
+                    current,
+                    payload,
+                    attempt.HasValue,
+                    attempt ?? settings.FragmentStrategy,
+                    host,
+                    port,
+                    cts.Token).ConfigureAwait(false);
+
+                if (!probe.Closed)
+                {
+                    succeeded = true;
+                    if (settings.FragmentStrategy == TlsFragmentStrategy.Auto)
+                    {
+                        fallbackCache.RememberStrategy(host, attempt);
+                    }
+                    if (i > 0)
+                    {
+                        log.Info("Tunnel", $"回退成功: {host} 策略={Describe(attempt)}");
+                    }
+                    break;
+                }
+
+                // 不分片仍被关闭时，没有更多可尝试的策略。
+                if (!attempt.HasValue) break;
+
                 stats.OnFallback();
                 stats.OnHostFallback(host);
-                log.Warn("Tunnel", $"分片握手被重置，回退直连重试: {host}");
-
-                try
-                {
-                    current.Client.Dispose();
-                    current = await connector.ConnectAsync(host, port, excluded, cts.Token).ConfigureAwait(false);
-                    probe = await SendFirstPayloadAsync(
-                        current.Stream, payload, fragment: false, host, port, cts.Token).ConfigureAwait(false);
-                    stats.OnReconnect();
-                }
-                catch (Exception ex) when (!cts.IsCancellationRequested)
-                {
-                    stats.OnFailure();
-                    log.Warn("Tunnel", $"回退重试失败: {host}: {ex.Message}");
-                    return;
-                }
+                log.Warn("Tunnel", $"分片握手被重置: {host} 策略={attempt}");
             }
 
-            if (probe.Closed)
+            if (!succeeded)
             {
                 stats.OnFailure();
-                log.Warn("Tunnel", $"上游在返回数据前关闭: {host}:{port}");
+                fallbackCache.Duration = TimeSpan.FromMinutes(settings.FallbackCacheMinutes);
+                fallbackCache.MarkFailure(host);
+                if (settings.FragmentStrategy == TlsFragmentStrategy.Auto)
+                {
+                    fallbackCache.RememberStrategy(host, null);
+                }
+                log.Warn("Tunnel", $"所有策略均失败: {host}:{port}");
                 return;
             }
 
@@ -277,10 +310,63 @@ public sealed class TunnelSession
         return true;
     }
 
+    List<TlsFragmentStrategy?> BuildStrategyAttempts(string host, byte[] payload, bool excluded)
+    {
+        var result = new List<TlsFragmentStrategy?>(4);
+
+        if (!ShouldFragment(host, payload, excluded))
+        {
+            result.Add(null);
+            return result;
+        }
+
+        var configured = settings.FragmentStrategy;
+        if (configured == TlsFragmentStrategy.Auto)
+        {
+            if (fallbackCache.TryGetPreferredStrategy(host, out var remembered))
+            {
+                if (!remembered.HasValue)
+                {
+                    // 之前验证过该域名不分片可用，直接沿用。
+                    result.Add(null);
+                    return result;
+                }
+                result.Add(remembered);
+            }
+            else
+            {
+                // 默认先用最强的 TLS record 拆分。
+                result.Add(TlsFragmentStrategy.TlsRecordSplit);
+            }
+
+            if (settings.EnableFragmentFallback)
+            {
+                foreach (var fallback in new TlsFragmentStrategy?[]
+                         {
+                             TlsFragmentStrategy.TlsRecordSplit,
+                             TlsFragmentStrategy.SniBoundary,
+                             null,
+                         })
+                {
+                    if (!result.Contains(fallback)) result.Add(fallback);
+                }
+            }
+
+            return result;
+        }
+
+        result.Add(configured);
+        if (settings.EnableFragmentFallback) result.Add(null);
+        return result;
+    }
+
+    static string Describe(TlsFragmentStrategy? strategy) => strategy?.ToString() ?? "不分片";
+
     async Task<ProbeResult> SendFirstPayloadAsync(
-        NetworkStream target,
+        UpstreamConnection upstream,
         byte[] payload,
         bool fragment,
+        TlsFragmentStrategy strategy,
         string host,
         int port,
         CancellationToken cancellationToken)
@@ -288,7 +374,7 @@ public sealed class TunnelSession
         bool fragmented;
         try
         {
-            fragmented = await WritePayloadAsync(target, payload, fragment, host, port, cancellationToken)
+            fragmented = await WritePayloadAsync(upstream, payload, fragment, strategy, host, port, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (fragment && IsConnectionReset(ex))
@@ -307,7 +393,7 @@ public sealed class TunnelSession
         var buffer = new byte[16 * 1024];
         try
         {
-            var read = await target.ReadAsync(buffer, timeout.Token).ConfigureAwait(false);
+            var read = await upstream.Stream.ReadAsync(buffer, timeout.Token).ConfigureAwait(false);
             if (read <= 0) return new ProbeResult(true, null);
             return new ProbeResult(false, buffer[..read]);
         }
@@ -327,25 +413,37 @@ public sealed class TunnelSession
     }
 
     static bool IsConnectionReset(Exception ex)
-        => ex is IOException || ex is SocketException || ex.InnerException is SocketException;
+        => ex is IOException or SocketException or InvalidOperationException ||
+           ex.InnerException is SocketException or InvalidOperationException;
 
     async Task<bool> WritePayloadAsync(
-        NetworkStream target,
+        UpstreamConnection upstream,
         byte[] payload,
         bool fragment,
+        TlsFragmentStrategy strategy,
         string host,
         int port,
         CancellationToken cancellationToken)
     {
+        var target = upstream.Stream;
+
         if (!fragment || payload.Length == 0)
         {
             await target.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
             return false;
         }
 
+        if (strategy == TlsFragmentStrategy.OobSplit &&
+            await TryWriteOobSplitAsync(upstream, payload, host, port, cancellationToken).ConfigureAwait(false))
+        {
+            return true;
+        }
+
+        if (strategy == TlsFragmentStrategy.Auto) strategy = TlsFragmentStrategy.TlsRecordSplit;
+
         var chunks = TlsClientHello.Fragment(
             payload,
-            settings.FragmentStrategy,
+            strategy,
             Math.Max(1, settings.FragmentChunkSize),
             Math.Max(2, settings.SplitPieces));
 
@@ -371,9 +469,51 @@ public sealed class TunnelSession
             }
         }
 
-        stats.OnFragment(settings.FragmentStrategy.ToString());
+        stats.OnFragment(strategy.ToString());
         log.Info("Tunnel",
-            $"分片: {host}:{port} 策略={settings.FragmentStrategy} 段数={chunks.Count} 大小={payload.Length} 延迟={delay}ms 抖动={jitter}ms");
+            $"分片: {host}:{port} 策略={strategy} 段数={chunks.Count} 大小={payload.Length} 延迟={delay}ms 抖动={jitter}ms");
+        return true;
+    }
+
+    /// <summary>
+    /// 使用 TCP 带外字节（URG）制造乱序，参考 byedpi 的 --oob。
+    /// 发送失败时抛 IOException，让上层换连接重试，避免把半个 ClientHello 留在流里。
+    /// </summary>
+    async Task<bool> TryWriteOobSplitAsync(
+        UpstreamConnection upstream,
+        byte[] payload,
+        string host,
+        int port,
+        CancellationToken cancellationToken)
+    {
+        if (payload.Length < 4) return false;
+
+        var split = TlsClientHello.TryGetSniRange(payload, out var offset, out var nameLength) && nameLength > 1
+            ? Math.Clamp(offset + 1, 1, payload.Length - 1)
+            : Math.Min(3, payload.Length - 1);
+
+        int sent;
+        try
+        {
+            sent = upstream.Client.Client.Send(payload, 0, split + 1, SocketFlags.OutOfBand);
+        }
+        catch (Exception ex)
+        {
+            throw new IOException("OOB 分片无法发送", ex);
+        }
+
+        if (sent != split + 1)
+        {
+            throw new IOException("OOB 分片写入不完整");
+        }
+
+        var wait = Math.Max(0, settings.FragmentDelayMs);
+        if (wait > 0) await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+
+        await upstream.Stream.WriteAsync(payload.AsMemory(split), cancellationToken).ConfigureAwait(false);
+
+        stats.OnFragment(TlsFragmentStrategy.OobSplit.ToString());
+        log.Info("Tunnel", $"OOB 分片: {host}:{port} 位置={split} 大小={payload.Length}");
         return true;
     }
 
@@ -435,9 +575,9 @@ public sealed class TunnelSession
         {
             // 对端重置
         }
-        catch (ObjectDisposedException)
+        catch (InvalidOperationException)
         {
-            // 正常关闭
+            // 套接字已断开 / 已释放，属于正常关闭
         }
     }
 

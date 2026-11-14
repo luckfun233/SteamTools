@@ -90,6 +90,7 @@ public sealed class AccelerationLab
         results.Add(CheckPorts());
         results.Add(await CheckSystemDnsAsync(host, cancellationToken).ConfigureAwait(false));
         results.Add(await CheckDohAsync(host, cancellationToken).ConfigureAwait(false));
+        results.Add(await CheckDnsPollutionAsync(host, cancellationToken).ConfigureAwait(false));
         results.Add(await CheckTcpAsync(host, 443, cancellationToken).ConfigureAwait(false));
 
         var direct = await SniConnectivityTester.ProbeDirectAsync(host, 443, 8, cancellationToken)
@@ -188,6 +189,7 @@ public sealed class AccelerationLab
                 TlsFragmentStrategy.Fixed,
                 TlsFragmentStrategy.Record,
                 TlsFragmentStrategy.Random,
+                TlsFragmentStrategy.OobSplit,
             };
 
             foreach (var strategy in strategies)
@@ -248,6 +250,8 @@ public sealed class AccelerationLab
         TlsFragmentStrategy.SniPieces => "SNI 多段",
         TlsFragmentStrategy.TlsRecordSplit => "TLS record 拆分",
         TlsFragmentStrategy.Random => "随机分片",
+        TlsFragmentStrategy.OobSplit => "OOB 拆分",
+        TlsFragmentStrategy.Auto => "自动",
         _ => "SNI 边界",
     };
 
@@ -286,7 +290,7 @@ public sealed class AccelerationLab
             $"HTTP={(settings.EnableHttp ? settings.HttpPort.ToString() : "关")}，" +
             $"分片={(settings.EnableSniFragment ? settings.FragmentStrategy.ToString() : "关")}，" +
             $"DoH={(settings.EnableDoh ? "开" : "关")}，" +
-            $"中继={(settings.EnableUpstreamRelay ? $"{settings.RelayHost}:{settings.RelayPort}" : "关")}";
+            $"中继={(settings.EnableUpstreamRelay ? $"{settings.RelayType} {settings.RelayHost}:{settings.RelayPort}" : "关")}";
         return new LabTestResult("当前设置", true, 0, detail, Informational: true);
     }
 
@@ -338,6 +342,51 @@ public sealed class AccelerationLab
         catch (Exception ex)
         {
             return new LabTestResult("DoH 解析", false, sw.ElapsedMilliseconds, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 对比系统 DNS 与 DoH 的结果：完全不相交通常意味着系统 DNS 被污染。
+    /// 这是提示性检查，不直接判定失败。
+    /// </summary>
+    async Task<LabTestResult> CheckDnsPollutionAsync(string host, CancellationToken cancellationToken)
+    {
+        if (!settings.EnableDoh)
+        {
+            return new LabTestResult("DNS 污染检查", true, 0, "未启用 DoH", Informational: true);
+        }
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(6));
+            var system = await Dns.GetHostAddressesAsync(host, timeout.Token).ConfigureAwait(false);
+            if (system.Length == 0)
+            {
+                return new LabTestResult("DNS 污染检查", true, sw.ElapsedMilliseconds, "系统 DNS 无结果",
+                    Informational: true);
+            }
+
+            using var resolver = new Net.DohResolver(settings, log);
+            var doh = await resolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+            if (doh.Count == 0)
+            {
+                return new LabTestResult("DNS 污染检查", true, sw.ElapsedMilliseconds, "DoH 无结果，无法比较",
+                    Informational: true);
+            }
+
+            var overlap = system.Any(x => doh.Contains(x));
+            var detail = overlap
+                ? $"系统与 DoH 结果有交集（系统 {system.Length} 个 / DoH {doh.Count} 个）"
+                : $"系统 DNS 与 DoH 完全不一致，系统 DNS 可能被污染（系统 {system[0]} / DoH {doh[0]}）";
+
+            return new LabTestResult("DNS 污染检查", true, sw.ElapsedMilliseconds, detail, Informational: true);
+        }
+        catch (Exception ex)
+        {
+            return new LabTestResult("DNS 污染检查", false, sw.ElapsedMilliseconds, Describe(ex),
+                Informational: true);
         }
     }
 
@@ -462,8 +511,9 @@ public sealed class AccelerationLab
         sb.AppendLine($"分片域名: {settings.FragmentDomains}");
         sb.AppendLine($"回退: {settings.EnableFragmentFallback}，探测={settings.FallbackProbeMs}ms，缓存={settings.FallbackCacheMinutes} 分钟");
         sb.AppendLine($"SNI 改写: {settings.EnableSniRewrite}，目标={settings.SniRewriteHost}");
-        sb.AppendLine($"DoH: {settings.EnableDoh}，{settings.DohEndpoint}，回退系统 DNS={settings.DohFallbackToSystem}");
-        sb.AppendLine($"上游中继: {settings.EnableUpstreamRelay}，{settings.RelayHost}:{settings.RelayPort}，" +
+        sb.AppendLine($"DoH: {settings.EnableDoh}，{settings.DohEndpoint}，回退系统 DNS={settings.DohFallbackToSystem}，" +
+                      $"走中继={settings.DohViaRelay}");
+        sb.AppendLine($"上游中继: {settings.EnableUpstreamRelay}，{settings.RelayType} {settings.RelayHost}:{settings.RelayPort}，" +
                       $"域名={(string.IsNullOrWhiteSpace(settings.RelayDomains) ? "全部" : settings.RelayDomains)}");
     }
 
