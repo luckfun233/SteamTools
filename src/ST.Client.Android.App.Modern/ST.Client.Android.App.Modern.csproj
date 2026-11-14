@@ -19,8 +19,7 @@
     <AotAssemblies>false</AotAssemblies>
     <EnableLLVM>false</EnableLLVM>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <AndroidLinkMode>Full</AndroidLinkMode>
-    <AndroidLinkTool>r8</AndroidLinkTool>
+    <AndroidLinkMode>None</AndroidLinkMode>
     <PublishTrimmed>false</PublishTrimmed>
     <AndroidFragmentType>AndroidX.Fragment.App.Fragment</AndroidFragmentType>
   </PropertyGroup>
@@ -161,6 +160,7 @@
   <ItemGroup>
     <PackageReference Include="XAB.FlexboxLayout" />
     <PackageReference Include="de.hdodenhof.circleimageview" />
+    <PackageReference Include="Xamarin.AndroidX.Annotation" />
     <PackageReference Include="Xamarin.AndroidX.AppCompat" />
     <PackageReference Include="Xamarin.AndroidX.SwipeRefreshLayout" />
     <PackageReference Include="Xamarin.Google.Android.Material" />
@@ -177,7 +177,6 @@
     <PackageReference Include="Xamarin.AndroidX.Biometric" />
     <PackageReference Include="Xamarin.AndroidX.ExifInterface" />
     <PackageReference Include="Xamarin.AndroidX.Fragment" />
-    <PackageReference Include="Xamarin.AndroidX.Migration" />
     <PackageReference Include="Xamarin.AndroidX.Legacy.Support.Core.UI" />
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" />
     <PackageReference Include="Xamarin.AndroidX.WebKit" />
@@ -860,7 +859,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.Migration" />
     <PackageReference Include="Xamarin.AndroidX.Legacy.Support.Core.UI" />
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" />
   </ItemGroup>

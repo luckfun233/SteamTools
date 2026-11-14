@@ -259,7 +259,11 @@ namespace System.Application.UI
                     const string f2 = "HH:mm:ss";
                     const string f3 = "dd HH:mm:ss";
 #if !EXCLUDE_ASF
+#if EXCLUDE_ASF
+                    var starttime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+#else
                     var starttime = ArchiSteamFarm.Core.OS.ProcessStartTime;
+#endif
 #else
                     var starttime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
 #endif

@@ -571,7 +571,9 @@ namespace System.Application.UI
             }
 
 #if !EXCLUDE_ASF
+#if !EXCLUDE_ASF
             ArchiSteamFarm.Web.WebBrowser.CreateHttpHandlerDelegate = CreateHttpHandler;
+#endif
 #endif
         }
 
