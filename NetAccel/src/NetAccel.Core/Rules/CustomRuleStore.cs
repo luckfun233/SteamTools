@@ -12,7 +12,7 @@ public sealed class CustomRuleStore
 {
     public const string SampleJson = @"{
   // 自定义规则会和远程 DevSidecar 规则合并，且优先匹配。
-  // 目录：{0}
+  // 目录：__NETACCEL_RULES_PATH__
   // 支持字段：sni、verifyHost、redirect、proxy、backup、abort、desc、
   //          requestReplace.headers、responseReplace.headers
   intercepts: {
@@ -49,7 +49,8 @@ public sealed class CustomRuleStore
 
     public string FilePath => filePath;
 
-    public static string BuildSample(string filePath) => string.Format(SampleJson, filePath);
+    public static string BuildSample(string filePath)
+        => SampleJson.Replace("__NETACCEL_RULES_PATH__", filePath, StringComparison.Ordinal);
 
     public string GetText()
     {

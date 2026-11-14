@@ -112,6 +112,9 @@ internal static class Program
 
     static async Task<int> CheckAsync(AccelSettings settings, IAccelLogger logger, string host)
     {
+        // 实验室只做检查，绝不修改系统代理。
+        settings.SetSystemProxy = false;
+
         await using var service = new AccelProxyService(settings, logger);
         var start = await service.StartAsync();
         if (!start.Success)

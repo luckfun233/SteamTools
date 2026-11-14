@@ -124,19 +124,27 @@ public sealed class RuleEngine
 
     public void Rebuild()
     {
+        var groups = ProxyRuleGroups.ParseEnabled(settings.EnabledRuleGroups);
+
         var remoteFiltered = ProxyRuleSet.Empty;
         if (settings.EnableRemoteRules && Remote.Rules.Count > 0)
         {
-            var groups = ProxyRuleGroups.ParseEnabled(settings.EnabledRuleGroups);
             remoteFiltered = Remote.FilterGroups(groups);
         }
 
         var customSet = settings.EnableCustomRules ? CustomSet : ProxyRuleSet.Empty;
-        var combined = ProxyRuleSet.Combine(customSet, remoteFiltered);
+        var builtIn = settings.EnableBuiltInRules ? BuiltInRules.CreateFiltered(groups) : ProxyRuleSet.Empty;
+
+        // 优先级：自定义 → 远程 → 内置预置 IP。
+        var combined = ProxyRuleSet.Combine(
+            ProxyRuleSet.Combine(customSet, remoteFiltered),
+            builtIn);
+
         Volatile.Write(ref current, combined);
 
         log.Info("Rules",
-            $"自定义 {customSet.Rules.Count} 条 + 远程启用 {remoteFiltered.Rules.Count} 条 = {combined.Rules.Count} 条");
+            $"自定义 {customSet.Rules.Count} 条 + 远程启用 {remoteFiltered.Rules.Count} 条 + " +
+            $"内置预置 IP {builtIn.PresetIps.Count} 组 = {combined.Rules.Count} 条规则");
     }
 
     public void ClearRemote()

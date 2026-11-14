@@ -49,12 +49,19 @@ public partial class MainWindow : Window
     readonly Button syncRulesButton;
     readonly TextBlock remoteRuleStatus;
     readonly CheckBox syncOnStartCheck;
+    readonly CheckBox builtInRulesCheck;
 
     readonly TextBox customRulesBox;
     readonly TextBlock customRuleStatus;
+    readonly TextBox quickDomainBox;
+    readonly ComboBox quickActionCombo;
+    readonly TextBox quickValueBox;
+    readonly TextBlock quickStatusText;
 
     readonly TextBox labHostBox;
     readonly Button labRunButton;
+    readonly Button runMatrixButton;
+    readonly NumericUpDown matrixRunsBox;
     readonly ProgressBar labProgress;
     readonly TextBlock labStatus;
     readonly StackPanel labResultsPanel;
@@ -137,12 +144,19 @@ public partial class MainWindow : Window
         syncRulesButton = C<Button>("SyncRulesButton");
         remoteRuleStatus = C<TextBlock>("RemoteRuleStatus");
         syncOnStartCheck = C<CheckBox>("SyncOnStartCheck");
+        builtInRulesCheck = C<CheckBox>("BuiltInRulesCheck");
 
         customRulesBox = C<TextBox>("CustomRulesBox");
         customRuleStatus = C<TextBlock>("CustomRuleStatus");
+        quickDomainBox = C<TextBox>("QuickDomainBox");
+        quickActionCombo = C<ComboBox>("QuickActionCombo");
+        quickValueBox = C<TextBox>("QuickValueBox");
+        quickStatusText = C<TextBlock>("QuickStatusText");
 
         labHostBox = C<TextBox>("LabHostBox");
         labRunButton = C<Button>("LabRunButton");
+        runMatrixButton = C<Button>("RunMatrixButton");
+        matrixRunsBox = C<NumericUpDown>("MatrixRunsBox");
         labProgress = C<ProgressBar>("LabProgress");
         labStatus = C<TextBlock>("LabStatus");
         labResultsPanel = C<StackPanel>("LabResultsPanel");
@@ -208,6 +222,16 @@ public partial class MainWindow : Window
         service = new AccelProxyService(settings, logger);
         service.StateChanged += () => Dispatcher.UIThread.Post(RefreshStatus);
 
+        // 启动时只读取本地规则缓存与自定义规则，不访问网络。
+        try
+        {
+            service.Rules.Initialize();
+        }
+        catch (Exception ex)
+        {
+            logger.Warn("UI", "初始化规则失败: " + ex.Message);
+        }
+
         memoryLog.Changed += () => logDirty = true;
 
         BuildGroupChecks();
@@ -222,6 +246,7 @@ public partial class MainWindow : Window
 
         Opened += OnOpened;
         Closing += OnClosing;
+        UpdateQuickValueState();
         loading = false;
     }
 
@@ -340,6 +365,7 @@ public partial class MainWindow : Window
             remoteRulesCheck.IsChecked = settings.EnableRemoteRules;
             remoteRuleUrlBox.Text = settings.RemoteRuleUrl;
             syncOnStartCheck.IsChecked = settings.SyncRemoteRulesOnStart;
+            builtInRulesCheck.IsChecked = settings.EnableBuiltInRules;
 
             var enabled = ProxyRuleGroups.ParseEnabled(settings.EnabledRuleGroups);
             foreach (var check in groupChecks)
@@ -404,6 +430,7 @@ public partial class MainWindow : Window
         settings.EnableRemoteRules = remoteRulesCheck.IsChecked == true;
         settings.RemoteRuleUrl = remoteRuleUrlBox.Text?.Trim() ?? settings.RemoteRuleUrl;
         settings.SyncRemoteRulesOnStart = syncOnStartCheck.IsChecked == true;
+        settings.EnableBuiltInRules = builtInRulesCheck.IsChecked == true;
 
         settings.EnabledRuleGroups = ProxyRuleGroups.ToStorage(
             groupChecks.Where(x => x.IsChecked == true).Select(x => (string)x.Tag!));
@@ -512,8 +539,8 @@ public partial class MainWindow : Window
         }
 
         startStopButton.Content = running ? "停止加速" : "启动加速";
+        startStopButton.Classes.Set("hero", true);
         startStopButton.Classes.Set("danger", running);
-        startStopButton.Classes.Set("primary", !running);
 
         if (!running && statusSubtitle.Text is null or "" or "正在停止代理…")
         {
@@ -628,6 +655,52 @@ public partial class MainWindow : Window
         customRuleStatus.Foreground = Brush("#8A94B0");
     }
 
+    void OnQuickActionChanged(object? sender, SelectionChangedEventArgs e) => UpdateQuickValueState();
+
+    void UpdateQuickValueState()
+    {
+        if (quickActionCombo is null || quickValueBox is null) return;
+
+        var action = (QuickRuleAction)Math.Clamp(quickActionCombo.SelectedIndex, 0, 4);
+        quickValueBox.IsEnabled = action is QuickRuleAction.Sni or QuickRuleAction.PresetIp;
+        quickValueBox.Watermark = action switch
+        {
+            QuickRuleAction.Sni => "SNI 目标，例如 baidu.com",
+            QuickRuleAction.PresetIp => "IP 列表，例如 140.82.121.4, 140.82.121.5",
+            _ => "该动作不需要值",
+        };
+    }
+
+    void OnQuickAddClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!CustomRuleStore.TryValidate(customRulesBox.Text ?? string.Empty, out var current, out var error))
+        {
+            quickStatusText.Text = "当前规则有语法错误，请先修正：" + error;
+            quickStatusText.Foreground = Brush("#FF5D6C");
+            return;
+        }
+
+        var action = (QuickRuleAction)Math.Clamp(quickActionCombo.SelectedIndex, 0, 4);
+        if (!CustomRuleEditor.TryApply(
+                current,
+                action,
+                quickDomainBox.Text ?? string.Empty,
+                quickValueBox.Text,
+                out var result,
+                out error))
+        {
+            quickStatusText.Text = error;
+            quickStatusText.Foreground = Brush("#FF5D6C");
+            return;
+        }
+
+        customRulesBox.Text = CustomRuleStore.Serialize(result);
+        quickStatusText.Text = "已写入编辑器，点击“保存并应用”后生效。";
+        quickStatusText.Foreground = Brush("#2ED573");
+        quickDomainBox.Text = string.Empty;
+        quickValueBox.Text = string.Empty;
+    }
+
     // ---------------- 实验室 ----------------
 
     async void OnRunLabClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -636,6 +709,7 @@ public partial class MainWindow : Window
 
         labBusy = true;
         labRunButton.IsEnabled = false;
+        runMatrixButton.IsEnabled = false;
         labProgress.IsVisible = true;
         labResultsPanel.Children.Clear();
         labStatus.Text = "正在检测，请稍候…";
@@ -668,8 +742,118 @@ public partial class MainWindow : Window
         {
             labProgress.IsVisible = false;
             labRunButton.IsEnabled = true;
+            runMatrixButton.IsEnabled = true;
             labBusy = false;
         }
+    }
+
+    async void OnRunMatrixClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (labBusy) return;
+
+        labBusy = true;
+        labRunButton.IsEnabled = false;
+        runMatrixButton.IsEnabled = false;
+        labProgress.IsVisible = true;
+        labResultsPanel.Children.Clear();
+        labStatus.Text = "正在运行分片策略矩阵，请稍候…";
+
+        try
+        {
+            CollectSettingsFromUi();
+            var runs = ToInt(matrixRunsBox, 3);
+            var lab = new AccelerationLab(settings, service, logger, fileLogger);
+            var report = await lab.RunStrategyMatrixAsync(labHostBox.Text ?? "github.com", runs);
+
+            lastReport = report.Text;
+            labReportBox.Text = report.Text;
+
+            foreach (var row in report.Rows)
+            {
+                labResultsPanel.Children.Add(BuildMatrixRow(row));
+            }
+
+            labStatus.Text = report.Rows.Count == 0
+                ? "策略矩阵未运行：请先启动加速。"
+                : $"策略矩阵完成：{report.Rows.Count} 种策略，每种 {runs} 次。";
+        }
+        catch (Exception ex)
+        {
+            labStatus.Text = "策略矩阵失败：" + ex.Message;
+            logger.Warn("Lab", "策略矩阵异常: " + ex.Message);
+        }
+        finally
+        {
+            labProgress.IsVisible = false;
+            labRunButton.IsEnabled = true;
+            runMatrixButton.IsEnabled = true;
+            labBusy = false;
+        }
+    }
+
+    static Control BuildMatrixRow(StrategyMatrixRow row)
+    {
+        var allOk = row.Success == row.Runs;
+        var color = row.Success == 0 ? "#FF5D6C" : allOk ? "#2ED573" : "#FFB020";
+
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("72,180,*,Auto"),
+            Margin = new Thickness(0, 2),
+        };
+
+        var badge = new Border
+        {
+            Background = Brush(color + "22"),
+            BorderBrush = Brush(color + "66"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(8, 3),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = new TextBlock
+            {
+                Text = $"{row.Success}/{row.Runs}",
+                FontSize = 11,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = Brush(color),
+            },
+        };
+
+        var name = new TextBlock
+        {
+            Text = AccelerationLab.GetStrategyName(
+                Enum.TryParse<NetAccel.Core.Tls.TlsFragmentStrategy>(row.Strategy, out var parsed)
+                    ? parsed
+                    : NetAccel.Core.Tls.TlsFragmentStrategy.SniBoundary),
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush("#E8ECF8"),
+        };
+
+        var detail = new TextBlock
+        {
+            Text = row.LastError ?? "全部成功",
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush("#8A94B0"),
+            FontSize = 12,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+
+        var median = new TextBlock
+        {
+            Text = row.MedianMs > 0 ? $"{row.MedianMs}ms" : string.Empty,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush("#8A94B0"),
+            FontSize = 11,
+        };
+
+        Grid.SetColumn(name, 1);
+        Grid.SetColumn(detail, 2);
+        Grid.SetColumn(median, 3);
+        grid.Children.Add(badge);
+        grid.Children.Add(name);
+        grid.Children.Add(detail);
+        grid.Children.Add(median);
+        return grid;
     }
 
     static Control BuildLabRow(LabTestResult result)
@@ -906,6 +1090,7 @@ public partial class MainWindow : Window
         finally
         {
             timer.Stop();
+            fileLogger.Dispose();
             Close();
         }
     }

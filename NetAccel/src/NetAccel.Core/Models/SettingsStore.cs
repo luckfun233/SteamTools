@@ -69,9 +69,10 @@ public sealed class SettingsStore
             if (File.Exists(FilePath))
             {
                 File.Copy(FilePath, FilePath + ".bak", overwrite: true);
-                File.Delete(FilePath);
             }
-            File.Move(tmp, FilePath);
+
+            // overwrite 移动避免“先删除再移动”之间出现无设置文件的窗口。
+            File.Move(tmp, FilePath, overwrite: true);
             return true;
         }
         catch

@@ -36,6 +36,9 @@ public sealed class AccelSettings
     public string EnabledRuleGroups { get; set; } = ProxyRuleGroups.DefaultEnabled;
     public bool EnableCustomRules { get; set; } = true;
 
+    /// <summary>启用内置的 GitHub / Pixiv 预置 IP，不依赖远程规则。</summary>
+    public bool EnableBuiltInRules { get; set; } = true;
+
     // ---- SNI 分片 ----
     public bool EnableSniFragment { get; set; } = true;
     public TlsFragmentStrategy FragmentStrategy { get; set; } = TlsFragmentStrategy.SniBoundary;
@@ -113,6 +116,17 @@ public sealed class AccelSettings
         changed |= FixProp(DohEndpoint, "https://dns.alidns.com/resolve", v => DohEndpoint = v);
         changed |= FixProp(RelayHost, "127.0.0.1", v => RelayHost = v);
 
+        if (!TryNormalizeListenAddress(ListenAddress, out var listenAddress))
+        {
+            ListenAddress = "127.0.0.1";
+            changed = true;
+        }
+        else if (!string.Equals(listenAddress, ListenAddress, StringComparison.Ordinal))
+        {
+            ListenAddress = listenAddress;
+            changed = true;
+        }
+
         changed |= ClampProp(FragmentChunkSize, 1, 4096, 64, v => FragmentChunkSize = v);
         changed |= ClampProp(SplitPieces, 2, 8, 3, v => SplitPieces = v);
         changed |= ClampProp(FragmentDelayMs, 0, 5000, 10, v => FragmentDelayMs = v);
@@ -144,6 +158,24 @@ public sealed class AccelSettings
         }
 
         return changed;
+    }
+
+    static bool TryNormalizeListenAddress(string value, out string normalized)
+    {
+        normalized = value;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        value = value.Trim();
+        if (value is "*" or "any") { normalized = "0.0.0.0"; return true; }
+        if (string.Equals(value, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = "127.0.0.1";
+            return true;
+        }
+
+        if (!System.Net.IPAddress.TryParse(value, out var ip)) return false;
+        normalized = ip.ToString();
+        return true;
     }
 
     static bool TryNormalizeEndpoint(string value, out string normalized)

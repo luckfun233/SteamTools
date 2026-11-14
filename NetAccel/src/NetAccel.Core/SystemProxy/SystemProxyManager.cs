@@ -131,6 +131,7 @@ public sealed class SystemProxyManager
 
         var previousEnable = key.GetValue("ProxyEnable")?.ToString() ?? "0";
         var previousServer = key.GetValue("ProxyServer")?.ToString() ?? string.Empty;
+        var previousOverride = key.GetValue("ProxyOverride")?.ToString() ?? string.Empty;
 
         SaveState(new State
         {
@@ -139,6 +140,7 @@ public sealed class SystemProxyManager
             {
                 ["ProxyEnable"] = previousEnable,
                 ["ProxyServer"] = previousServer,
+                ["ProxyOverride"] = previousOverride,
             },
         });
 
@@ -171,6 +173,10 @@ public sealed class SystemProxyManager
         if (state.Values.TryGetValue("ProxyServer", out var server))
         {
             key.SetValue("ProxyServer", server, Microsoft.Win32.RegistryValueKind.String);
+        }
+        if (state.Values.TryGetValue("ProxyOverride", out var proxyOverride))
+        {
+            key.SetValue("ProxyOverride", proxyOverride, Microsoft.Win32.RegistryValueKind.String);
         }
 
         InternetSetOption(IntPtr.Zero, INTERNET_OPTION_SETTINGS_CHANGED, IntPtr.Zero, 0);

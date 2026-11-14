@@ -42,6 +42,22 @@ public class SettingsTests
     }
 
     [Fact]
+    public void Normalize_Fixes_Invalid_Listen_Address()
+    {
+        var settings = new AccelSettings { ListenAddress = "not-an-ip" };
+        settings.Normalize();
+        Assert.Equal("127.0.0.1", settings.ListenAddress);
+
+        settings.ListenAddress = "*";
+        settings.Normalize();
+        Assert.Equal("0.0.0.0", settings.ListenAddress);
+
+        settings.ListenAddress = "::1";
+        settings.Normalize();
+        Assert.Equal("::1", settings.ListenAddress);
+    }
+
+    [Fact]
     public void Settings_Roundtrip_Through_Store()
     {
         var dir = Path.Combine(Path.GetTempPath(), "netaccel-tests", Guid.NewGuid().ToString("N"));

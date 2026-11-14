@@ -69,6 +69,11 @@ public sealed class AccelProxyService : IAsyncDisposable
             Settings.Normalize();
             AppPaths.EnsureDirectories();
 
+            if (!Settings.EnableSocks5 && !Settings.EnableHttp)
+            {
+                return new StartResult(false, "至少需要启用 SOCKS5 或 HTTP 其中一个协议。");
+            }
+
             rules ??= CreateRuleEngine();
             rules.Initialize();
 
@@ -119,7 +124,12 @@ public sealed class AccelProxyService : IAsyncDisposable
             var message = "代理已启动";
             if (Settings.SetSystemProxy)
             {
-                if (systemProxy.Enable(Settings.HttpPort, Settings.Socks5Port, out var proxyMessage))
+                if (!Settings.EnableHttp)
+                {
+                    message += "；系统代理未开启：需要同时启用 HTTP 端口";
+                    log.Warn("SystemProxy", "系统代理需要 HTTP 端口，当前已关闭");
+                }
+                else if (systemProxy.Enable(Settings.HttpPort, Settings.Socks5Port, out var proxyMessage))
                 {
                     systemProxyEnabledByUs = true;
                     message += "；" + proxyMessage;
@@ -176,15 +186,10 @@ public sealed class AccelProxyService : IAsyncDisposable
         await lifecycle.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!running)
-            {
-                DisposeServers();
-                return;
-            }
-
             running = false;
             DisposeServers();
 
+            // 即使上次运行异常退出（running 已为 false），也要根据状态文件恢复系统代理。
             if (systemProxyEnabledByUs || systemProxy.IsEnabledByUs)
             {
                 if (!systemProxy.Disable(out var message))
@@ -214,6 +219,9 @@ public sealed class AccelProxyService : IAsyncDisposable
         Rules.ReloadCustom();
         Rules.Rebuild();
     }
+
+    /// <summary>清空“分片失败域名”缓存，实验室策略矩阵会用到。</summary>
+    public void ClearFallbackCache() => fallbackCache?.Clear();
 
     public Task SyncRulesAsync(CancellationToken cancellationToken = default) => Rules.SyncRemoteAsync(cancellationToken);
 

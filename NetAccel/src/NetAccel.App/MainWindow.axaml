@@ -2,404 +2,560 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="NetAccel.App.MainWindow"
         Title="NetAccel 网络加速器"
-        Width="1100" Height="740"
-        MinWidth="920" MinHeight="620"
+        Width="1140" Height="780"
+        MinWidth="960" MinHeight="640"
         WindowStartupLocation="CenterScreen">
 
-  <Grid RowDefinitions="Auto,*">
-    <!-- 顶栏 -->
-    <Border Grid.Row="0" Padding="24,18,24,10">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="12">
-          <Border Width="38" Height="38" CornerRadius="11" Background="{DynamicResource AccentGradientBrush}">
-            <TextBlock Text="N" FontSize="20" FontWeight="Bold" Foreground="White"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-          <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="NetAccel" Classes="h2" />
-            <TextBlock Text="免证书 SNI 网络加速器" Classes="muted" />
-          </StackPanel>
-        </StackPanel>
+  <Grid>
+    <!-- 背景装饰 -->
+    <Canvas IsHitTestVisible="False" ClipToBounds="True">
+      <Ellipse Width="560" Height="560" Fill="#14224C" Opacity="0.55" Canvas.Left="860" Canvas.Top="-300" />
+      <Ellipse Width="480" Height="480" Fill="#241B4C" Opacity="0.5" Canvas.Left="-200" Canvas.Top="520" />
+      <Ellipse Width="260" Height="260" Fill="#122B4A" Opacity="0.45" Canvas.Left="520" Canvas.Top="640" />
+    </Canvas>
 
-        <Border Grid.Column="2" Classes="pill" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Border x:Name="StatusDot" Width="8" Height="8" CornerRadius="4"
-                    Background="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
-            <TextBlock x:Name="HeaderStatusText" Text="未启动" FontSize="12" />
-          </StackPanel>
-        </Border>
-      </Grid>
-    </Border>
+    <Grid RowDefinitions="Auto,*">
 
-    <!-- 主内容 -->
-    <TabControl Grid.Row="1" Classes="nav" TabStripPlacement="Left" Margin="20,0,20,20">
-
-      <!-- ================= 加速 ================= -->
-      <TabItem Header="加速">
-        <ScrollViewer>
-          <StackPanel Spacing="16" Margin="16,0,0,0">
-
-            <Border Classes="card">
-              <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="6">
-                  <TextBlock x:Name="StatusTitle" Text="加速未启动" Classes="h1" />
-                  <TextBlock x:Name="StatusSubtitle" Text="启动本地代理后，把应用或系统代理指向下面的地址即可。"
-                             Classes="muted" TextWrapping="Wrap" />
-                  <TextBlock x:Name="StatusDetail" Text="SOCKS5 127.0.0.1:8868 · HTTP 127.0.0.1:8869"
-                             Classes="label" Margin="0,8,0,0" />
-                </StackPanel>
-                <Button x:Name="StartStopButton" Grid.Column="1" Classes="primary"
-                        Content="启动加速" Click="OnStartStopClick" VerticalAlignment="Center" />
-              </Grid>
+      <!-- 顶栏 -->
+      <Border Grid.Row="0" Padding="28,20,28,12">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="13">
+            <Border Width="42" Height="42" CornerRadius="13" Background="{DynamicResource AccentGradientBrush}"
+                    BoxShadow="0 8 20 0 #335B8CFF">
+              <Path Data="M13 2 L4 14 H11 L10 22 L19 10 H12 Z" Fill="White"
+                    Width="22" Height="22" Stretch="Uniform"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
-
-            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-              <Border Grid.Column="0" Classes="card" Padding="16">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="活动连接" Classes="label" />
-                  <TextBlock x:Name="ActiveConnText" Text="0" Classes="value" />
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="1" Classes="card" Padding="16">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="已分片" Classes="label" />
-                  <TextBlock x:Name="FragmentedText" Text="0" Classes="value" />
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="2" Classes="card" Padding="16">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="上行流量" Classes="label" />
-                  <TextBlock x:Name="BytesUpText" Text="0 B" Classes="value" />
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="3" Classes="card" Padding="16">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="下行流量" Classes="label" />
-                  <TextBlock x:Name="BytesDownText" Text="0 B" Classes="value" />
-                </StackPanel>
-              </Border>
-            </Grid>
-
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <TextBlock Text="代理地址" Classes="h2" />
-                <Grid ColumnDefinitions="90,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="10">
-                  <TextBlock Text="SOCKS5" Classes="muted" VerticalAlignment="Center" />
-                  <SelectableTextBlock x:Name="SocksAddressText" Grid.Column="1"
-                                       Text="127.0.0.1:8868" FontFamily="Cascadia Code, Consolas, monospace"
-                                       VerticalAlignment="Center" />
-                  <Button Grid.Column="2" Content="复制" Classes="ghost" Click="OnCopySocksClick" />
-                  <TextBlock Grid.Row="1" Text="HTTP" Classes="muted" VerticalAlignment="Center" />
-                  <SelectableTextBlock x:Name="HttpAddressText" Grid.Row="1" Grid.Column="1"
-                                       Text="127.0.0.1:8869" FontFamily="Cascadia Code, Consolas, monospace"
-                                       VerticalAlignment="Center" />
-                  <Button Grid.Row="1" Grid.Column="2" Content="复制" Classes="ghost" Click="OnCopyHttpClick" />
-                </Grid>
-                <TextBlock Text="浏览器也可使用 PAC：http://127.0.0.1:8869/pac"
-                           Classes="muted" TextWrapping="Wrap" />
-              </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="加速站点" Classes="h2" />
-                  <TextBlock Text="勾选需要加速的站点组；未勾选的域名会在本地代理里直接直连。"
-                             Classes="muted" TextWrapping="Wrap" />
-                </StackPanel>
-                <WrapPanel x:Name="GroupPanel" Orientation="Horizontal" />
-              </StackPanel>
-            </Border>
-
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ================= 规则 ================= -->
-      <TabItem Header="规则">
-        <ScrollViewer>
-          <StackPanel Spacing="16" Margin="16,0,0,0">
-
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="远程 DevSidecar 规则" Classes="h2" />
-                  <TextBlock Text="远程规则只接受 HTTPS 地址；下载失败会自动使用本地缓存。"
-                             Classes="muted" TextWrapping="Wrap" />
-                </StackPanel>
-
-                <CheckBox x:Name="RemoteRulesCheck" Content="启用远程规则" />
-
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox x:Name="RemoteRuleUrlBox" Watermark="https://example.com/remote_config.json5" />
-                  <Button Grid.Column="1" x:Name="SyncRulesButton" Content="立即同步" Classes="ghost"
-                          Margin="10,0,0,0" Click="OnSyncRulesClick" />
-                </Grid>
-
-                <TextBlock x:Name="RemoteRuleStatus" Classes="muted" Text="尚未同步" TextWrapping="Wrap" />
-                <CheckBox x:Name="SyncOnStartCheck" Content="启动代理时自动同步远程规则" />
-              </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="自定义规则" Classes="h2" />
-                  <TextBlock Text="与远程规则合并，且优先匹配。支持 JSON5 注释、单引号与尾随逗号。"
-                             Classes="muted" TextWrapping="Wrap" />
-                </StackPanel>
-
-                <TextBox x:Name="CustomRulesBox" AcceptsReturn="True" Height="300"
-                         FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" FontSize="12"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
-
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <Button Content="校验" Classes="ghost" Click="OnValidateRulesClick" />
-                  <Button Content="保存并应用" Classes="primary" Click="OnSaveRulesClick" />
-                  <Button Content="恢复示例" Classes="ghost" Click="OnResetRulesClick" />
-                </StackPanel>
-
-                <TextBlock x:Name="CustomRuleStatus" Classes="muted" TextWrapping="Wrap" />
-              </StackPanel>
-            </Border>
-
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ================= 实验室 ================= -->
-      <TabItem Header="实验室">
-        <ScrollViewer>
-          <StackPanel Spacing="16" Margin="16,0,0,0">
-
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="加速实验室" Classes="h2" />
-                  <TextBlock Text="依次检查规则、DNS、DoH、TCP、直连 TLS、代理链路与 HTTP 代理，并生成可复制的报告。"
-                             Classes="muted" TextWrapping="Wrap" />
-                </StackPanel>
-
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox x:Name="LabHostBox" Text="github.com" Watermark="要测试的域名" />
-                  <Button Grid.Column="1" x:Name="LabRunButton" Content="开始检测" Classes="primary"
-                          Margin="10,0,0,0" Click="OnRunLabClick" />
-                </Grid>
-
-                <ProgressBar x:Name="LabProgress" IsIndeterminate="True" IsVisible="False" Height="4" />
-                <TextBlock x:Name="LabStatus" Classes="muted" />
-
-                <StackPanel x:Name="LabResultsPanel" Spacing="6" />
-              </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-              <StackPanel Spacing="10">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="检测报告" Classes="h2" />
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <Button Content="复制" Classes="ghost" Click="OnCopyReportClick" />
-                    <Button Content="导出" Classes="ghost" Click="OnExportReportClick" />
-                  </StackPanel>
-                </Grid>
-                <TextBox x:Name="LabReportBox" IsReadOnly="True" AcceptsReturn="True" Height="280"
-                         FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" FontSize="12"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto" />
-              </StackPanel>
-            </Border>
-
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ================= 设置 ================= -->
-      <TabItem Header="设置">
-        <ScrollViewer>
-          <StackPanel Spacing="14" Margin="16,0,0,0">
-
-            <Expander Header="监听与启动" IsExpanded="True">
-              <StackPanel Spacing="10" Margin="14,4,14,14">
-                <Grid ColumnDefinitions="190,*,Auto">
-                  <TextBlock Text="SOCKS5 端口" Classes="muted" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                    <CheckBox x:Name="SocksEnableCheck" Content="启用" />
-                    <NumericUpDown x:Name="SocksPortBox" Minimum="1" Maximum="65535" Increment="1"
-                                   FormatString="0" Width="120" />
-                  </StackPanel>
-                </Grid>
-                <Grid ColumnDefinitions="190,*,Auto">
-                  <TextBlock Text="HTTP 端口" Classes="muted" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                    <CheckBox x:Name="HttpEnableCheck" Content="启用" />
-                    <NumericUpDown x:Name="HttpPortBox" Minimum="1" Maximum="65535" Increment="1"
-                                   FormatString="0" Width="120" />
-                  </StackPanel>
-                </Grid>
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="监听地址" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="ListenAddressBox" Grid.Column="1" Text="127.0.0.1" Width="220"
-                           HorizontalAlignment="Left" />
-                </Grid>
-                <TextBlock Text="默认只监听 127.0.0.1。改成 0.0.0.0 会允许局域网设备使用，请确认网络可信。"
-                           Classes="muted" TextWrapping="Wrap" />
-                <CheckBox x:Name="SetSystemProxyCheck" Content="启动加速时自动设置系统代理（关闭时恢复原设置）" />
-                <CheckBox x:Name="AutoStartCheck" Content="打开应用后自动启动加速" />
-                <CheckBox x:Name="BypassLocalCheck" Content="本机与内网地址始终直连" />
-              </StackPanel>
-            </Expander>
-
-            <Expander Header="SNI 分片" IsExpanded="True">
-              <StackPanel Spacing="10" Margin="14,4,14,14">
-                <CheckBox x:Name="FragmentEnableCheck" Content="启用 SNI 分片（免证书绕过 SNI 阻断）" />
-
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="分片策略" Classes="muted" VerticalAlignment="Center" />
-                  <ComboBox x:Name="StrategyCombo" Grid.Column="1" Width="240" HorizontalAlignment="Left">
-                    <ComboBoxItem Content="固定大小" />
-                    <ComboBoxItem Content="SNI 边界（推荐）" />
-                    <ComboBoxItem Content="TLS 记录头" />
-                    <ComboBoxItem Content="SNI 多段" />
-                    <ComboBoxItem Content="TLS record 拆分（较强）" />
-                    <ComboBoxItem Content="随机分片" />
-                  </ComboBox>
-                </Grid>
-
-                <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
-                  <TextBlock Text="分片大小（字节）" Classes="muted" VerticalAlignment="Center" />
-                  <NumericUpDown x:Name="ChunkBox" Grid.Column="1" Minimum="1" Maximum="4096" FormatString="0" />
-                  <TextBlock Text="SNI 段数" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <NumericUpDown x:Name="PiecesBox" Grid.Column="3" Minimum="2" Maximum="8" FormatString="0" />
-                  <TextBlock Text="分片间隔（毫秒）" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
-                  <NumericUpDown x:Name="DelayBox" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="5000" FormatString="0" />
-                  <TextBlock Text="随机抖动（毫秒）" Classes="muted" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <NumericUpDown x:Name="JitterBox" Grid.Row="1" Grid.Column="3" Minimum="0" Maximum="5000" FormatString="0" />
-                </Grid>
-
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="分片域名" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="FragmentDomainsBox" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
-                           Height="64" />
-                </Grid>
-                <TextBlock Text="分号分隔的通配符/正则；留空表示所有 TLS 域名。" Classes="muted" />
-
-                <CheckBox x:Name="OnlyTlsCheck" Content="只对 TLS 连接分片，其它协议直接转发" />
-
-                <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
-                  <TextBlock Text="回退探测（毫秒）" Classes="muted" VerticalAlignment="Center" />
-                  <NumericUpDown x:Name="ProbeBox" Grid.Column="1" Minimum="100" Maximum="10000" FormatString="0" />
-                  <TextBlock Text="回退缓存（分钟）" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <NumericUpDown x:Name="FallbackCacheBox" Grid.Column="3" Minimum="1" Maximum="1440" FormatString="0" />
-                  <TextBlock Text="ClientHello 上限" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
-                  <NumericUpDown x:Name="MaxHelloBox" Grid.Row="1" Grid.Column="1" Minimum="1024" Maximum="65536" FormatString="0" />
-                  <TextBlock Text="首包超时（毫秒）" Classes="muted" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <NumericUpDown x:Name="FirstTimeoutBox" Grid.Row="1" Grid.Column="3" Minimum="50" Maximum="5000" FormatString="0" />
-                </Grid>
-
-                <CheckBox x:Name="FallbackCheck" Content="分片被重置时自动换连接、不分片重试一次" />
-              </StackPanel>
-            </Expander>
-
-            <Expander Header="SNI 改写与 DNS">
-              <StackPanel Spacing="10" Margin="14,4,14,14">
-                <CheckBox x:Name="RewriteEnableCheck" Content="启用 SNI 改写（实验性，仅对白名单域名）" />
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="改写目标" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="RewriteHostBox" Grid.Column="1" Text="baidu.com" Width="220" HorizontalAlignment="Left" />
-                </Grid>
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="改写域名" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="RewriteDomainsBox" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True" Height="64" />
-                </Grid>
-
-                <Separator Margin="0,6" />
-
-                <CheckBox x:Name="DohEnableCheck" Content="启用 DoH 解析（绕过 DNS 污染）" />
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="DoH 地址" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="DohEndpointBox" Grid.Column="1" />
-                </Grid>
-                <CheckBox x:Name="DohFallbackCheck" Content="DoH 失败时回退系统 DNS" />
-              </StackPanel>
-            </Expander>
-
-            <Expander Header="上游中继">
-              <StackPanel Spacing="10" Margin="14,4,14,14">
-                <CheckBox x:Name="RelayEnableCheck" Content="把流量转交给上游 SOCKS5（例如 Clash / V2Ray 的 7890 端口）" />
-                <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
-                  <TextBlock Text="中继地址" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="RelayHostBox" Grid.Column="1" Text="127.0.0.1" />
-                  <TextBlock Text="端口" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <NumericUpDown x:Name="RelayPortBox" Grid.Column="3" Minimum="1" Maximum="65535" FormatString="0" />
-                  <TextBlock Text="用户名" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
-                  <TextBox x:Name="RelayUserBox" Grid.Row="1" Grid.Column="1" />
-                  <TextBlock Text="密码" Classes="muted" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <TextBox x:Name="RelayPassBox" Grid.Row="1" Grid.Column="3" PasswordChar="●" />
-                </Grid>
-                <Grid ColumnDefinitions="190,*">
-                  <TextBlock Text="中继域名" Classes="muted" VerticalAlignment="Center" />
-                  <TextBox x:Name="RelayDomainsBox" Grid.Column="1" Watermark="留空表示全部域名" />
-                </Grid>
-              </StackPanel>
-            </Expander>
-
-            <Expander Header="诊断日志">
-              <StackPanel Spacing="10" Margin="14,4,14,14">
-                <CheckBox x:Name="DiagEnableCheck" Content="启用诊断日志（不记录 Cookie / Authorization / 请求体）" />
-                <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
-                  <TextBlock Text="最低级别" Classes="muted" VerticalAlignment="Center" />
-                  <ComboBox x:Name="DiagLevelCombo" Grid.Column="1" SelectedIndex="0">
-                    <ComboBoxItem Content="全部（Info）" />
-                    <ComboBoxItem Content="警告（Warn）" />
-                    <ComboBoxItem Content="仅错误（Error）" />
-                  </ComboBox>
-                  <TextBlock Text="保留天数" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
-                  <NumericUpDown x:Name="DiagRetentionBox" Grid.Column="3" Minimum="1" Maximum="365" FormatString="0" />
-                  <TextBlock Text="单文件上限（KB）" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
-                  <NumericUpDown x:Name="DiagSizeBox" Grid.Row="1" Grid.Column="1" Minimum="64" Maximum="262144" FormatString="0" />
-                  <CheckBox x:Name="DiagHostCheck" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
-                            Content="日志中保留完整域名" Margin="14,0,0,0" />
-                </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <Button Content="打开数据目录" Classes="ghost" Click="OnOpenDataDirClick" />
-                  <Button Content="打开日志目录" Classes="ghost" Click="OnOpenLogDirClick" />
-                </StackPanel>
-              </StackPanel>
-            </Expander>
-
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,8">
-              <Button Content="保存并应用" Classes="primary" Click="OnSaveSettingsClick" />
-              <Button Content="恢复默认设置" Classes="ghost" Click="OnResetSettingsClick" />
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <TextBlock Text="NetAccel" FontSize="20" FontWeight="Bold" />
+              <TextBlock Text="DevSidecar 规则兼容 · 免证书 SNI 加速" Classes="muted" FontSize="12" />
             </StackPanel>
-
           </StackPanel>
-        </ScrollViewer>
-      </TabItem>
 
-      <!-- ================= 日志 ================= -->
-      <TabItem Header="日志">
-        <Grid RowDefinitions="Auto,*" Margin="16,0,0,0" RowSpacing="10">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="运行日志" Classes="h2" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-              <Button Content="清空" Classes="ghost" Click="OnClearLogClick" />
-              <Button Content="打开日志目录" Classes="ghost" Click="OnOpenLogDirClick" />
-            </StackPanel>
-          </Grid>
-          <Border Grid.Row="1" Classes="card" Padding="12">
-            <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True"
-                     FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" FontSize="12"
-                     TextWrapping="NoWrap"
-                     Background="Transparent" BorderThickness="0"
-                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
-          </Border>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+            <Border Classes="pill">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border x:Name="StatusDot" Width="8" Height="8" CornerRadius="4"
+                        Background="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="HeaderStatusText" Text="未启动" FontSize="12" />
+              </StackPanel>
+            </Border>
+            <Border Classes="pill">
+              <TextBlock Text="v1.0.0" FontSize="12" Classes="muted" />
+            </Border>
+          </StackPanel>
         </Grid>
-      </TabItem>
+      </Border>
 
-    </TabControl>
+      <!-- 主内容 -->
+      <TabControl x:Name="RootTabs" Grid.Row="1" Classes="nav" TabStripPlacement="Left" Margin="20,0,20,20">
+
+        <!-- ================= 加速 ================= -->
+        <TabItem x:Name="TabAccel">
+          <TabItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Path Data="M13 2 L4 14 H11 L10 22 L19 10 H12 Z" Fill="#8A94B0"
+                    Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="加速" VerticalAlignment="Center" />
+            </StackPanel>
+          </TabItem.Header>
+
+          <ScrollViewer>
+            <StackPanel Spacing="16" Margin="16,0,0,0">
+
+              <!-- Hero 状态卡 -->
+              <Border CornerRadius="18" BorderThickness="1" Padding="24" BoxShadow="0 20 45 0 #40000000">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Offset="0" Color="#243B7C" />
+                    <GradientStop Offset="0.55" Color="#3B2A78" />
+                    <GradientStop Offset="1" Color="#1B2454" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Offset="0" Color="#805B8CFF" />
+                    <GradientStop Offset="1" Color="#608B5CF6" />
+                  </LinearGradientBrush>
+                </Border.BorderBrush>
+
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <Border Width="64" Height="64" CornerRadius="20" Background="#26FFFFFF"
+                          BorderBrush="#40FFFFFF" BorderThickness="1">
+                    <Path Data="M13 2 L4 14 H11 L10 22 L19 10 H12 Z" Fill="White"
+                          Width="28" Height="28" Stretch="Uniform"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+
+                  <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center" Spacing="5">
+                    <TextBlock x:Name="StatusTitle" Text="加速未启动"
+                               FontSize="25" FontWeight="Bold" Foreground="White" />
+                    <TextBlock x:Name="StatusSubtitle" Text="启动本地代理后，把应用或系统代理指向下面的地址即可。"
+                               FontSize="13" Foreground="#C6D2F2" TextWrapping="Wrap" />
+                    <TextBlock x:Name="StatusDetail" Text="SOCKS5 127.0.0.1:8868 · HTTP 127.0.0.1:8869"
+                               FontSize="12" Foreground="#8FA0CE" Margin="0,5,0,0" />
+                  </StackPanel>
+
+                  <Button x:Name="StartStopButton" Grid.Column="2" Classes="hero"
+                          Content="启动加速" Click="OnStartStopClick" VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+
+              <!-- 统计 -->
+              <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                <Border Grid.Column="0" Classes="card stat">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <Border Classes="iconbox" Background="#1B2B4D">
+                      <Path Data="M4 12 A8 8 0 1 0 20 12 A8 8 0 1 0 4 12"
+                            Stroke="#5B8CFF" StrokeThickness="1.8" Width="18" Height="18" Stretch="Uniform" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                      <TextBlock Text="活动连接" Classes="label" />
+                      <TextBlock x:Name="ActiveConnText" Text="0" Classes="value" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Classes="card stat">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <Border Classes="iconbox" Background="#2A2350">
+                      <Path Data="M4 12 H20 M4 6 H12 M4 18 H12"
+                            Stroke="#A78BFA" StrokeThickness="1.8" Width="18" Height="18" Stretch="Uniform" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                      <TextBlock Text="已分片" Classes="label" />
+                      <TextBlock x:Name="FragmentedText" Text="0" Classes="value" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Classes="card stat">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <Border Classes="iconbox" Background="#173A33">
+                      <Path Data="M12 19 V5 M6 11 L12 5 L18 11"
+                            Stroke="#2ED573" StrokeThickness="1.8" Width="18" Height="18" Stretch="Uniform" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                      <TextBlock Text="上行流量" Classes="label" />
+                      <TextBlock x:Name="BytesUpText" Text="0 B" Classes="value" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Column="3" Classes="card stat">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <Border Classes="iconbox" Background="#3A2430">
+                      <Path Data="M12 5 V19 M6 13 L12 19 L18 13"
+                            Stroke="#FF7A9A" StrokeThickness="1.8" Width="18" Height="18" Stretch="Uniform" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                      <TextBlock Text="下行流量" Classes="label" />
+                      <TextBlock x:Name="BytesDownText" Text="0 B" Classes="value" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </Grid>
+
+              <Grid ColumnDefinitions="1.05*,1*" ColumnSpacing="16">
+                <!-- 代理地址 -->
+                <Border Classes="card">
+                  <StackPanel Spacing="14">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="代理地址" Classes="h2" />
+                      <TextBlock Text="把应用代理指向这里；PAC 可用于浏览器自动配置。" Classes="muted" />
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="86,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="10">
+                      <Border Classes="pill" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <TextBlock Text="SOCKS5" FontSize="11" />
+                      </Border>
+                      <SelectableTextBlock x:Name="SocksAddressText" Grid.Column="1"
+                                           Text="127.0.0.1:8868" FontSize="13"
+                                           FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace"
+                                           VerticalAlignment="Center" />
+                      <Button Grid.Column="2" Content="复制" Classes="ghost" Click="OnCopySocksClick" />
+
+                      <Border Grid.Row="1" Classes="pill" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <TextBlock Text="HTTP" FontSize="11" />
+                      </Border>
+                      <SelectableTextBlock x:Name="HttpAddressText" Grid.Row="1" Grid.Column="1"
+                                           Text="127.0.0.1:8869" FontSize="13"
+                                           FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace"
+                                           VerticalAlignment="Center" />
+                      <Button Grid.Row="1" Grid.Column="2" Content="复制" Classes="ghost" Click="OnCopyHttpClick" />
+                    </Grid>
+
+                    <Border Background="#101426" CornerRadius="10" Padding="12,9">
+                      <SelectableTextBlock Text="PAC: http://127.0.0.1:8869/pac"
+                                           FontSize="12" Foreground="#8FA0CE"
+                                           FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" />
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+                <!-- 加速站点 -->
+                <Border Classes="card">
+                  <StackPanel Spacing="12">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="加速站点" Classes="h2" />
+                      <TextBlock Text="勾选要加速的站点组；未勾选的域名在本地代理里直连。" Classes="muted"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                    <WrapPanel x:Name="GroupPanel" Orientation="Horizontal" />
+                    <TextBlock Text="规则来自 DevSidecar 远程配置 + 自定义规则 + 内置预置 IP。"
+                               Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 规则 ================= -->
+        <TabItem x:Name="TabRules">
+          <TabItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Path Data="M4 6 H20 M4 12 H14 M4 18 H20" Stroke="#8A94B0" StrokeThickness="1.6"
+                    Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="规则" VerticalAlignment="Center" />
+            </StackPanel>
+          </TabItem.Header>
+
+          <ScrollViewer>
+            <StackPanel Spacing="16" Margin="16,0,0,0">
+
+              <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="规则来源" Classes="h2" />
+                    <TextBlock Text="远程规则只接受 HTTPS；下载失败会自动回退本地缓存。内置预置 IP 不依赖远程配置。"
+                               Classes="muted" TextWrapping="Wrap" />
+                  </StackPanel>
+
+                  <CheckBox x:Name="RemoteRulesCheck" Content="启用远程 DevSidecar 规则" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox x:Name="RemoteRuleUrlBox" Watermark="https://example.com/remote_config.json5" />
+                    <Button Grid.Column="1" x:Name="SyncRulesButton" Content="立即同步" Classes="ghost"
+                            Margin="10,0,0,0" Click="OnSyncRulesClick" />
+                  </Grid>
+                  <CheckBox x:Name="SyncOnStartCheck" Content="启动代理时自动同步远程规则" />
+                  <CheckBox x:Name="BuiltInRulesCheck" Content="启用内置加速组（GitHub / Pixiv 预置 IP）" />
+
+                  <TextBlock x:Name="RemoteRuleStatus" Classes="muted" Text="尚未同步" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="自定义规则" Classes="h2" />
+                    <TextBlock Text="与远程规则合并且优先匹配。支持 JSON5 注释、单引号与尾随逗号；保存前会先校验。"
+                               Classes="muted" TextWrapping="Wrap" />
+                  </StackPanel>
+
+                  <Grid ColumnDefinitions="1.1*,1.1*,1.4*,Auto" ColumnSpacing="10">
+                    <TextBox x:Name="QuickDomainBox" Watermark="域名，如 github.com" />
+                    <ComboBox x:Name="QuickActionCombo" Grid.Column="1" SelectedIndex="0"
+                              SelectionChanged="OnQuickActionChanged">
+                      <ComboBoxItem Content="SNI 伪装" />
+                      <ComboBoxItem Content="移除 SNI" />
+                      <ComboBoxItem Content="阻断域名" />
+                      <ComboBoxItem Content="预置 IP" />
+                      <ComboBoxItem Content="直连排除" />
+                    </ComboBox>
+                    <TextBox x:Name="QuickValueBox" Grid.Column="2" Watermark="值：SNI 目标 / IP 列表" />
+                    <Button Grid.Column="3" Content="快速添加" Classes="ghost" Click="OnQuickAddClick" />
+                  </Grid>
+                  <TextBlock x:Name="QuickStatusText" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+
+                  <TextBox x:Name="CustomRulesBox" AcceptsReturn="True" Height="280"
+                           FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" FontSize="12"
+                           TextWrapping="NoWrap"
+                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                           ScrollViewer.VerticalScrollBarVisibility="Auto" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Content="校验" Classes="ghost" Click="OnValidateRulesClick" />
+                    <Button Content="保存并应用" Classes="primary" Click="OnSaveRulesClick" />
+                    <Button Content="恢复示例" Classes="ghost" Click="OnResetRulesClick" />
+                  </StackPanel>
+
+                  <TextBlock x:Name="CustomRuleStatus" Classes="muted" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 实验室 ================= -->
+        <TabItem x:Name="TabLab">
+          <TabItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Path Data="M9 3 H15 M10 3 V9 L5.5 19 H18.5 L14 9 V3" Stroke="#8A94B0" StrokeThickness="1.6"
+                    Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="实验室" VerticalAlignment="Center" />
+            </StackPanel>
+          </TabItem.Header>
+
+          <ScrollViewer>
+            <StackPanel Spacing="16" Margin="16,0,0,0">
+
+              <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="加速实验室" Classes="h2" />
+                    <TextBlock Text="检查规则、DNS、DoH、TCP、直连 TLS、SOCKS5 链路与 HTTP 代理；可运行六种分片策略矩阵。"
+                               Classes="muted" TextWrapping="Wrap" />
+                  </StackPanel>
+
+                  <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+                    <TextBox x:Name="LabHostBox" Text="github.com" Watermark="要测试的域名" />
+                    <NumericUpDown x:Name="MatrixRunsBox" Grid.Column="1" Minimum="1" Maximum="10"
+                                   Increment="1" FormatString="0" Value="3" Width="96" />
+                    <Button x:Name="RunMatrixButton" Grid.Column="2" Content="策略矩阵" Classes="ghost"
+                            Click="OnRunMatrixClick" />
+                    <Button x:Name="LabRunButton" Grid.Column="3" Content="开始检测" Classes="primary"
+                            Click="OnRunLabClick" />
+                  </Grid>
+
+                  <ProgressBar x:Name="LabProgress" IsIndeterminate="True" IsVisible="False" Height="4" />
+                  <TextBlock x:Name="LabStatus" Classes="muted" />
+
+                  <StackPanel x:Name="LabResultsPanel" Spacing="6" />
+                </StackPanel>
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="10">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="检测报告" Classes="h2" />
+                      <TextBlock Text="可直接复制反馈，或导出为 txt 文件。" Classes="muted" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Button Content="复制" Classes="ghost" Click="OnCopyReportClick" />
+                      <Button Content="导出" Classes="ghost" Click="OnExportReportClick" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBox x:Name="LabReportBox" IsReadOnly="True" AcceptsReturn="True" Height="270"
+                           FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" FontSize="12"
+                           TextWrapping="NoWrap"
+                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                           ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                </StackPanel>
+              </Border>
+
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 设置 ================= -->
+        <TabItem x:Name="TabSettings">
+          <TabItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Path Data="M4 8 H20 M4 16 H20 M8 8 V16 M16 8 V16" Stroke="#8A94B0" StrokeThickness="1.6"
+                    Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="设置" VerticalAlignment="Center" />
+            </StackPanel>
+          </TabItem.Header>
+
+          <ScrollViewer>
+            <StackPanel Spacing="14" Margin="16,0,0,0">
+
+              <Expander Header="监听与启动" IsExpanded="True">
+                <StackPanel Spacing="10" Margin="14,4,14,14">
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="SOCKS5 端口" Classes="muted" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                      <CheckBox x:Name="SocksEnableCheck" Content="启用" />
+                      <NumericUpDown x:Name="SocksPortBox" Minimum="1" Maximum="65535" Increment="1"
+                                     FormatString="0" Width="120" />
+                    </StackPanel>
+                  </Grid>
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="HTTP 端口" Classes="muted" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                      <CheckBox x:Name="HttpEnableCheck" Content="启用" />
+                      <NumericUpDown x:Name="HttpPortBox" Minimum="1" Maximum="65535" Increment="1"
+                                     FormatString="0" Width="120" />
+                    </StackPanel>
+                  </Grid>
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="监听地址" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="ListenAddressBox" Grid.Column="1" Text="127.0.0.1" Width="220"
+                             HorizontalAlignment="Left" />
+                  </Grid>
+                  <TextBlock Text="默认只监听 127.0.0.1。改成 0.0.0.0 会允许局域网设备使用，请确认网络可信。"
+                             Classes="muted" TextWrapping="Wrap" />
+                  <CheckBox x:Name="SetSystemProxyCheck" Content="启动加速时自动设置系统代理（关闭时恢复原设置）" />
+                  <CheckBox x:Name="AutoStartCheck" Content="打开应用后自动启动加速" />
+                  <CheckBox x:Name="BypassLocalCheck" Content="本机与内网地址始终直连" />
+                </StackPanel>
+              </Expander>
+
+              <Expander Header="SNI 分片" IsExpanded="True">
+                <StackPanel Spacing="10" Margin="14,4,14,14">
+                  <CheckBox x:Name="FragmentEnableCheck" Content="启用 SNI 分片（免证书绕过 SNI 阻断）" />
+
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="分片策略" Classes="muted" VerticalAlignment="Center" />
+                    <ComboBox x:Name="StrategyCombo" Grid.Column="1" Width="260" HorizontalAlignment="Left">
+                      <ComboBoxItem Content="固定大小" />
+                      <ComboBoxItem Content="SNI 边界（推荐）" />
+                      <ComboBoxItem Content="TLS 记录头" />
+                      <ComboBoxItem Content="SNI 多段" />
+                      <ComboBoxItem Content="TLS record 拆分（较强）" />
+                      <ComboBoxItem Content="随机分片" />
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                    <TextBlock Text="分片大小（字节）" Classes="muted" VerticalAlignment="Center" />
+                    <NumericUpDown x:Name="ChunkBox" Grid.Column="1" Minimum="1" Maximum="4096" FormatString="0" />
+                    <TextBlock Text="SNI 段数" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <NumericUpDown x:Name="PiecesBox" Grid.Column="3" Minimum="2" Maximum="8" FormatString="0" />
+                    <TextBlock Text="分片间隔（毫秒）" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
+                    <NumericUpDown x:Name="DelayBox" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="5000" FormatString="0" />
+                    <TextBlock Text="随机抖动（毫秒）" Classes="muted" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <NumericUpDown x:Name="JitterBox" Grid.Row="1" Grid.Column="3" Minimum="0" Maximum="5000" FormatString="0" />
+                  </Grid>
+
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="分片域名" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="FragmentDomainsBox" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
+                             Height="64" />
+                  </Grid>
+                  <TextBlock Text="分号分隔的通配符/正则；留空表示所有 TLS 域名。" Classes="muted" />
+
+                  <CheckBox x:Name="OnlyTlsCheck" Content="只对 TLS 连接分片，其它协议直接转发" />
+
+                  <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                    <TextBlock Text="回退探测（毫秒）" Classes="muted" VerticalAlignment="Center" />
+                    <NumericUpDown x:Name="ProbeBox" Grid.Column="1" Minimum="100" Maximum="10000" FormatString="0" />
+                    <TextBlock Text="回退缓存（分钟）" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <NumericUpDown x:Name="FallbackCacheBox" Grid.Column="3" Minimum="1" Maximum="1440" FormatString="0" />
+                    <TextBlock Text="ClientHello 上限" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
+                    <NumericUpDown x:Name="MaxHelloBox" Grid.Row="1" Grid.Column="1" Minimum="1024" Maximum="65536" FormatString="0" />
+                    <TextBlock Text="首包超时（毫秒）" Classes="muted" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <NumericUpDown x:Name="FirstTimeoutBox" Grid.Row="1" Grid.Column="3" Minimum="50" Maximum="5000" FormatString="0" />
+                  </Grid>
+
+                  <CheckBox x:Name="FallbackCheck" Content="分片被重置时自动换连接、不分片重试一次" />
+                </StackPanel>
+              </Expander>
+
+              <Expander Header="SNI 改写与 DNS">
+                <StackPanel Spacing="10" Margin="14,4,14,14">
+                  <CheckBox x:Name="RewriteEnableCheck" Content="启用 SNI 改写（实验性，仅对白名单域名）" />
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="改写目标" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="RewriteHostBox" Grid.Column="1" Text="baidu.com" Width="220" HorizontalAlignment="Left" />
+                  </Grid>
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="改写域名" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="RewriteDomainsBox" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True" Height="64" />
+                  </Grid>
+
+                  <Separator Margin="0,6" />
+
+                  <CheckBox x:Name="DohEnableCheck" Content="启用 DoH 解析（绕过 DNS 污染）" />
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="DoH 地址" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="DohEndpointBox" Grid.Column="1" />
+                  </Grid>
+                  <CheckBox x:Name="DohFallbackCheck" Content="DoH 失败时回退系统 DNS" />
+                </StackPanel>
+              </Expander>
+
+              <Expander Header="上游中继">
+                <StackPanel Spacing="10" Margin="14,4,14,14">
+                  <CheckBox x:Name="RelayEnableCheck" Content="把流量转交给上游 SOCKS5（例如 Clash / V2Ray 的 7890 端口）" />
+                  <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                    <TextBlock Text="中继地址" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="RelayHostBox" Grid.Column="1" Text="127.0.0.1" />
+                    <TextBlock Text="端口" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <NumericUpDown x:Name="RelayPortBox" Grid.Column="3" Minimum="1" Maximum="65535" FormatString="0" />
+                    <TextBlock Text="用户名" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
+                    <TextBox x:Name="RelayUserBox" Grid.Row="1" Grid.Column="1" />
+                    <TextBlock Text="密码" Classes="muted" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <TextBox x:Name="RelayPassBox" Grid.Row="1" Grid.Column="3" PasswordChar="●" />
+                  </Grid>
+                  <Grid ColumnDefinitions="190,*">
+                    <TextBlock Text="中继域名" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="RelayDomainsBox" Grid.Column="1" Watermark="留空表示全部域名" />
+                  </Grid>
+                </StackPanel>
+              </Expander>
+
+              <Expander Header="诊断日志">
+                <StackPanel Spacing="10" Margin="14,4,14,14">
+                  <CheckBox x:Name="DiagEnableCheck" Content="启用诊断日志（不记录 Cookie / Authorization / 请求体）" />
+                  <Grid ColumnDefinitions="190,*,190,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                    <TextBlock Text="最低级别" Classes="muted" VerticalAlignment="Center" />
+                    <ComboBox x:Name="DiagLevelCombo" Grid.Column="1" SelectedIndex="0">
+                      <ComboBoxItem Content="全部（Info）" />
+                      <ComboBoxItem Content="警告（Warn）" />
+                      <ComboBoxItem Content="仅错误（Error）" />
+                    </ComboBox>
+                    <TextBlock Text="保留天数" Classes="muted" Grid.Column="2" VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <NumericUpDown x:Name="DiagRetentionBox" Grid.Column="3" Minimum="1" Maximum="365" FormatString="0" />
+                    <TextBlock Text="单文件上限（KB）" Classes="muted" Grid.Row="1" VerticalAlignment="Center" />
+                    <NumericUpDown x:Name="DiagSizeBox" Grid.Row="1" Grid.Column="1" Minimum="64" Maximum="262144" FormatString="0" />
+                    <CheckBox x:Name="DiagHostCheck" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
+                              Content="日志中保留完整域名" Margin="14,0,0,0" />
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Content="打开数据目录" Classes="ghost" Click="OnOpenDataDirClick" />
+                    <Button Content="打开日志目录" Classes="ghost" Click="OnOpenLogDirClick" />
+                  </StackPanel>
+                </StackPanel>
+              </Expander>
+
+              <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,8">
+                <Button Content="保存并应用" Classes="primary" Click="OnSaveSettingsClick" />
+                <Button Content="恢复默认设置" Classes="ghost" Click="OnResetSettingsClick" />
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- ================= 日志 ================= -->
+        <TabItem x:Name="TabLog">
+          <TabItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Path Data="M6 3 H14 L18 7 V21 H6 Z M14 3 V7 H18 M9 12 H15 M9 16 H15"
+                    Stroke="#8A94B0" StrokeThickness="1.6"
+                    Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="日志" VerticalAlignment="Center" />
+            </StackPanel>
+          </TabItem.Header>
+
+          <Grid RowDefinitions="Auto,*" Margin="16,0,0,0" RowSpacing="10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="3">
+                <TextBlock Text="运行日志" Classes="h2" />
+                <TextBlock Text="仅保留最近 600 行；敏感查询参数会自动脱敏。" Classes="muted" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Content="清空" Classes="ghost" Click="OnClearLogClick" />
+                <Button Content="打开日志目录" Classes="ghost" Click="OnOpenLogDirClick" />
+              </StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Classes="card" Padding="12">
+              <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True"
+                       FontFamily="Cascadia Code, Consolas, DejaVu Sans Mono, monospace" FontSize="12"
+                       TextWrapping="NoWrap"
+                       Background="Transparent" BorderThickness="0"
+                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </Border>
+          </Grid>
+        </TabItem>
+
+      </TabControl>
+    </Grid>
   </Grid>
 </Window>

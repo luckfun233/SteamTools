@@ -33,7 +33,6 @@ public sealed class ProxyStats
     public long BytesDown => Interlocked.Read(ref bytesDown);
 
     public void OnConnection() => Interlocked.Increment(ref connections);
-    public void OnConnectionClosed() => Interlocked.Decrement(ref activeConnections);
 
     public void OnFragment(string strategy)
     {

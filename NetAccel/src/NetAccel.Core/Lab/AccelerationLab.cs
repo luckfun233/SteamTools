@@ -8,6 +8,7 @@ using NetAccel.Core.Models;
 using NetAccel.Core.Proxy;
 using NetAccel.Core.Rules;
 using NetAccel.Core.Stats;
+using NetAccel.Core.Tls;
 
 namespace NetAccel.Core.Lab;
 
@@ -40,6 +41,22 @@ public sealed class LabReport
     public IReadOnlyList<LabTestResult> Results { get; }
     public string Text { get; }
     public bool AllRequiredPassed => Results.Where(x => !x.Informational).All(x => x.Success);
+}
+
+public sealed record StrategyMatrixRow(string Strategy, int Success, int Runs, long MedianMs, string? LastError);
+
+public sealed class StrategyMatrixReport
+{
+    public StrategyMatrixReport(string host, IReadOnlyList<StrategyMatrixRow> rows, string text)
+    {
+        Host = host;
+        Rows = rows;
+        Text = text;
+    }
+
+    public string Host { get; }
+    public IReadOnlyList<StrategyMatrixRow> Rows { get; }
+    public string Text { get; }
 }
 
 /// <summary>
@@ -123,6 +140,116 @@ public sealed class AccelerationLab
         log.Info("Lab", $"实验室完成：{results.Count(x => !x.Informational && x.Success)}/{results.Count(x => !x.Informational)} 项通过");
         return new LabReport(host, startedAt, results, text);
     }
+
+    /// <summary>
+    /// 分片策略矩阵：在正在运行的代理上依次切换策略，每种重复若干次，
+    /// 输出成功次数与中位延迟。对应原项目实验设置页的策略矩阵。
+    /// </summary>
+    public async Task<StrategyMatrixReport> RunStrategyMatrixAsync(
+        string host,
+        int runs,
+        CancellationToken cancellationToken = default)
+    {
+        host = string.IsNullOrWhiteSpace(host) ? "github.com" : host.Trim();
+        runs = Math.Clamp(runs, 1, 10);
+
+        var sb = new StringBuilder();
+        var rows = new List<StrategyMatrixRow>();
+        sb.AppendLine("NetAccel 分片策略矩阵");
+        sb.AppendLine($"时间: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        sb.AppendLine($"目标: {host}:443，每种策略 {runs} 次");
+        sb.AppendLine();
+
+        if (!service.Socks5Running)
+        {
+            sb.AppendLine("SOCKS5 服务未运行，请先启动加速后再运行策略矩阵。");
+            return new StrategyMatrixReport(host, rows, sb.ToString());
+        }
+
+        var originalStrategy = settings.FragmentStrategy;
+        var originalEnabled = settings.EnableSniFragment;
+
+        try
+        {
+            settings.EnableSniFragment = false;
+            service.ClearFallbackCache();
+            var baseline = await SniConnectivityTester.ProbeViaSocks5Async(
+                host, 443, service.Socks5Port, 8, cancellationToken).ConfigureAwait(false);
+            sb.AppendLine($"不分片基准: {baseline}");
+            sb.AppendLine();
+
+            settings.EnableSniFragment = true;
+
+            var strategies = new[]
+            {
+                TlsFragmentStrategy.SniBoundary,
+                TlsFragmentStrategy.SniPieces,
+                TlsFragmentStrategy.TlsRecordSplit,
+                TlsFragmentStrategy.Fixed,
+                TlsFragmentStrategy.Record,
+                TlsFragmentStrategy.Random,
+            };
+
+            foreach (var strategy in strategies)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                settings.FragmentStrategy = strategy;
+                // 清空失败缓存，避免上一次策略的失败记录让后面直接跳过。
+                service.ClearFallbackCache();
+
+                var successes = 0;
+                var times = new List<long>();
+                string? lastError = null;
+
+                for (var i = 0; i < runs; i++)
+                {
+                    var result = await SniConnectivityTester.ProbeViaSocks5Async(
+                        host, 443, service.Socks5Port, 8, cancellationToken).ConfigureAwait(false);
+                    if (result.Success)
+                    {
+                        successes++;
+                        times.Add(result.ElapsedMs);
+                    }
+                    else
+                    {
+                        lastError = result.Error;
+                    }
+                }
+
+                times.Sort();
+                var median = times.Count == 0 ? 0 : times[times.Count / 2];
+                rows.Add(new StrategyMatrixRow(strategy.ToString(), successes, runs, median, lastError));
+                sb.AppendLine(
+                    $"{GetStrategyName(strategy),-14} 成功 {successes}/{runs} 中位 {median}ms" +
+                    (lastError == null ? string.Empty : $"，最后错误: {lastError}"));
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("判读：");
+            sb.AppendLine("- 全部成功通常说明当前网络没有阻断该目标，无法据此判断分片是否有效。");
+            sb.AppendLine("- 部分成功说明策略不稳定；记录型 DPI 只能被 TLS record 拆分或上游中继绕过。");
+            sb.AppendLine("- 若直连/QoS 抖动明显，优先比较中位耗时，而不是单次结果。");
+        }
+        finally
+        {
+            settings.FragmentStrategy = originalStrategy;
+            settings.EnableSniFragment = originalEnabled;
+            service.ClearFallbackCache();
+        }
+
+        return new StrategyMatrixReport(host, rows, sb.ToString());
+    }
+
+    public static string GetStrategyName(TlsFragmentStrategy strategy) => strategy switch
+    {
+        TlsFragmentStrategy.Fixed => "固定大小",
+        TlsFragmentStrategy.Record => "TLS 记录头",
+        TlsFragmentStrategy.SniPieces => "SNI 多段",
+        TlsFragmentStrategy.TlsRecordSplit => "TLS record 拆分",
+        TlsFragmentStrategy.Random => "随机分片",
+        _ => "SNI 边界",
+    };
 
     LabTestResult CheckRules()
     {

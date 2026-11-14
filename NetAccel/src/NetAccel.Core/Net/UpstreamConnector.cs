@@ -51,7 +51,8 @@ public sealed class UpstreamConnector
         bool excluded,
         CancellationToken cancellationToken)
     {
-        if (NetUtil.IsLocalHost(host) || (excluded && settings.BypassLocalhost))
+        // 本机/内网与排除列表命中时始终直连，不参与分片、DoH 或中继。
+        if (NetUtil.IsLocalHost(host) || excluded)
         {
             var direct = await ConnectTcpAsync(host, port, cancellationToken).ConfigureAwait(false);
             return new UpstreamConnection(direct, false, null);

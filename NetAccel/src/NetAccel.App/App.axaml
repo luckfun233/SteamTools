@@ -37,6 +37,21 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="14" />
       <Setter Property="Padding" Value="18" />
+      <Setter Property="BoxShadow" Value="0 12 28 0 #26000000" />
+    </Style>
+
+    <Style Selector="Border.card:pointerover">
+      <Setter Property="Background" Value="#171E33" />
+    </Style>
+
+    <Style Selector="Border.stat">
+      <Setter Property="Padding" Value="15" />
+    </Style>
+
+    <Style Selector="Border.iconbox">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="CornerRadius" Value="11" />
     </Style>
 
     <Style Selector="Border.pill">
@@ -96,6 +111,28 @@
       <Setter Property="Padding" Value="22,11" />
     </Style>
 
+    <Style Selector="Button.hero">
+      <Setter Property="Background" Value="White" />
+      <Setter Property="Foreground" Value="#141B33" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Padding" Value="28,13" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <Style Selector="Button.hero:pointerover">
+      <Setter Property="Background" Value="#E9EEFF" />
+    </Style>
+
+    <Style Selector="Button.hero.danger">
+      <Setter Property="Background" Value="#FF5D6C" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="Button.hero.danger:pointerover">
+      <Setter Property="Background" Value="#FF7A88" />
+    </Style>
+
     <Style Selector="Button.ghost">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -132,16 +169,23 @@
       <Setter Property="Padding" Value="0" />
     </Style>
 
-    <Style Selector="TabControl.nav > TabItem">
+    <Style Selector="TabControl.nav TabItem">
       <Setter Property="FontSize" Value="14" />
-      <Setter Property="Padding" Value="18,13" />
-      <Setter Property="MinWidth" Value="128" />
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="MinWidth" Value="148" />
+      <Setter Property="Margin" Value="0,2" />
+      <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
     </Style>
 
-    <Style Selector="TabControl.nav > TabItem:selected">
+    <Style Selector="TabControl.nav TabItem:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+
+    <Style Selector="TabControl.nav TabItem:selected">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Background" Value="#1A2138" />
     </Style>
 
     <Style Selector="CheckBox">

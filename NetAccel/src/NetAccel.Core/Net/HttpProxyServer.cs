@@ -194,9 +194,8 @@ public sealed class HttpProxyServer : IDisposable
         string[] headerLines,
         CancellationToken cancellationToken)
     {
-        // 本地 PAC 与状态页
-        if (target.StartsWith("/pac", StringComparison.OrdinalIgnoreCase) ||
-            target.EndsWith("/pac", StringComparison.OrdinalIgnoreCase))
+        // 只处理源站形式的 /pac，避免把远端 http://host/pac 误判成本地 PAC。
+        if (target.StartsWith("/pac", StringComparison.OrdinalIgnoreCase))
         {
             var pac = BuildPac(settings.HttpPort, settings.Socks5Port);
             await WriteResponseAsync(stream, 200, "OK", pac, cancellationToken, "application/x-ns-proxy-autoconfig")
@@ -205,9 +204,10 @@ public sealed class HttpProxyServer : IDisposable
         }
 
         if (!Uri.TryCreate(target, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            uri.Scheme != Uri.UriSchemeHttp)
         {
-            await WriteResponseAsync(stream, 400, "Bad Request", "仅支持绝对地址形式的 HTTP 请求", cancellationToken)
+            await WriteResponseAsync(stream, 400, "Bad Request",
+                "普通 HTTP 转发只支持 http:// 绝对地址；HTTPS 请使用 CONNECT。", cancellationToken)
                 .ConfigureAwait(false);
             return;
         }
