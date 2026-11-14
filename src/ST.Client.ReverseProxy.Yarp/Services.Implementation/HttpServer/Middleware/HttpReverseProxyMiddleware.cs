@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Logging;
 using System.Application.Models;
+using System.Application.ProxyRules;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using System.Net;
@@ -49,6 +50,43 @@ sealed class HttpReverseProxyMiddleware
 
         var isScriptInject = reverseProxyConfig.TryGetScriptConfig(url, out var scriptConfigs);
 
+        // DevSidecar 规则：阻断和镜像重定向在进入转发前直接返回，
+        // 其余规则（proxy/sni/预置IP/请求头）通过 ProxyRuleDomainConfig 合并到域名配置。
+        var ruleHost = context.Request.Host.Host;
+        var rulePathAndQuery = context.Request.Path.Value + context.Request.QueryString.Value;
+        var ruleSet = ProxyRuleEngine.Current;
+        ProxyRule? rule = null;
+        if (ruleSet.Rules.Count > 0 && !ruleSet.IsExcluded(ruleHost))
+        {
+            rule = ruleSet.Match(ruleHost, rulePathAndQuery ?? "/");
+        }
+
+        var sensitiveCredentials = rule != null && HasSensitiveCredentials(context.Request);
+        var thirdPartyAction = rule != null &&
+                               (!string.IsNullOrEmpty(rule.Redirect) || !string.IsNullOrEmpty(rule.Proxy));
+
+        if (rule != null)
+        {
+            if (rule.Block)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
+            if (!sensitiveCredentials && !string.IsNullOrEmpty(rule.Redirect))
+            {
+                var target = rule.ExpandTarget(ruleHost, rule.Redirect);
+                var redirectUri = BuildRuleRedirectUri(context.Request, target);
+                if (redirectUri != null)
+                {
+                    ProxyDiagnostics.Info("Rule", $"重定向: {ruleHost} -> {redirectUri.Host}");
+                    context.Response.StatusCode = StatusCodes.Status302Found;
+                    context.Response.Headers.Location = redirectUri.AbsoluteUri;
+                    return;
+                }
+            }
+        }
+
         var originalBody = context.Response.Body;
         MemoryStream? memoryStream = null;
 
@@ -62,6 +100,25 @@ sealed class HttpReverseProxyMiddleware
         {
             await next(context);
             return;
+        }
+
+        if (rule != null)
+        {
+            domainConfig = ProxyRuleDomainConfig.Get(rule, domainConfig, !sensitiveCredentials);
+
+            if (rule.RequestHeaders.Count > 0 && !(sensitiveCredentials && thirdPartyAction))
+            {
+                ApplyRequestHeaders(context, rule);
+            }
+
+            if (rule.ResponseHeaders.Count > 0 && !(sensitiveCredentials && thirdPartyAction))
+            {
+                context.Response.OnStarting(() =>
+                {
+                    ApplyResponseHeaders(context, rule);
+                    return Task.CompletedTask;
+                });
+            }
         }
 
         if (domainConfig == defaultDomainConfig &&
@@ -336,6 +393,92 @@ sealed class HttpReverseProxyMiddleware
                 context.Response.Body = originalBody;
             }
         }
+    }
+
+    /// <summary>
+    /// 带凭证的请求不能走第三方镜像或反代，否则私有仓库会 404，凭据也可能泄露。
+    /// 同源 SNI/IP 伪装仍然允许，因为流量最终仍然到原始站点。
+    /// </summary>
+    static bool HasSensitiveCredentials(HttpRequest request)
+    {
+        if (request.Headers.ContainsKey("Authorization")) return true;
+
+        var cookie = request.Headers.Cookie.ToString();
+        if (!string.IsNullOrEmpty(cookie) &&
+            (cookie.Contains("user_session", StringComparison.OrdinalIgnoreCase) ||
+             cookie.Contains("_gh_sess", StringComparison.OrdinalIgnoreCase) ||
+             cookie.Contains("dotcom_user", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var query = request.QueryString.Value;
+        if (string.IsNullOrEmpty(query)) return false;
+        return query.Contains("sig=", StringComparison.OrdinalIgnoreCase) ||
+               query.Contains("signature=", StringComparison.OrdinalIgnoreCase) ||
+               query.Contains("x-amz-signature", StringComparison.OrdinalIgnoreCase) ||
+               query.Contains("jwt=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 构造镜像重定向地址：支持 {path}/{args} 模板，否则保留原始路径拼接到镜像前缀之后。
+    /// </summary>
+    static Uri? BuildRuleRedirectUri(HttpRequest request, string target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return null;
+
+        var path = request.Path.Value ?? "/";
+        var query = request.QueryString.Value ?? string.Empty;
+        var isTemplate = target.Contains("{path}", StringComparison.Ordinal) ||
+                         target.Contains("{args}", StringComparison.Ordinal);
+
+        target = target.Replace("{path}", path).Replace("{args}", query);
+        if (!target.Contains("://", StringComparison.Ordinal))
+        {
+            target = "https://" + target.TrimStart('/');
+        }
+
+        if (!Uri.TryCreate(target, UriKind.Absolute, out var baseUri)) return null;
+        if (isTemplate) return baseUri;
+
+        var combined = target.TrimEnd('/') + path + query;
+        return Uri.TryCreate(combined, UriKind.Absolute, out var result) ? result : baseUri;
+    }
+
+    static void ApplyRequestHeaders(HttpContext context, ProxyRule rule)
+    {
+        foreach (var item in rule.RequestHeaders)
+        {
+            if (item.Value == null ||
+                string.Equals(item.Value, "[remove]", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Request.Headers.Remove(item.Key);
+            }
+            else
+            {
+                var origin = context.Request.Headers[item.Key].ToString();
+                context.Request.Headers[item.Key] = item.Value.Replace("${origin}", origin);
+            }
+        }
+        ProxyDiagnostics.Info("Rule", $"已替换请求头 {rule.RequestHeaders.Count} 项: {context.Request.Host.Host}");
+    }
+
+    static void ApplyResponseHeaders(HttpContext context, ProxyRule rule)
+    {
+        foreach (var item in rule.ResponseHeaders)
+        {
+            if (item.Value == null ||
+                string.Equals(item.Value, "[remove]", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Headers.Remove(item.Key);
+            }
+            else
+            {
+                var origin = context.Response.Headers[item.Key].ToString();
+                context.Response.Headers[item.Key] = item.Value.Replace("${origin}", origin);
+            }
+        }
+        ProxyDiagnostics.Info("Rule", $"已替换响应头 {rule.ResponseHeaders.Count} 项: {context.Request.Host.Host}");
     }
 
     static Stream? GetStreamByContentCompression(Stream stream, string contentCompression, CompressionMode mode, bool leaveOpen) => contentCompression switch

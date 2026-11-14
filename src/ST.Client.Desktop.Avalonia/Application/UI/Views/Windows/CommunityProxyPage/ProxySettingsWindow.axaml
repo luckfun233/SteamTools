@@ -3,7 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        Width="600" Height="450"
+        Width="600" Height="620"
         x:Class="System.Application.UI.Views.Windows.ProxySettingsWindow"
         xmlns:resx="using:System.Application.UI.Resx"
         xmlns:vm="using:System.Application.UI.ViewModels"
@@ -75,6 +75,51 @@
                 <Label Content="自定义根证书" ></Label>
                 <Button Content="选择证书"/>
               </DockPanel>-->
+            </StackPanel>
+          </Expander>
+
+          <Expander Header="加速规则组" IsExpanded="True">
+            <StackPanel Spacing="10">
+              <DockPanel>
+                <TextBlock Text="启用 DevSidecar 订阅规则"/>
+                <ToggleSwitch
+                            IsChecked="{ReflectionBinding Source={x:Static ms:ProxySettings.EnableDevSidecarRules},Path=Value, Mode=TwoWay}"/>
+              </DockPanel>
+
+              <DockPanel>
+                <TextBlock Text="启动加速时自动同步远程配置"/>
+                <ToggleSwitch
+                            IsChecked="{ReflectionBinding Source={x:Static ms:ProxySettings.SyncDevSidecarConfigOnStartup},Path=Value, Mode=TwoWay}"/>
+              </DockPanel>
+
+              <DockPanel>
+                <TextBlock Text="订阅配置地址"/>
+                <TextBox Text="{ReflectionBinding Source={x:Static ms:ProxySettings.DevSidecarConfigUrl},Path=Value, Mode=TwoWay}"/>
+              </DockPanel>
+
+              <DockPanel>
+                <TextBlock Text="启用自定义规则"/>
+                <ToggleSwitch
+                            IsChecked="{ReflectionBinding Source={x:Static ms:ProxySettings.EnableCustomRules},Path=Value, Mode=TwoWay}"/>
+              </DockPanel>
+
+              <TextBlock Text="规则组（勾选后立即生效）" FontWeight="SemiBold"/>
+              <ItemsControl Items="{Binding RuleGroups}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ProxyRuleGroupToggle">
+                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                              Content="{Binding Name}"
+                              ToolTip.Tip="{Binding Description}"/>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="立即同步规则" Click="OnSyncRulesClick"/>
+                <Button Content="打开自定义规则文件" Click="OnEditCustomRulesClick"/>
+              </StackPanel>
+
+              <TextBlock Text="{Binding RuleStatusText}" TextWrapping="Wrap"/>
             </StackPanel>
           </Expander>
 

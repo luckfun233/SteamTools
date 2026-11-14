@@ -189,7 +189,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 默认关闭；未安装/未信任根证书时会自动退化为隧道模式。
     /// </summary>
     public static SerializableProperty<bool> IsCertificateLessMode { get; }
-        = GetProperty(defaultValue: false, autoSave: false);
+        = GetProperty(defaultValue: false, autoSave: true);
 
     #region 实验性加速设置
 
@@ -197,13 +197,13 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 是否加载 DevSidecar 兼容规则（remote_config.json5）。
     /// </summary>
     public static SerializableProperty<bool> EnableDevSidecarRules { get; }
-        = GetProperty(defaultValue: false, autoSave: false);
+        = GetProperty(defaultValue: false, autoSave: true);
 
     /// <summary>
     /// DevSidecar 远程配置地址。
     /// </summary>
     public static SerializableProperty<string> DevSidecarConfigUrl { get; }
-        = GetProperty(defaultValue: DefaultDevSidecarConfigUrl, autoSave: false);
+        = GetProperty(defaultValue: DefaultDevSidecarConfigUrl, autoSave: true);
 
     public const string DefaultDevSidecarConfigUrl = "https://ds-official-config.bestar.de5.net/remote_config.json5";
 
@@ -211,19 +211,19 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 启动加速时是否同步 DevSidecar 配置。
     /// </summary>
     public static SerializableProperty<bool> SyncDevSidecarConfigOnStartup { get; }
-        = GetProperty(defaultValue: false, autoSave: false);
+        = GetProperty(defaultValue: false, autoSave: true);
 
     /// <summary>
     /// 启用的 DevSidecar 规则组，分号分隔。未选中的组不会参与匹配。
     /// </summary>
     public static SerializableProperty<string> DevSidecarRuleGroups { get; }
-        = GetProperty(defaultValue: ProxyRuleGroups.DefaultEnabled, autoSave: false);
+        = GetProperty(defaultValue: ProxyRuleGroups.DefaultEnabled, autoSave: true);
 
     /// <summary>
     /// 是否启用用户自定义规则。自定义规则与远程规则合并，且优先匹配。
     /// </summary>
     public static SerializableProperty<bool> EnableCustomRules { get; }
-        = GetProperty(defaultValue: true, autoSave: false);
+        = GetProperty(defaultValue: true, autoSave: true);
 
     /// <summary>
     /// 启用免证书 SNI 分片（通过本地 sidecar SOCKS5）。

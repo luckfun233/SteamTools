@@ -382,7 +382,9 @@ namespace System.Application.Services.Implementation
             }
 
             public bool Success { get; }
+
             public long ElapsedMs { get; }
+
             public string? Error { get; }
 
             public static SniProbeResult Ok(long elapsedMs) => new(true, elapsedMs, null);
