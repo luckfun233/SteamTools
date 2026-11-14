@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>netaccel</AssemblyName>
+    <RootNamespace>NetAccel.Cli</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NetAccel.Core\NetAccel.Core.csproj" />
+  </ItemGroup>
+</Project>

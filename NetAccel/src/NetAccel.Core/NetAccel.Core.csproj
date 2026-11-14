@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>NetAccel.Core</RootNamespace>
+    <AssemblyName>NetAccel.Core</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NetAccel.Core.Tests" />
+  </ItemGroup>
+</Project>
