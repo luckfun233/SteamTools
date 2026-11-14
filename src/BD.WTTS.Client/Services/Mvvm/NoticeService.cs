@@ -84,11 +84,28 @@ public sealed class NoticeService : ReactiveObject
                 //    INotificationService.Instance.Notify($"{UnreadNotificationsCount}条通知未读", NotificationType.Announcement);
                 //    return;
                 //}
-                var notice = Notices.First(x => x.Unread == true);
-                INotificationService.Instance.Notify(notice.Content, NotificationType.Announcement, title: notice.Title);
+                var notice = Notices.FirstOrDefault(x => x.Unread == true && !IsOfficialChannelNotice(x));
+                if (notice != null)
+                {
+                    INotificationService.Instance.Notify(notice.Content, NotificationType.Announcement, title: notice.Title);
+                }
                 GeneralSettings.LastLookNoticeDateTime.Value = DateTimeOffset.Now;
             }
         }
+    }
+
+    /// <summary>
+    /// 自建包会收到“请从官方渠道下载”的公告，这类公告不再弹窗打扰。
+    /// </summary>
+    static bool IsOfficialChannelNotice(OfficialMessageItemDTO notice)
+    {
+#if SELF_BUILT_BUILD
+        var text = notice.Title + notice.Content;
+        return text.Contains("官方渠道", StringComparison.Ordinal) ||
+               text.Contains("非官方", StringComparison.Ordinal);
+#else
+        return false;
+#endif
     }
 
     public void MarkNotificationsHasRead()

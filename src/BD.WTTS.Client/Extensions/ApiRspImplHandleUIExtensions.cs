@@ -27,6 +27,14 @@ public static class ApiRspImplHandleUIExtensions
     {
         if (!apiRsp.IsSuccess)
         {
+#if SELF_BUILT_BUILD
+            // 自建包不是官方渠道包，服务端返回该错误码时只记录日志，不弹误导性提示。
+            if (apiRsp.Code == ApiRspCode.IsNotOfficialChannelPackage)
+            {
+                apiRsp.LogError("self-built build: IsNotOfficialChannelPackage ignored");
+                return false;
+            }
+#endif
             //if (!apiRsp.IsDisplayed)
             //{
             //    apiRsp.IsDisplayed = true;
@@ -61,6 +69,13 @@ public static class ApiRspImplHandleUIExtensions
         if (!apiRsp.IsSuccess)
         {
             content = default;
+#if SELF_BUILT_BUILD
+            if (apiRsp.Code == ApiRspCode.IsNotOfficialChannelPackage)
+            {
+                apiRsp.LogError("self-built build: IsNotOfficialChannelPackage ignored");
+                return false;
+            }
+#endif
             //if (!isDisplayed)
             //{
             IApiRsp apiRsp1 = apiRsp;
@@ -116,6 +131,13 @@ public static class ApiRspImplHandleUIExtensions
         if (!apiRsp.IsSuccess)
         {
             content = default;
+#if SELF_BUILT_BUILD
+            if (apiRsp.Code == ApiRspCode.IsNotOfficialChannelPackage)
+            {
+                apiRsp.LogError("self-built build: IsNotOfficialChannelPackage ignored");
+                return false;
+            }
+#endif
             //if (!isDisplayed)
             //{
             IApiRsp apiRsp1 = apiRsp;

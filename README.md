@@ -5,6 +5,14 @@
 [English](./README.en.md) | 简体中文
 
 「Watt Toolkit」是一个开源跨平台的多功能游戏工具箱，此工具的大部分功能都是需要您下载安装 Steam 才能使用。
+
+> [!IMPORTANT]
+> **本仓库是实验分支，不是上游发行版。**
+> 目的：让加速功能在**自建 Linux 包 / 非官方渠道构建**下也能用，并复用 DevSidecar 的规则。
+> 具体做了什么、怎么构建、遇到“加速组为空 / 没有自定义设置 / 提示非官方渠道”怎么处理，见
+> [doc/accelerator-fork/README.md](doc/accelerator-fork/README.md) 和
+> [doc/accelerator-fork/technical-route.md](doc/accelerator-fork/technical-route.md)。
+> 这里**不是 Android 工程**；老的 2.8.x Android 实验代码在独立分支上，不要把两者混在一起。
  
 ![Release Download](https://img.shields.io/github/downloads/BeyondDimension/SteamTools/total?style=flat-square)
 [![Release Version](https://img.shields.io/github/v/release/BeyondDimension/SteamTools?style=flat-square)](https://github.com/BeyondDimension/SteamTools/releases/latest)

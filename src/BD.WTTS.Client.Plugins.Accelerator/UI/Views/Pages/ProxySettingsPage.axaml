@@ -147,5 +147,45 @@
                 </ui:FASettingsExpanderItem.Footer>
             </ui:FASettingsExpanderItem>
         </ui:FASettingsExpander>
+
+        <ui:FASettingsExpander
+            Description="内置加速组不依赖服务端接口，离线或自建包也能在加速页显示；DevSidecar 规则会把 remote_config.json5 中可安全表达的域名规则转换成加速组。"
+            Header="实验性加速（内置规则 / DevSidecar 兼容）"
+            IsExpanded="True">
+            <ui:FASettingsExpanderItem Description="GitHub、Hugging Face 等内置 SNI 伪装规则，服务端接口不可用时作为兜底。">
+                <TextBlock Text="启用内置加速组" />
+                <ui:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch Classes="LeftContent" IsChecked="{Binding Experimental.EnableBuiltInGroups, Mode=TwoWay}" />
+                </ui:FASettingsExpanderItem.Footer>
+            </ui:FASettingsExpanderItem>
+
+            <ui:FASettingsExpanderItem Description="解析 DevSidecar 的 server.intercepts，只转换域名级 sni / proxy 规则；路径级镜像规则不会启用，避免私有仓库请求被送去镜像站。">
+                <TextBlock Text="启用 DevSidecar 兼容规则" />
+                <ui:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch Classes="LeftContent" IsChecked="{Binding Experimental.EnableDevSidecarRules, Mode=TwoWay}" />
+                </ui:FASettingsExpanderItem.Footer>
+            </ui:FASettingsExpanderItem>
+
+            <ui:FASettingsExpanderItem>
+                <TextBlock Text="DevSidecar 配置地址（仅 HTTPS）" />
+                <ui:FASettingsExpanderItem.Footer>
+                    <TextBox MinWidth="320" Text="{Binding Experimental.DevSidecarConfigUrl, Mode=TwoWay}" />
+                </ui:FASettingsExpanderItem.Footer>
+            </ui:FASettingsExpanderItem>
+
+            <ui:FASettingsExpanderItem Description="关闭后只读取上次成功同步的本地缓存，不再联网。">
+                <TextBlock Text="启动时同步 DevSidecar 配置" />
+                <ui:FASettingsExpanderItem.Footer>
+                    <ToggleSwitch Classes="LeftContent" IsChecked="{Binding Experimental.SyncDevSidecarOnStartup, Mode=TwoWay}" />
+                </ui:FASettingsExpanderItem.Footer>
+            </ui:FASettingsExpanderItem>
+
+            <ui:FASettingsExpanderItem Description="{Binding Experimental.ConfigFilePath}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Command="{Binding Experimental.RefreshGroupsCommand}" Content="重新加载加速组" />
+                    <Button Command="{Binding Experimental.OpenConfigFolderCommand}" Content="打开配置目录" />
+                </StackPanel>
+            </ui:FASettingsExpanderItem>
+        </ui:FASettingsExpander>
     </StackPanel>
 </UserControl>

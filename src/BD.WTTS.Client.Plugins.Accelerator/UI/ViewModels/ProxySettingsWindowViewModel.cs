@@ -17,6 +17,11 @@ public sealed class ProxySettingsWindowViewModel : WindowViewModel
             "127.0.0.1",
         };
 
+    /// <summary>
+    /// 实验性加速设置（内置加速组、DevSidecar 规则等）。
+    /// </summary>
+    public ExperimentalAcceleratorViewModel Experimental { get; } = new();
+
 
     public void ResetSettings()
     {

@@ -24,6 +24,13 @@
 		<Deterministic>true</Deterministic>
 		<CheckEolWorkloads>false</CheckEolWorkloads>
 		<!--<DefineConstants>REMOVE_DNS_INTERCEPT;$(DefineConstants)</DefineConstants>-->
+		<!--
+		  自建/非官方渠道构建：
+		  服务端可能拒绝非官方客户端（ApiRspCode.IsNotOfficialChannelPackage），
+		  也可能推送“请从官方渠道下载”的公告。此常量让这些提示只写日志，不打扰用户。
+		  合并上游时如果不需要该行为，删除此行即可。
+		-->
+		<DefineConstants>SELF_BUILT_BUILD;$(DefineConstants)</DefineConstants>
 		<CETCompat>false</CETCompat>
 	</PropertyGroup>
 

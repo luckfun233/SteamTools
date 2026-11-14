@@ -462,6 +462,10 @@ public sealed partial class ProxyService
 
             LoadOrSaveLocalAccelerate();
 
+            // 服务端接口不可用时（自建包、离线、接口拒绝非官方客户端），用内置规则兜底，
+            // 保证加速页至少能看到条目，而不是一片空白。
+            await MergeBuiltInAccelerateAsync();
+
             if (ProxySettings.SupportProxyServicesStatus.Value.Any_Nullable() && ProxyDomains.Items.Any_Nullable())
             {
                 var items = ProxyDomains.Items!.SelectMany(s => s.Items!);
@@ -477,6 +481,39 @@ public sealed partial class ProxyService
     }
 
     public static bool IsChangeSupportProxyServicesStatus { get; set; }
+
+    /// <summary>
+    /// 合并客户端内置加速组，以及可选的 DevSidecar 兼容规则。
+    /// </summary>
+    async Task MergeBuiltInAccelerateAsync()
+    {
+        var options = ExperimentalAcceleratorSettings.Current;
+
+        if (options.EnableBuiltInGroups)
+        {
+            foreach (var group in BuiltInAccelerateGroups.CreateAll())
+            {
+                ProxyDomains.AddOrUpdate(group);
+            }
+        }
+
+        if (!options.EnableDevSidecarRules) return;
+
+        try
+        {
+            var groups = await DevSidecarRuleGroups.LoadAsync(
+                options.DevSidecarConfigUrl,
+                options.SyncDevSidecarOnStartup);
+            foreach (var group in groups)
+            {
+                ProxyDomains.AddOrUpdate(group);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(nameof(ProxyService), ex, "合并 DevSidecar 规则失败");
+        }
+    }
 
     private void LoadOrSaveLocalAccelerate()
     {

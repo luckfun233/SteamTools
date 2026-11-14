@@ -28,6 +28,10 @@
     <File Path="doc/publish.md" />
     <File Path="doc/release-keylol.md" />
   </Folder>
+  <Folder Name="/0.Root/Document/Accelerator Fork/">
+    <File Path="doc/accelerator-fork/README.md" />
+    <File Path="doc/accelerator-fork/technical-route.md" />
+  </Folder>
   <Folder Name="/0.Root/Document/Program File Structure/">
     <File Path="doc/program-file-structure/Linux.md" />
     <File Path="doc/program-file-structure/macOS.md" />
