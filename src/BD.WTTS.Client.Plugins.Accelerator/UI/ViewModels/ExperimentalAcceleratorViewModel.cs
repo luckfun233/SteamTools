@@ -1,3 +1,5 @@
+using System.Reactive;
+
 // ReSharper disable once CheckNamespace
 namespace BD.WTTS.UI.ViewModels;
 

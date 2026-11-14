@@ -19,7 +19,10 @@
   </Folder>
   <Folder Name="/0.Root/Build/">
     <File Path="build/publish_apphost_linux_x64.sh" />
+    <File Path="build/publish_linux_selfbuilt.sh" />
     <File Path="build/settings_v4_app.json" />
+    <File Path="build/linux/install.sh" />
+    <File Path="build/linux/README-便携版.txt" />
   </Folder>
   <Folder Name="/0.Root/Document/">
     <File Path="doc/file-system.md" />

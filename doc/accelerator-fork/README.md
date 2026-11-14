@@ -65,18 +65,41 @@
 
 ## 6. 构建（Linux）
 
+已在本仓库用 `.NET SDK 11.0.100` 实测通过（linux-x64）。
+
 ```bash
 git clone -b <你的分支> https://github.com/luckfun233/SteamTools.git
 cd SteamTools
 git submodule update --init --recursive
 
-dotnet restore WattToolkit.slnx
-dotnet build src/BD.WTTS.Client.Avalonia.App/BD.WTTS.Client.Avalonia.App.csproj -c Release
+# 一键构建便携包
+./build/publish_linux_selfbuilt.sh linux-x64
 ```
 
-打包脚本在 `build/` 与 `packaging/` 目录，按上游 `doc/publish.md` 的 Linux 部分执行。需要 .NET 11 SDK（以 `src/Directory.Build.props` 的 `DotNet_Version` 为准）。
+脚本会做四件事：
 
-> 本次改动没有在当前沙箱内编译验证（沙箱没有 .NET SDK）。如果构建失败，优先检查新增文件的命名空间与 `ExperimentalAcceleratorViewModel` 的绑定类型。
+1. 发布主程序（自包含运行时，不需要用户装 .NET）。
+2. 发布 5 个插件，只把插件 DLL 放进 `modules/<Name>/`，依赖合并到主目录。
+3. 发布 `Steam++.Accelerator` 反代子进程（自包含单文件，放在 `modules/Accelerator/`）。
+4. 复制图标 / 安装脚本 / 说明，打包成 `artifacts/WattToolkit_linux-x64_selfbuilt_<日期>.tar.zst` 并生成 sha256。
+
+注意事项：
+
+- `Splat 19.3.1` 的 NuGet 作者证书已被吊销，`dotnet restore` 会报 `NU3012`。脚本里设置了
+  `DOTNET_NUGET_SIGNATURE_VERIFICATION=false` 绕过；这是构建环境的证书链问题，与包内容无关。
+- 反代子进程必须**自包含**。官方流程是单文件 + 依赖主进程的 `DOTNET_ROOT`，
+  便携包直接跑很容易出现找不到运行时，脚本改为自包含单文件。
+- 插件目录名必须是 `modules/<短名>`，且目录内 DLL 必须叫
+  `BD.WTTS.Client.Plugins.<短名>.dll`，否则 `PluginsCore` 不会加载。
+
+### 已构建的产物
+
+- 下载（gofile，暂存）：<https://gofile.io/d/zpqNQ1ty>
+- 文件名：`WattToolkit_linux_x64_selfbuilt_20261114.tar.zst`（约 121 MB）
+- SHA256：`3ae21ee46df861df829ed30e99f7e862b776c656fb9c178935e4fa13f6dd6387`
+
+上传的是匿名临时空间，链接可能过期；过期后按上面的脚本自行构建即可。
+
 
 ## 7. 常见问题
 

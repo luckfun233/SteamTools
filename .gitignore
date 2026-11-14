@@ -640,3 +640,7 @@ iOSInjectionProject/
 /pkg
 !**/BD.WTTS.Client.Avalonia.App
 /ref/DirectoryPackages
+
+# 本地构建工具（自建包环境）
+/.dotnet/
+/.tools/
