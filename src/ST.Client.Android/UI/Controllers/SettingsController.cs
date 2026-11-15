@@ -108,7 +108,10 @@ namespace System.Application.UI.Controllers
                 binding.layoutRootGeneralSettingsStorageSpace,
                 binding.layoutRootOSAppDetailsSettings,
                 binding.layoutRootOSAppNotificationSettings,
-                binding.layoutRootGeneralSettingsCaptureScreen);
+                binding.layoutRootGeneralSettingsCaptureScreen,
+                binding.layoutRootExperimentalAccelerator,
+                binding.layoutRootCustomProxyRules,
+                binding.layoutRootAcceleratorLab);
 
             SetIsAutoCheckUpdateChecked();
             SetCaptureScreenChecked();
@@ -170,6 +173,21 @@ namespace System.Application.UI.Controllers
             {
                 GeneralSettings.CaptureScreen.Value = !GeneralSettings.CaptureScreen.Value;
                 SetCaptureScreenChecked();
+                return true;
+            }
+            else if (view.Id == Resource.Id.layoutRootExperimentalAccelerator)
+            {
+                Activity.StartActivity<ExperimentalSettingsActivity>();
+                return true;
+            }
+            else if (view.Id == Resource.Id.layoutRootCustomProxyRules)
+            {
+                Activity.StartActivity<CustomRulesActivity>();
+                return true;
+            }
+            else if (view.Id == Resource.Id.layoutRootAcceleratorLab)
+            {
+                Activity.StartActivity<AcceleratorLabActivity>();
                 return true;
             }
 

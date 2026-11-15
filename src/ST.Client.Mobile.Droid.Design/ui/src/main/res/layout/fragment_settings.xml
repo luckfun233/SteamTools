@@ -403,6 +403,184 @@
     </FrameLayout>
 
     <androidx.appcompat.widget.AppCompatTextView
+      android:id="@+id/tvAcceleratorExperimentalSettings"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="@dimen/settings_ui_subtitle_margin_start"
+      android:layout_marginTop="@dimen/activity_vertical_margin"
+      android:layout_marginBottom="@dimen/settings_ui_subtitle_margin_bottom"
+      android:text="加速（实验性）"
+      android:textColor="?colorPrimary"
+      android:textSize="16sp"
+      tools:ignore="HardcodedText"
+      xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+
+    <FrameLayout
+      android:id="@+id/layoutRootExperimentalAccelerator"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:background="?android:windowBackground"
+      android:clickable="true"
+      android:focusable="true"
+      android:foreground="?android:attr/selectableItemBackground"
+      android:minHeight="@dimen/preference_button_height_large">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:minHeight="@dimen/preference_button_height_large"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageView
+          android:layout_width="@dimen/settings_ui_icon_size"
+          android:layout_height="@dimen/settings_ui_icon_size"
+          android:layout_gravity="center_vertical"
+          android:layout_marginStart="@dimen/activity_horizontal_margin"
+          android:layout_marginEnd="@dimen/activity_horizontal_margin"
+          app:srcCompat="@drawable/ic_baseline_security_24"
+          app:tint="@color/icon_background"
+          xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatImageView" />
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center_vertical"
+          android:minHeight="@dimen/preference_button_height_large"
+          android:orientation="vertical">
+
+          <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvExperimentalAccelerator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="实验性加速设置"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/settings_ui_item_title_font_size"
+            tools:ignore="HardcodedText"
+            xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+
+          <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvExperimentalAcceleratorDesc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="规则组、SNI 改写/分片、DoH、中继"
+            android:textColor="@color/text_secondary"
+            tools:ignore="HardcodedText"
+            xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+        </LinearLayout>
+      </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+      android:id="@+id/layoutRootCustomProxyRules"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:background="?android:windowBackground"
+      android:clickable="true"
+      android:focusable="true"
+      android:foreground="?android:attr/selectableItemBackground"
+      android:minHeight="@dimen/preference_button_height_large">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:minHeight="@dimen/preference_button_height_large"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageView
+          android:layout_width="@dimen/settings_ui_icon_size"
+          android:layout_height="@dimen/settings_ui_icon_size"
+          android:layout_gravity="center_vertical"
+          android:layout_marginStart="@dimen/activity_horizontal_margin"
+          android:layout_marginEnd="@dimen/activity_horizontal_margin"
+          app:srcCompat="@drawable/baseline_edit_black_24"
+          app:tint="@color/icon_background"
+          xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatImageView" />
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center_vertical"
+          android:minHeight="@dimen/preference_button_height_large"
+          android:orientation="vertical">
+
+          <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvCustomProxyRules"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="自定义代理规则"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/settings_ui_item_title_font_size"
+            tools:ignore="HardcodedText"
+            xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+
+          <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvCustomProxyRulesDesc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="按 DevSidecar 格式追加域名/路径规则"
+            android:textColor="@color/text_secondary"
+            tools:ignore="HardcodedText"
+            xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+        </LinearLayout>
+      </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+      android:id="@+id/layoutRootAcceleratorLab"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:background="?android:windowBackground"
+      android:clickable="true"
+      android:focusable="true"
+      android:foreground="?android:attr/selectableItemBackground"
+      android:minHeight="@dimen/preference_button_height_large">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:minHeight="@dimen/preference_button_height_large"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageView
+          android:layout_width="@dimen/settings_ui_icon_size"
+          android:layout_height="@dimen/settings_ui_icon_size"
+          android:layout_gravity="center_vertical"
+          android:layout_marginStart="@dimen/activity_horizontal_margin"
+          android:layout_marginEnd="@dimen/activity_horizontal_margin"
+          app:srcCompat="@drawable/mdi_rocket_black_24"
+          app:tint="@color/icon_background"
+          xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatImageView" />
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center_vertical"
+          android:minHeight="@dimen/preference_button_height_large"
+          android:orientation="vertical">
+
+          <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvAcceleratorLab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="加速实验室"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/settings_ui_item_title_font_size"
+            tools:ignore="HardcodedText"
+            xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+
+          <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tvAcceleratorLabDesc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="规则命中测试、连通性诊断"
+            android:textColor="@color/text_secondary"
+            tools:ignore="HardcodedText"
+            xamarin:managedType="AndroidX.AppCompat.Widget.AppCompatTextView" />
+        </LinearLayout>
+      </LinearLayout>
+    </FrameLayout>
+
+    <androidx.appcompat.widget.AppCompatTextView
       android:id="@+id/tvSystemSettings"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"

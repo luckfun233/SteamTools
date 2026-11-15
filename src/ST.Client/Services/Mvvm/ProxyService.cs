@@ -423,7 +423,14 @@ namespace System.Application.Services
         public async Task Initialize()
         {
             //reverseProxyService.StopProxy();
-            await InitializeAccelerate();
+            try
+            {
+                await InitializeAccelerate();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(nameof(ProxyService), ex, "初始化加速项目失败");
+            }
             await InitializeScript();
 
             if (IsProgramStartupRunProxy())
@@ -460,27 +467,36 @@ namespace System.Application.Services
             var stopwatch = Stopwatch.StartNew();
 #endif
             //var result = await client.All(reverseProxyService.ReverseProxyEngine);
-            var result = await client.All(reverseProxyService.ReverseProxyEngine);
-#if DEBUG
-            stopwatch.Stop();
-            Toast.Show($"加载代理服务数据耗时：{stopwatch.ElapsedMilliseconds}ms，IsSuccess：{result.IsSuccess}，Count：{result.Content?.Count}");
-#endif
-            if (result.IsSuccess)
+            try
             {
-                if (ProxySettings.SupportProxyServicesStatus.Value.Any_Nullable() && result.Content.Any_Nullable())
+                var result = await client.All(reverseProxyService.ReverseProxyEngine);
+#if DEBUG
+                stopwatch.Stop();
+                Toast.Show($"加载代理服务数据耗时：{stopwatch.ElapsedMilliseconds}ms，IsSuccess：{result.IsSuccess}，Count：{result.Content?.Count}");
+#endif
+                if (result.IsSuccess)
                 {
-                    var items = result.Content!.SelectMany(s => s.Items);
-                    foreach (var item in items)
+                    if (ProxySettings.SupportProxyServicesStatus.Value.Any_Nullable() && result.Content.Any_Nullable())
                     {
-                        if (ProxySettings.SupportProxyServicesStatus.Value.Contains(item.Id.ToString()))
+                        var items = result.Content!.SelectMany(s => s.Items);
+                        foreach (var item in items)
                         {
-                            item.Enable = true;
+                            if (ProxySettings.SupportProxyServicesStatus.Value.Contains(item.Id.ToString()))
+                            {
+                                item.Enable = true;
+                            }
                         }
                     }
-                }
 
-                ProxyDomains.Clear();
-                ProxyDomains.AddRange(result.Content!);
+                    ProxyDomains.Clear();
+                    ProxyDomains.AddRange(result.Content!);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 服务端接口失败（网络不可达、非官方渠道拒绝、服务端异常）不能中断初始化，
+                // 否则后面的内置规则不会合并，加速页会一个组都没有。
+                Log.Error(nameof(ProxyService), ex, "加载服务端加速项目失败，使用本地内置规则");
             }
 
             LoadOrSaveLocalAccelerate();

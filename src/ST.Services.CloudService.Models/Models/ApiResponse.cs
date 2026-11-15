@@ -72,7 +72,12 @@ namespace System.Application.Models
             }
             else if (code == ApiResponseCode.IsNotOfficialChannelPackage)
             {
+#if SELF_BUILT_BUILD
+                // 自建包会被服务端判定为非官方渠道，这个提示对用户没有意义，直接吞掉。
+                return string.Empty;
+#else
                 return SR.IsNotOfficialChannelPackageWarning;
+#endif
             }
             else if (code == ApiResponseCode.AppObsolete)
             {

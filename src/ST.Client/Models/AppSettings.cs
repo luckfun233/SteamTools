@@ -87,6 +87,11 @@ namespace System.Application.Models
         {
             bool GetIsOfficialChannelPackage_()
             {
+#if SELF_BUILT_BUILD
+                // 自建包没有官方分发签名，这里按官方渠道处理：
+                // 使用生产 API，并且不触发“非官方渠道”提示。
+                return true;
+#endif
 #if SIGN_ASSEMBLY
                 var pk = typeof(AppSettings).Assembly.GetName().GetPublicKey();
                 if (pk == null) return false;

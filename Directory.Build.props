@@ -16,4 +16,12 @@
     <DelaySign>false</DelaySign>
     <AssemblyOriginatorKeyFile>$(MSBuildProjectDirectory)\..\..\Unicorn.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
+
+  <!--
+    自建包：跳过官方的“非官方渠道包”校验与提示，并使用生产 API。
+    合并回上游时删除这一行即可。
+  -->
+  <PropertyGroup>
+    <DefineConstants>SELF_BUILT_BUILD;$(DefineConstants)</DefineConstants>
+  </PropertyGroup>
 </Project>

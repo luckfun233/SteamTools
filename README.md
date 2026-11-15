@@ -37,6 +37,23 @@
 <img src="./resources/screenshot-android.png" width="800" />
 </div>
 
+---
+
+## 📱 分支说明：Android 手机端（`trae/android-linux-build`）
+
+> **本分支服务于 Android 手机版（Watt Toolkit 2.8.3），不是 Linux 桌面版分支。**
+> 分支名里的“linux”指“把 Android 工程迁移为可以在 Linux 上构建 APK 的 `net6.0-android` 工程”，与 Linux 桌面端无关；桌面版（Avalonia）代码不在本分支的改造范围内。
+
+本分支的主要改动：
+
+- **内置加速组**：GitHub、Hugging Face、Pixiv 组不再依赖服务端接口，即使接口失败（网络不可达 / 非官方渠道被拒绝）也能显示并启用。
+- **DevSidecar 兼容层**：解析 DevSidecar 的远程配置与规则格式（域名 / 路径 / SNI / redirect / proxy / 中继），并提供本地规则引擎。
+- **实验性加速能力**：SNI 改写、SNI 分片、DoH、可信中继等多条绕过路径，均可在设置中单独开关。
+- **设置入口**：设置页新增「加速（实验性）」分组，包含实验性加速设置、自定义代理规则、加速实验室。
+- **自建包处理**：构建时定义 `SELF_BUILT_BUILD`，跳过官方渠道校验与“非官方渠道”提示，并使用生产 API。
+
+构建方式见 [Android 构建说明](./src/ST.Client.Android.App.Modern/README.md)，技术路线与可行性分析见 [可行性文档](./doc/experimental/android-accelerator-feasibility.md)。
+
 ## 🚀 下载渠道
 - [GitHub Releases](https://github.com/BeyondDimension/SteamTools/releases)
 - [Gitee Releases](https://gitee.com/rmbgame/SteamTools/releases)
