@@ -461,6 +461,10 @@ namespace System.Application.Services
 
         public async Task InitializeAccelerate()
         {
+            // 旧版本的 SNI 默认策略是“SNI 边界”，对能重组 TCP 的 DPI 无效。
+            // 这里只做一次迁移，之后用户在设置页的选择会被保留。
+            ProxySettings.MigrateExperimentalDefaults();
+
             #region 加载代理服务数据
             var client = ICloudServiceClient.Instance.Accelerate;
 #if DEBUG
@@ -500,16 +504,13 @@ namespace System.Application.Services
             }
 
             LoadOrSaveLocalAccelerate();
-            MergeBuiltInAccelerate();
             if (ProxySettings.EnableDevSidecarRules.Value)
             {
+                // 先用本地缓存让加速尽快可用，再在后台同步最新配置。
+                ProxyRuleEngine.LoadFromCache();
                 if (ProxySettings.SyncDevSidecarConfigOnStartup.Value)
                 {
-                    await ProxyRuleEngine.ReloadAsync();
-                }
-                else
-                {
-                    ProxyRuleEngine.LoadFromCache();
+                    _ = SyncDevSidecarInBackgroundAsync();
                 }
             }
             else
@@ -520,8 +521,10 @@ namespace System.Application.Services
             // 自定义规则与远程规则合并，远程规则关闭时也要加载。
             ProxyRuleEngine.ReloadCustom();
 
-            // 提前启动免证书 SNI sidecar，避免 VPN/tun2socks 启动时端口还没就绪。
+            // 提前启动免证书 SNI sidecar 与本地 DNS 代理，避免 VPN/tun2socks 启动时端口还没就绪。
             SniSidecarService.Start();
+            DnsProxyService.Start();
+            StartDevSidecarAutoSync();
 
             if (IsLoadImage && ProxyDomains.Items.Any_Nullable())
             {
@@ -580,40 +583,46 @@ namespace System.Application.Services
             }
         }
 
-        /// <summary>
-        /// 合并不依赖服务端下发的内置加速项目，并放到最前面优先匹配。
-        /// </summary>
-        void MergeBuiltInAccelerate()
+        Timer? devSidecarSyncTimer;
+
+        async Task SyncDevSidecarInBackgroundAsync()
         {
-            var status = ProxySettings.SupportProxyServicesStatus.Value;
-
-            void ApplySavedStatus(AccelerateProjectGroupDTO group)
+            try
             {
-                if (group.Items == null) return;
-                foreach (var item in group.Items)
+                await ProxyRuleEngine.ReloadAsync().ConfigureAwait(false);
+                ProxyDiagnostics.Info("Rules", "启动后台同步 DevSidecar 配置完成");
+            }
+            catch (Exception ex)
+            {
+                ProxyDiagnostics.Warn("Rules", $"启动后台同步 DevSidecar 配置失败: {ex.Message}");
+            }
+        }
+
+        void StartDevSidecarAutoSync()
+        {
+            devSidecarSyncTimer?.Dispose();
+            devSidecarSyncTimer = null;
+
+            var hours = ProxySettings.DevSidecarAutoSyncHours.Value;
+            if (hours <= 0 || !ProxySettings.EnableDevSidecarRules.Value) return;
+
+            var interval = TimeSpan.FromHours(Math.Max(1, Math.Min(168, hours)));
+            devSidecarSyncTimer = new Timer(_ =>
+            {
+                if (!ProxySettings.EnableDevSidecarRules.Value) return;
+                _ = Task.Run(async () =>
                 {
-                    item.Enable = status?.Contains(item.Id.ToString()) == true;
-                }
-            }
-
-            if (!ProxyDomains.Items.Any(x => x.Name == "GitHub SNI 加速"))
-            {
-                var group = BuiltInAccelerateProjects.CreateGitHubGroup();
-                ApplySavedStatus(group);
-                ProxyDomains.Insert(0, group);
-            }
-            if (!ProxyDomains.Items.Any(x => x.Name == "Hugging Face SNI 镜像"))
-            {
-                var group = BuiltInAccelerateProjects.CreateHuggingFaceGroup();
-                ApplySavedStatus(group);
-                ProxyDomains.Insert(0, group);
-            }
-            if (!ProxyDomains.Items.Any(x => x.Name == "Pixiv / P站 SNI 加速"))
-            {
-                var group = BuiltInAccelerateProjects.CreatePixivGroup();
-                ApplySavedStatus(group);
-                ProxyDomains.Insert(0, group);
-            }
+                    try
+                    {
+                        await ProxyRuleEngine.ReloadAsync().ConfigureAwait(false);
+                        ProxyDiagnostics.Info("Rules", "后台自动同步 DevSidecar 配置完成");
+                    }
+                    catch (Exception ex)
+                    {
+                        ProxyDiagnostics.Warn("Rules", $"后台自动同步 DevSidecar 配置失败: {ex.Message}");
+                    }
+                });
+            }, null, interval, interval);
         }
 
         private Timer? timer;
@@ -916,6 +925,9 @@ namespace System.Application.Services
             }
             reverseProxyService.Dispose();
             SniSidecarService.Stop();
+            DnsProxyService.Stop();
+            devSidecarSyncTimer?.Dispose();
+            devSidecarSyncTimer = null;
         }
 
         public IPAddress ProxyIp => reverseProxyService.ProxyIp;

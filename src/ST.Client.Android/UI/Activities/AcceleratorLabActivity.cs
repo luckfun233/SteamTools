@@ -138,11 +138,17 @@ namespace System.Application.UI.Activities
             row3.AddView(CreateButton("清空统计", () =>
             {
                 SniSidecarStats.Reset();
+                DnsProxyServer.ResetStats();
                 RefreshStatus();
                 ToastShow("统计与回退缓存已清空");
             }, false), WeightedButtonParams());
             row3.AddView(CreateButton("查看最近日志", ShowLogDialog, false), WeightedButtonParams());
             testCard.AddView(row3);
+
+            var row4 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row4.AddView(CreateButton("DNS / UDP 检查", RunDnsUdpAsync, true), WeightedButtonParams());
+            row4.AddView(CreateButton("规则匹配", ShowRuleMatch, false), WeightedButtonParams());
+            testCard.AddView(row4);
 
             var resultCard = AddSection("测试结果", "失败的项会标记为 FAIL；INFO 表示该检查只能作为参考，不能判定通过/失败。");
             resultsView = AddInfoText(resultCard, "尚未运行测试。");
@@ -190,8 +196,10 @@ namespace System.Application.UI.Activities
                     $"代理模式: {ProxySettings.ProxyModeValue}\n" +
                     $"代理状态: {(proxy.ProxyStatus ? "运行中" : "已停止")}，监听 {proxy.ProxyIp}:{proxy.ProxyPort}，SOCKS5 {proxy.Socks5ProxyPortId}\n" +
                     $"Sidecar: {sidecar}\n" +
-                    $"规则: 自定义 {ProxyRuleEngine.CustomRuleCount} 条，启用 {ProxyRuleEngine.Current.Rules.Count} 条\n" +
-                    $"统计: {SniSidecarStats.ToDisplayString()}\n" +
+                    $"DNS 代理: {(DnsProxyService.IsRunning ? $"运行中 127.0.0.1:{DnsProxyService.ActivePort}" : "未运行")}\n" +
+                    $"规则: 自定义 {ProxyRuleEngine.CustomRuleCount} 条，启用 {ProxyRuleEngine.Current.Rules.Count} 条，分组 {ProxyRuleEngine.GroupStats.Count} 个\n" +
+                    $"SNI 统计: {SniSidecarStats.ToDisplayString()}\n" +
+                    $"DNS 统计: {DnsProxyServer.GetStats()}\n" +
                     $"回退缓存: {FragmentFallbackCache.Count} 个域名";
             }
             catch (Exception ex)
@@ -315,6 +323,90 @@ namespace System.Application.UI.Activities
             {
                 return new LabTestResult("Titanium 代理 HTTP", false, watch.ElapsedMilliseconds, ex.Message);
             }
+        }
+
+        async void RunDnsUdpAsync()
+        {
+            if (hostInput == null) return;
+            var host = hostInput.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(host)) host = AcceleratorLabService.DefaultHost;
+
+            var progress = ShowProgress("正在检查 DNS / UDP…");
+            try
+            {
+                var device = GetDeviceInfo();
+                var results = await Task.Run(() => AcceleratorLabService.RunAllAsync(host!, device));
+                var filtered = results
+                    .Where(x => x.Name.Contains("DNS", StringComparison.OrdinalIgnoreCase) ||
+                                x.Name.Contains("DoH", StringComparison.OrdinalIgnoreCase) ||
+                                x.Name.Contains("UDP", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                lastResults = filtered;
+                lastReport = AcceleratorLabService.BuildReport(device, filtered, includeLog: false);
+                ShowResults(filtered);
+                RefreshStatus();
+
+                var failed = filtered.Count(x => !x.Success && !x.Informational);
+                ToastShow(failed == 0 ? "DNS / UDP 检查完成" : $"DNS / UDP 有 {failed} 项失败");
+            }
+            catch (Exception ex)
+            {
+                ToastShow("检查失败: " + ex.Message);
+            }
+            finally
+            {
+                progress.Dismiss();
+            }
+        }
+
+        void ShowRuleMatch()
+        {
+            if (hostInput == null) return;
+            var host = hostInput.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(host)) host = AcceleratorLabService.DefaultHost;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"域名: {host}");
+            sb.AppendLine($"代理模式: {ProxySettings.ProxyModeValue}，免证书: {ProxySettings.IsCertificateLessMode.Value}");
+            sb.AppendLine();
+
+            var services = ProxyRuleEngine.MatchServices(host!);
+            sb.AppendLine($"匹配到 {services.Count} 个服务配置：");
+            foreach (var pattern in services)
+            {
+                sb.AppendLine($"- {pattern}");
+                var rules = ProxyRuleEngine.Current.Rules
+                    .Where(r => string.Equals(r.DomainPattern, pattern, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (rules.Count == 0)
+                {
+                    sb.AppendLine("    （仅预置 IP，没有拦截规则）");
+                    continue;
+                }
+                foreach (var rule in rules)
+                {
+                    sb.AppendLine($"    组={rule.Group ?? "未分组"} 路径={rule.PathPattern ?? ".*"}" +
+                                  (string.IsNullOrEmpty(rule.Sni) ? string.Empty : $" sni={rule.Sni}") +
+                                  (string.IsNullOrEmpty(rule.Redirect) ? string.Empty : $" redirect={rule.Redirect}") +
+                                  (string.IsNullOrEmpty(rule.Proxy) ? string.Empty : $" proxy={rule.Proxy}") +
+                                  (rule.Block ? " abort" : string.Empty));
+                }
+            }
+
+            var presetIps = ProxyRuleEngine.Current.GetPresetIps(host!);
+            if (presetIps.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"预置 IP: {string.Join(", ", presetIps)}");
+            }
+
+            if (services.Count == 0 && presetIps.Count == 0)
+            {
+                sb.AppendLine("没有规则会作用于该域名。可以在“规则组 / 服务”页面搜索确认。");
+            }
+
+            ShowTextDialog("规则匹配结果", sb.ToString());
         }
 
         void ShowResults(IReadOnlyList<LabTestResult> results)

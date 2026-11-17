@@ -507,36 +507,63 @@ ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 
 实验设置页按组保存，修改后建议停止并重新启动加速：
 
-- **规则组**：GitHub / Hugging Face / Pixiv / Google / YouTube / Wikipedia / Docker / Reddit / Steam / 其它。
-- **自定义规则**：启用开关、管理页（文本编辑、校验、快速添加、删除、示例、复制、清空）。
+- **规则组 / 服务分组**：分组名直接读取 `remote_config.json5` 的 `//` 注释（与 DevSidecar 2.3.x 一致），默认全部开启；支持按组开关、按单个域名开关，以及包含 / 正则 / 匹配域名三种搜索。
+- **自定义规则**：启用开关、管理页（文本编辑、校验、快速添加、删除、示例、复制、清空），与远程规则合并且优先匹配。
 - **免证书模式**：VPN 出口切换为 sidecar。
-- **SNI 分片**：开关、六种策略、生效域名、仅 TLS、分片大小、SNI 多段数、间隔、随机抖动、最大缓冲、读取超时。
+- **SNI 分片**：开关、七种策略、生效域名、仅 TLS、分片大小、SNI 多段数、间隔、随机抖动、最大缓冲、读取超时。
+  - 默认策略改为 **TLS record 拆分**：重封装成多个 TLS record，SNI 跨 record，可绕过“重组 TCP 但按 record 解析”的 DPI。
+  - 新增 **TLS record 随机拆分**：在 SNI 内部强制切一刀，其余切点随机，降低固定三段指纹。
 - **分片自动回退**：开关、首字节探测超时、跳过分片缓存分钟数。
 - **SNI 改写**：开关、目标域名（`none` 表示删除 SNI）、允许改写的域名。
-- **Sidecar 端口**：仅监听 127.0.0.1。
+- **Sidecar 端口**：仅监听 127.0.0.1；被占用时自动向后寻找端口。
 - **上游 SOCKS5 中继**：地址、端口、生效域名、用户名、密码。
-- **DoH**：开关、JSON 接口、失败是否回退系统 DNS。
+- **DoH / DNS**：
+  - DoH JSON 接口（sidecar 选路解析）。
+  - DoH wire 接口（本地 DNS 代理转发完整 DNS 报文）。
+  - DevSidecar `dns.mapping`：按域名选择配置里的 HTTPS DoH provider；`tls://` DoT provider 当前跳过并回退默认 DoH。
+  - 本地 DNS 代理开关、端口、回退 DNS 服务器列表。
+  - VPN 通过 `tun2socks --dnsgw 127.0.0.1:<port>` 把 UDP:53 送到本地 DNS 代理，不再依赖 SOCKS5 UDP ASSOCIATE。
 - **VPN**：增强模式仅浏览器走 VPN。
 - **日志**：开关、最低级别、是否保留主机名、保留天数、单文件上限、清理与查看目录。
-- **加速实验室**：一键测试、分片策略矩阵、导出/复制报告、清空统计。
+- **加速实验室**：一键测试、分片策略矩阵、DNS / UDP 检查、规则匹配、导出/复制报告、清空统计。
 - **恢复默认值**：只重置实验设置，不修改代理端口/二级代理。
 
 ## 10. 已知缺口与路线图
 
-1. **UDP/QUIC**：sidecar 已明确拒绝 UDP ASSOCIATE，但尚未在 VPN 内阻断 UDP 443 或做 UDP relay。
+1. **UDP/QUIC**：sidecar 已实现 SOCKS5 UDP ASSOCIATE（DNS 优先走 DoH，其它 UDP 直接转发）；QUIC 仍可能受运营商 UDP 策略影响。
 2. **按应用分流 UI**：目前是常见浏览器包名硬编码 + 开关，尚未做应用选择器。
 3. **缓存**：`cacheDays` 只解析不执行；GitHub raw 图片/脚本缓存尚未实现。
 4. **脚本/油猴**：`script`/`tampermonkeyScript` 只解析不执行。
 5. **`success`/`options`**：DevSidecar 的本地假响应和 OPTIONS 处理尚未完整实现。
-6. **规则更新签名**：远端配置只做 HTTPS/缓存，尚未做签名校验和回滚策略。
-7. **构建/真机验证**：当前 Linux 沙箱无 Android SDK/Xamarin.Android 12，需要在 macOS/Windows 或 CI 完成；实验室页需要在真机上跑一轮并导出报告。
-8. **分片对抗上限**：TLS record 拆分只能对抗到“逐 record 检查”的 DPI；会重组 handshake 的 DPI 只能依赖中继。
-9. **需要 root 的方案**：TTL 伪造、假包、乱序、TCP 序列重叠需要 raw socket / NFQUEUE / 内核转发，当前 VpnService 用户态架构不实现。
-10. **ECH**：无法由代理替应用发起；需要客户端与服务端协商 ECH，且 Android 17 起才有平台级支持。
-11. **自定义规则的执行范围**：只执行代理相关子集，不支持 DevSidecar 的 Node 脚本、`cacheDays`、`success`/`options`。
-12. **策略矩阵的判定局限**：如果当前网络没有阻断目标，所有策略都会成功，矩阵无法证明分片有效；需要在不阻断/阻断两种网络下对比。
+6. **规则更新签名**：远端配置只做 HTTPS/大小限制/缓存，尚未做签名校验和回滚策略。
+7. **分片对抗上限**：TLS record 拆分能对抗逐 record 检查的 DPI；会完整重组 TLS handshake 的 DPI 只能依赖中继。
+8. **需要 root 的方案**：TTL 伪造、假包、乱序、TCP 序列重叠需要 raw socket / NFQUEUE / 内核转发，当前 VpnService 用户态架构不实现。
+9. **ECH**：无法由代理替应用发起；需要客户端与服务端协商 ECH。
+10. **自定义规则的执行范围**：只执行代理相关子集，不支持 DevSidecar 的 Node 脚本、`cacheDays`、`success`/`options`。
+11. **策略矩阵的判定局限**：如果当前网络没有阻断目标，所有策略都会成功，矩阵无法证明分片有效；需要在不阻断/阻断两种网络下对比。
+12. **DoH 引导**：本地 DNS 代理使用域名访问 DoH 服务，首次解析仍依赖系统 DNS；后续可加入 DoH 服务器 IP 引导。
 
-## 11. 参考资料
+## 11. 本次 Linux 实测记录（2026-11）
+
+环境：.NET SDK 6.0.428、`dotnet workload install android`（32.0.509）、JDK 11、Android SDK `platforms;android-31` + `build-tools;32.0.0`、Linux x64。
+
+已实际运行并通过的测试：
+
+| 测试 | 结果 | 说明 |
+|---|---|---|
+| `TlsClientHelloTest`（6 项） | 通过 | 解析/改写/删除 SNI；固定、SNI 边界、SNI 多段、记录头、TLS record、TLS record 随机拆分均可无损重组 |
+| `DevSidecarConfigTest`（6 项） | 通过 | 注释分组、`dns.mapping`、`whiteList`、`excludeIpList`、按组/服务过滤、通配符/正则匹配、ReDoS 超时保护 |
+| `Parse_Real_Remote_Config_When_Available` | 通过 | 使用官方 `remote_config.json5` 实测：解析出 69 条可执行规则、预置 IP、GitHub/Pixiv/DockerHub 等注释分组 |
+| `DohWire_Query_Real_Network` | 通过 | 通过 `https://dns.alidns.com/dns-query` 实际解析 `github.com`，返回 NOERROR |
+| `DnsProxy_Uses_Doh_When_Enabled` | 通过 | 本地 DNS 代理走真实 DoH，返回 A 记录 |
+| `DnsProxy_Forwards_To_Fallback_Server` | 通过 | DoH 关闭时回退到指定 DNS，返回 A 记录 |
+| `SniSidecar_TlsRecordSplit_Handshake_Succeeds` | 通过 | 本地自签 TLS 服务端 + SOCKS5 只传 IP；sidecar 从 ClientHello 识别 SNI，TLS record 拆分后握手成功 |
+| APK Release 构建 | 通过 | `dotnet build ... -f net6.0-android -p:AndroidPackageFormat=apk` 产出 70MB universal APK |
+
+> 说明：以上是 Linux 环境下的自动化/本地回环实测，不等价于在所有运营商网络上的真机验证；真机仍需在“会阻断 SNI”的网络下对比直连、分片和中继三种路径。
+
+
+## 12. 参考资料
 
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>

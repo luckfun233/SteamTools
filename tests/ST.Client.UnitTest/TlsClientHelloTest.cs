@@ -92,6 +92,28 @@ public class TlsClientHelloTest
     }
 
     [Test]
+    public void TlsRecordSplitRandom_Reassembles_And_Hides_Host()
+    {
+        var hello = CreateClientHello("raw.githubusercontent.com", 400);
+        for (var i = 0; i < 20; i++)
+        {
+            var records = TlsClientHello.FragmentToTlsRecordsRandom(hello, 4, new Random(i));
+            Assert.That(records.Count, Is.GreaterThan(1));
+
+            foreach (var record in records)
+            {
+                Assert.That(record[0], Is.EqualTo(0x16));
+                var length = (record[3] << 8) | record[4];
+                Assert.That(length, Is.EqualTo(record.Length - 5));
+                Assert.That(Encoding.ASCII.GetString(record).Contains("raw.githubusercontent.com", StringComparison.Ordinal), Is.False);
+            }
+
+            var payloads = records.Select(x => x.Skip(5).ToArray()).ToArray();
+            Assert.That(Join(payloads), Is.EqualTo(hello.Skip(5).ToArray()));
+        }
+    }
+
+    [Test]
     public void Random_Fragment_Reassembles()
     {
         var hello = CreateClientHello("github.com", 500);

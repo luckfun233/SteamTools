@@ -14,6 +14,8 @@ namespace System.Application.ProxyRules
     {
         public const string FileName = "custom_rules.json";
 
+        const int MaxRuleFileBytes = 1024 * 1024;
+
         public const string SampleJson = @"{
   // 自定义规则会和 DevSidecar 远程规则合并，且优先匹配。
   // 支持字段：sni、verifyHost、redirect、proxy、backup、abort、desc、
@@ -89,6 +91,12 @@ namespace System.Application.ProxyRules
             {
                 var path = FilePath;
                 if (!File.Exists(path)) return true;
+                var info = new FileInfo(path);
+                if (info.Length > MaxRuleFileBytes)
+                {
+                    error = $"自定义规则文件过大（{info.Length} 字节），上限 {MaxRuleFileBytes} 字节";
+                    return false;
+                }
                 return TryValidate(File.ReadAllText(path), out rules, out error);
             }
             catch (Exception ex)
@@ -106,6 +114,13 @@ namespace System.Application.ProxyRules
                 rules = ProxyRuleSet.Empty;
                 error = null;
                 return true;
+            }
+
+            if (text.Length > MaxRuleFileBytes)
+            {
+                rules = ProxyRuleSet.Empty;
+                error = $"自定义规则内容过大，上限 {MaxRuleFileBytes} 字符";
+                return false;
             }
 
             return DevSidecarConfigLoader.TryParse(

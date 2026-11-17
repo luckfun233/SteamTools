@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +7,58 @@ using System.Text.RegularExpressions;
 
 namespace System.Application.ProxyRules
 {
+    /// <summary>
+    /// 带超时的正则缓存。远程配置里的正则不可信，必须防止灾难性回溯阻塞请求线程。
+    /// </summary>
+    internal static class RegexCache
+    {
+        static readonly TimeSpan Timeout = TimeSpan.FromMilliseconds(100);
+        static readonly ConcurrentDictionary<string, Regex> cache = new(StringComparer.Ordinal);
+        const int MaxEntries = 2048;
+
+        public static Regex? Get(string pattern, bool ignoreCase = true)
+        {
+            if (string.IsNullOrEmpty(pattern) || pattern.Length > 512) return null;
+
+            var key = (ignoreCase ? "i:" : "s:") + pattern;
+            if (cache.TryGetValue(key, out var cached)) return cached;
+
+            Regex regex;
+            try
+            {
+                var options = RegexOptions.CultureInvariant;
+                if (ignoreCase) options |= RegexOptions.IgnoreCase;
+                regex = new Regex(pattern, options, Timeout);
+            }
+            catch
+            {
+                return null;
+            }
+
+            if (cache.Count >= MaxEntries) cache.Clear();
+            cache.TryAdd(key, regex);
+            return regex;
+        }
+
+        public static bool IsMatch(string input, string pattern)
+        {
+            var regex = Get(pattern);
+            if (regex == null) return false;
+            try
+            {
+                return regex.IsMatch(input);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     /// <summary>
     /// 一条代理规则，兼容 DevSidecar 的 server.intercepts 子集。
     /// </summary>
@@ -92,14 +145,7 @@ namespace System.Application.ProxyRules
             {
                 return true;
             }
-            try
-            {
-                return Regex.IsMatch(path, PathPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            }
-            catch
-            {
-                return false;
-            }
+            return RegexCache.IsMatch(path, PathPattern);
         }
 
         /// <summary>
@@ -112,12 +158,15 @@ namespace System.Application.ProxyRules
                 return target;
             }
 
+            var regex = RegexCache.Get(DomainPattern);
+            if (regex == null) return target;
+
             try
             {
-                var match = Regex.Match(host, DomainPattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                var match = regex.Match(host);
                 if (!match.Success) return target;
 
-                return Regex.Replace(target, @"\$\{([A-Za-z0-9_]+)\}", m =>
+                return targetVariableRegex.Replace(target, m =>
                 {
                     var group = match.Groups[m.Groups[1].Value];
                     return group.Success ? group.Value : m.Value;
@@ -128,6 +177,11 @@ namespace System.Application.ProxyRules
                 return target;
             }
         }
+
+        static readonly Regex targetVariableRegex = new(
+            @"\$\{([A-Za-z0-9_]+)\}",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
     }
 
     /// <summary>
@@ -143,11 +197,15 @@ namespace System.Application.ProxyRules
         public ProxyRuleSet(
             IReadOnlyList<ProxyRule> rules,
             IReadOnlyList<string> excludePatterns,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> presetIps)
+            IReadOnlyDictionary<string, IReadOnlyList<string>> presetIps,
+            IReadOnlyDictionary<string, string>? presetIpGroups = null,
+            IReadOnlyList<DnsMapping>? dnsMappings = null)
         {
             Rules = rules;
             ExcludePatterns = excludePatterns;
             PresetIps = presetIps;
+            PresetIpGroups = presetIpGroups ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            DnsMappings = dnsMappings ?? Array.Empty<DnsMapping>();
         }
 
         public IReadOnlyList<ProxyRule> Rules { get; }
@@ -155,6 +213,31 @@ namespace System.Application.ProxyRules
         public IReadOnlyList<string> ExcludePatterns { get; }
 
         public IReadOnlyDictionary<string, IReadOnlyList<string>> PresetIps { get; }
+
+        /// <summary>
+        /// 预置 IP 域名 → 规则组，用于按组过滤。
+        /// </summary>
+        public IReadOnlyDictionary<string, string> PresetIpGroups { get; }
+
+        /// <summary>
+        /// DevSidecar 的 dns.mapping：域名 → HTTPS DoH 接口。只保留能直接使用的 HTTPS provider。
+        /// </summary>
+        public IReadOnlyList<DnsMapping> DnsMappings { get; }
+
+        /// <summary>
+        /// 为指定域名选择 DevSidecar dns.mapping 里的 DoH 接口。
+        /// </summary>
+        public string? GetDohEndpoint(string host)
+        {
+            foreach (var item in DnsMappings)
+            {
+                if (DomainPatternMatcher.IsMatch(host, item.DomainPattern))
+                {
+                    return item.Endpoint;
+                }
+            }
+            return null;
+        }
 
         public ProxyRule? Match(string host, string path = "/")
         {
@@ -307,16 +390,25 @@ namespace System.Application.ProxyRules
             }
 
             var presetIps = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            var presetIpGroups = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var item in lowPriority.PresetIps)
             {
                 presetIps[item.Key] = item.Value;
+                if (lowPriority.PresetIpGroups.TryGetValue(item.Key, out var group))
+                {
+                    presetIpGroups[item.Key] = group;
+                }
             }
             foreach (var item in highPriority.PresetIps)
             {
                 presetIps[item.Key] = item.Value;
+                if (highPriority.PresetIpGroups.TryGetValue(item.Key, out var group))
+                {
+                    presetIpGroups[item.Key] = group;
+                }
             }
 
-            return new ProxyRuleSet(rules, excludes, presetIps);
+            return new ProxyRuleSet(rules, excludes, presetIps, presetIpGroups, lowPriority.DnsMappings);
         }
 
         /// <summary>
@@ -338,17 +430,176 @@ namespace System.Application.ProxyRules
             }
 
             var presetIps = new Dictionary<string, IReadOnlyList<string>>();
+            var presetIpGroups = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var item in PresetIps)
             {
-                var group = ProxyRuleGroups.Classify(item.Key);
+                var group = ProxyRuleGroups.ResolvePresetGroup(item.Key, PresetIpGroups);
                 if (string.IsNullOrEmpty(group) || enabledGroups.Contains(group))
                 {
                     presetIps[item.Key] = item.Value;
+                    if (!string.IsNullOrEmpty(group)) presetIpGroups[item.Key] = group;
                 }
             }
 
-            return new ProxyRuleSet(rules, ExcludePatterns, presetIps);
+            return new ProxyRuleSet(rules, ExcludePatterns, presetIps, presetIpGroups, DnsMappings);
         }
+
+        /// <summary>
+        /// 移除已关闭的规则组和服务。默认全部开启，因此空集合表示不过滤。
+        /// </summary>
+        public ProxyRuleSet FilterDisabled(ISet<string> disabledGroups, ISet<string> disabledServices)
+        {
+            if (disabledGroups.Count == 0 && disabledServices.Count == 0) return this;
+
+            var rules = new List<ProxyRule>(Rules.Count);
+            foreach (var rule in Rules)
+            {
+                if (!string.IsNullOrEmpty(rule.Group) && disabledGroups.Contains(rule.Group)) continue;
+                if (disabledServices.Contains(rule.DomainPattern)) continue;
+                rules.Add(rule);
+            }
+
+            var presetIps = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            var presetIpGroups = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in PresetIps)
+            {
+                var group = ResolveGroup(item.Key);
+                if (!string.IsNullOrEmpty(group) && disabledGroups.Contains(group)) continue;
+                if (disabledServices.Contains(item.Key)) continue;
+                presetIps[item.Key] = item.Value;
+                if (!string.IsNullOrEmpty(group)) presetIpGroups[item.Key] = group;
+            }
+
+            var dnsMappings = new List<DnsMapping>();
+            foreach (var item in DnsMappings)
+            {
+                if (disabledServices.Contains(item.DomainPattern)) continue;
+                if (!string.IsNullOrEmpty(item.Group) && disabledGroups.Contains(item.Group)) continue;
+                dnsMappings.Add(item);
+            }
+
+            return new ProxyRuleSet(rules, ExcludePatterns, presetIps, presetIpGroups, dnsMappings);
+        }
+
+        string? ResolveGroup(string domain)
+        {
+            if (PresetIpGroups.TryGetValue(domain, out var group) && !string.IsNullOrEmpty(group))
+            {
+                return group;
+            }
+            return ProxyRuleGroups.Classify(domain);
+        }
+
+        /// <summary>
+        /// 统计规则组。服务 = 域名（或域名通配符），与 DevSidecar 的服务分组概念一致。
+        /// </summary>
+        public IReadOnlyList<ProxyRuleGroupStat> GetGroups()
+        {
+            var map = new Dictionary<string, ProxyRuleGroupStat>(StringComparer.OrdinalIgnoreCase);
+            var seenServices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddRule(string? group, string service)
+            {
+                if (string.Equals(group, ProxyRuleGroups.Custom, StringComparison.OrdinalIgnoreCase)) return;
+                var id = string.IsNullOrEmpty(group) ? ProxyRuleGroups.Unclassified : group!;
+                if (!map.TryGetValue(id, out var stat))
+                {
+                    stat = new ProxyRuleGroupStat(id, id);
+                    map[id] = stat;
+                }
+                if (seenServices.Add(id + "\u0001" + service))
+                {
+                    stat.Services.Add(service);
+                }
+                stat.RuleCount++;
+            }
+
+            foreach (var rule in Rules)
+            {
+                AddRule(rule.Group, rule.DomainPattern);
+            }
+            foreach (var item in PresetIps)
+            {
+                AddRule(ResolveGroup(item.Key), item.Key);
+            }
+            foreach (var item in DnsMappings)
+            {
+                AddRule(string.IsNullOrEmpty(item.Group) ? ResolveGroup(item.DomainPattern) : item.Group, item.DomainPattern);
+            }
+
+            var list = map.Values.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            foreach (var item in list) item.Services.Sort(StringComparer.OrdinalIgnoreCase);
+            return list;
+        }
+
+        /// <summary>
+        /// 判断某个主机名会被哪些规则/预置 IP 命中，供“匹配域名”搜索使用。
+        /// </summary>
+        public IReadOnlyList<string> MatchServices(string host)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(host)) return Array.Empty<string>();
+            foreach (var rule in Rules)
+            {
+                if (DomainPatternMatcher.IsMatch(host, rule.DomainPattern))
+                {
+                    result.Add(rule.DomainPattern);
+                }
+            }
+            foreach (var item in PresetIps)
+            {
+                if (DomainPatternMatcher.IsMatch(host, item.Key))
+                {
+                    result.Add(item.Key);
+                }
+            }
+            foreach (var item in DnsMappings)
+            {
+                if (DomainPatternMatcher.IsMatch(host, item.DomainPattern))
+                {
+                    result.Add(item.DomainPattern);
+                }
+            }
+            return result.ToList();
+        }
+    }
+
+    public sealed class ProxyRuleGroupStat
+    {
+        public ProxyRuleGroupStat(string id, string name)
+        {
+            Id = id;
+            Name = name;
+        }
+
+        public string Id { get; }
+
+        public string Name { get; }
+
+        public List<string> Services { get; } = new();
+
+        public int RuleCount { get; set; }
+
+        public int ServiceCount => Services.Count;
+    }
+
+    /// <summary>
+    /// DevSidecar dns.mapping 的一条映射：域名 → HTTPS DoH 接口。
+    /// </summary>
+    public sealed class DnsMapping
+    {
+        public DnsMapping(string domainPattern, string endpoint, string? group)
+        {
+            DomainPattern = domainPattern;
+            Endpoint = endpoint;
+            Group = group;
+        }
+
+        public string DomainPattern { get; }
+
+        public string Endpoint { get; }
+
+        public string? Group { get; }
     }
 
     /// <summary>
@@ -365,6 +616,7 @@ namespace System.Application.ProxyRules
 
             host = host.Trim();
             pattern = pattern.Trim();
+            if (pattern.Length > 512) return false;
 
             // IPv6 字面量在 URL 中带方括号，规则里也常带方括号。
             if (pattern.StartsWith("[", StringComparison.Ordinal) && pattern.EndsWith("]", StringComparison.Ordinal))
@@ -459,9 +711,16 @@ namespace System.Application.ProxyRules
 
         static bool TryRegex(string host, string pattern, out bool matched)
         {
+            var regex = RegexCache.Get(pattern);
+            if (regex == null)
+            {
+                matched = false;
+                return false;
+            }
+
             try
             {
-                matched = Regex.IsMatch(host, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                matched = regex.IsMatch(host);
                 return true;
             }
             catch

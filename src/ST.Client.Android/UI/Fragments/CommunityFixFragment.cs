@@ -295,6 +295,12 @@ namespace System.Application.UI.Fragments
 
         public override bool OnOptionsItemSelected(IMenuItem item)
         {
+            if (item.ItemId == Resource.Id.menu_rule_groups)
+            {
+                StartActivity(new Intent(RequireContext(), typeof(RuleGroupsActivity)));
+                return true;
+            }
+
             var actionItem = MenuIdResToEnum(item.ItemId);
             if (actionItem.IsDefined())
             {

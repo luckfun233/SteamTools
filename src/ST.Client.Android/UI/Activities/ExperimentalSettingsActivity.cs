@@ -34,24 +34,7 @@ namespace System.Application.UI.Activities
     {
         LinearLayout? container;
         TextView? statusView;
-        readonly List<GroupRow> groupRows = new();
         bool building = true;
-
-        sealed class GroupRow
-        {
-            public GroupRow(string id, string name, CheckBox box)
-            {
-                Id = id;
-                Name = name;
-                Box = box;
-            }
-
-            public string Id { get; }
-
-            public string Name { get; }
-
-            public CheckBox Box { get; }
-        }
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -77,14 +60,12 @@ namespace System.Application.UI.Activities
             BuildUi();
             building = false;
             RefreshStatus();
-            RefreshGroupCounts();
         }
 
         protected override void OnResume()
         {
             base.OnResume();
             RefreshStatus();
-            RefreshGroupCounts();
         }
 
         protected override void OnPause()
@@ -158,11 +139,11 @@ namespace System.Application.UI.Activities
             row.AddView(CreateButton("刷新状态", () =>
             {
                 RefreshStatus();
-                RefreshGroupCounts();
             }, false), WeightedButtonParams());
             row.AddView(CreateButton("重置统计", () =>
             {
                 SniSidecarStats.Reset();
+                DnsProxyServer.ResetStats();
                 RefreshStatus();
                 ShowToast("统计已重置");
             }, false), WeightedButtonParams());
@@ -183,8 +164,9 @@ namespace System.Application.UI.Activities
                 "DevSidecar 兼容规则",
                 "读取官方 remote_config.json5，只执行代理相关子集：域名/路径匹配、SNI、镜像、反代、预置 IP、请求/响应头替换。不会执行它的 Node 脚本。自定义规则会和远程规则合并，并优先匹配。");
 
-            AddSwitch(card, "启用 DevSidecar 规则", "总开关。关闭后仍可使用自定义规则和内置加速项目。", ProxySettings.EnableDevSidecarRules);
+            AddSwitch(card, "启用 DevSidecar 规则", "总开关。关闭后仍可使用自定义规则。", ProxySettings.EnableDevSidecarRules);
             AddSwitch(card, "启动时同步配置", "启动加速时重新下载；关闭则优先使用本地缓存。", ProxySettings.SyncDevSidecarConfigOnStartup);
+            AddNumber(card, "后台同步间隔（小时）", "0 表示只在启动时同步；默认 6 小时。", ProxySettings.DevSidecarAutoSyncHours, 0, 168);
             AddText(card, "配置地址", "仅支持 HTTPS，修改后点“立即同步”。", ProxySettings.DevSidecarConfigUrl, false, InputTypes.ClassText | InputTypes.TextVariationUri);
 
             AddSubTitle(card, "自定义规则");
@@ -200,53 +182,22 @@ namespace System.Application.UI.Activities
             {
                 ProxyRuleEngine.ReloadCustom();
                 RefreshStatus();
-                RefreshGroupCounts();
                 ShowToast($"已加载 {ProxyRuleEngine.CustomRuleCount} 条自定义规则");
             }, false), WeightedButtonParams());
             card.AddView(customRow);
 
-            AddSubTitle(card, "远程规则组");
-            AddParagraphTo(card, "未选中的组不会参与匹配，也不会使用该组的预置 IP。至少保留一个组。");
+            AddSubTitle(card, "服务分组");
+            AddParagraphTo(card, "分组名读取自 remote_config.json5 的 // 注释，与 DevSidecar 2.3.x 一致。可以按组开关，也可以单独关闭某个服务；支持包含、正则和匹配域名三种搜索。");
+            AddText(card, "已关闭的分组", "分号分隔，默认全部开启。留空表示所有组都启用。", ProxySettings.DevSidecarDisabledGroups, false);
+            AddText(card, "已关闭的服务", "分号分隔的域名/通配符，例如 ads.example.com。", ProxySettings.DevSidecarDisabledServices, false);
 
-            foreach (var group in ProxyRuleGroups.All)
+            var groupButton = CreateButton("打开规则组 / 服务分组（可搜索）", () =>
             {
-                var box = new CheckBox(this)
-                {
-                    Text = group.Name,
-                    TextSize = 14,
-                };
-                box.SetTextColor(ResColor(Resource.Color.text_primary));
-                box.Checked = ProxyRuleGroups.ParseEnabled(ProxySettings.DevSidecarRuleGroups.Value)
-                    .Contains(group.Id);
-                box.CheckedChange += (_, e) =>
-                {
-                    if (building) return;
-                    if (!e.IsChecked && groupRows.Count(x => x.Box.Checked) == 0)
-                    {
-                        box.Checked = true;
-                        ShowToast("至少保留一个规则组");
-                        return;
-                    }
-                    SaveGroups();
-                };
-                card.AddView(box);
-                AddParagraphTo(card, group.Description);
-                groupRows.Add(new GroupRow(group.Id, group.Name, box));
-            }
-
-            var groupButtons = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-            groupButtons.AddView(CreateButton("全选", () =>
-            {
-                foreach (var row in groupRows) row.Box.Checked = true;
-                SaveGroups();
-            }, false), WeightedButtonParams());
-            groupButtons.AddView(CreateButton("仅默认组", () =>
-            {
-                var defaults = ProxyRuleGroups.ParseEnabled(ProxyRuleGroups.DefaultEnabled);
-                foreach (var row in groupRows) row.Box.Checked = defaults.Contains(row.Id);
-                SaveGroups();
-            }, false), WeightedButtonParams());
-            card.AddView(groupButtons);
+                StartActivity(new Intent(this, typeof(RuleGroupsActivity)));
+            }, true);
+            groupButton.LayoutParameters = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, Dp(44));
+            card.AddView(groupButton);
 
             var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             actions.AddView(CreateButton("立即同步并应用", SyncRulesAsync, true), WeightedButtonParams());
@@ -264,8 +215,8 @@ namespace System.Application.UI.Activities
             AddParagraphTo(card, "只有免证书模式或系统未安装根证书时，VPN 才会使用 sidecar；已安装根证书且关闭免证书模式时，流量仍走 Titanium 的 MITM/规则链路，此时 SNI 分片设置不会生效。");
 
             AddSwitch(card, "启用 SNI 分片", "只对下方列出的域名做分片，其它流量原样转发。", ProxySettings.EnableSniFragment);
-            AddChoice(card, "分片策略", "SNI 边界：在域名首字节拆三段，兼容性最好。SNI 多段：把域名拆成多段。TLS record 拆分：重封装成多个 TLS record，可绕过重组 TCP 但仍按 record 检查的 DPI。随机：随机大小，降低指纹。固定大小/TLS 记录头为兼容选项。",
-                new[] { "固定大小", "SNI 边界（推荐）", "TLS 记录头", "SNI 多段", "TLS record 拆分", "随机分片" },
+            AddChoice(card, "分片策略", "TLS record 拆分：重封装成多个 TLS record，可绕过重组 TCP 但仍按 record 检查的 DPI。TLS record 随机拆分：在 SNI 内部强制切一刀，其余切点随机，更难被指纹。SNI 边界/多段只拆 TCP 段，对能重组 TCP 的 DPI 无效。固定大小/TLS 记录头/随机为兼容选项。",
+                new[] { "固定大小", "SNI 边界", "TLS 记录头", "SNI 多段", "TLS record 拆分（推荐）", "随机分片", "TLS record 随机拆分" },
                 ProxySettings.SniFragmentStrategy.Value,
                 value => ProxySettings.SniFragmentStrategy.Value = value);
 
@@ -307,9 +258,15 @@ namespace System.Application.UI.Activities
             AddText(card, "中继密码", "没有认证时留空。", ProxySettings.SniUpstreamRelayPassword, true);
 
             AddDivider(card);
-            AddSwitch(card, "启用 DoH", "通过 HTTPS 查询 A 记录，避免 DNS 污染；失败时按下方开关决定是否回退系统 DNS。", ProxySettings.EnableDoh);
-            AddText(card, "DoH JSON 接口", "例如 https://dns.alidns.com/resolve 或 https://dns.google/resolve。仅支持 HTTPS。", ProxySettings.DohEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
-            AddSwitch(card, "DoH 失败回退系统 DNS", "关闭后 DoH 失败会直接使用域名连接，可能再次被污染。", ProxySettings.DohFallbackToSystem);
+            AddSwitch(card, "启用 DoH", "通过 HTTPS 查询 DNS，避免污染；失败时按下方开关决定是否回退。", ProxySettings.EnableDoh);
+            AddText(card, "DoH JSON 接口", "用于 sidecar 选路，例如 https://dns.alidns.com/resolve。仅支持 HTTPS。", ProxySettings.DohEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
+            AddText(card, "DoH wire 接口", "用于本地 DNS 代理转发完整 DNS 报文，例如 https://dns.alidns.com/dns-query。", ProxySettings.DohWireEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
+            AddSwitch(card, "DoH 失败回退系统 DNS", "关闭后 DoH 失败会返回 SERVFAIL，便于确认 DoH 本身是否可用。", ProxySettings.DohFallbackToSystem);
+
+            AddDivider(card);
+            AddSwitch(card, "启用本地 DNS 代理", "VPN 模式通过 tun2socks --dnsgw 把 UDP:53 送到 127.0.0.1。这是修复 ERR_NAME_NOT_RESOLVED 的关键开关。", ProxySettings.EnableDnsProxy);
+            AddNumber(card, "DNS 代理端口", "仅绑定 127.0.0.1；被占用时自动向后寻找可用端口。", ProxySettings.DnsProxyPortId, 1024, 65535);
+            AddText(card, "回退 DNS 服务器", "分号分隔，可写 ip 或 ip:port，例如 223.5.5.5;119.29.29.29。", ProxySettings.DnsFallbackServers, false);
         }
 
         void BuildVpnAndLogSection()
@@ -357,6 +314,7 @@ namespace System.Application.UI.Activities
                 ProxyDiagnostics.Initialize();
                 ApplyRules();
                 SniSidecarService.Restart();
+                DnsProxyService.Restart();
                 RefreshStatus();
                 ShowToast("已应用；如修改了免证书模式，请重启加速");
             }, true);
@@ -379,6 +337,7 @@ namespace System.Application.UI.Activities
                         ProxySettings.RestoreExperimentalDefaults();
                         ProxyRuleEngine.Clear();
                         SniSidecarService.Stop();
+                        DnsProxyService.Stop();
                         Recreate();
                     })
                     .SetNegativeButton("取消", (_, _) => { })
@@ -404,8 +363,7 @@ namespace System.Application.UI.Activities
             {
                 await ProxyRuleEngine.ReloadAsync();
                 RefreshStatus();
-                RefreshGroupCounts();
-                ShowToast($"已应用 {ProxyRuleEngine.Current.Rules.Count} 条规则");
+                ShowToast($"已应用 {ProxyRuleEngine.Current.Rules.Count} 条规则，{ProxyRuleEngine.GroupStats.Count} 个分组");
             }
             catch (Exception ex)
             {
@@ -434,31 +392,6 @@ namespace System.Application.UI.Activities
                 ProxyRuleEngine.Clear();
             }
             RefreshStatus();
-            RefreshGroupCounts();
-        }
-
-        void SaveGroups()
-        {
-            var enabled = groupRows.Where(x => x.Box.Checked).Select(x => x.Id).ToArray();
-            if (enabled.Length == 0) return;
-
-            ProxySettings.DevSidecarRuleGroups.Value = ProxyRuleGroups.ToStorage(enabled);
-            SettingsHost.Save();
-            if (ProxyRuleEngine.Remote.Rules.Count > 0)
-            {
-                ProxyRuleEngine.Apply(ProxyRuleEngine.Remote);
-            }
-            RefreshStatus();
-        }
-
-        void RefreshGroupCounts()
-        {
-            var allCount = ProxyRuleEngine.Remote.Rules.Count;
-            foreach (var row in groupRows)
-            {
-                var count = ProxyRuleEngine.GetRuleCount(row.Id);
-                row.Box.Text = allCount > 0 ? $"{row.Name}（{count} 条）" : row.Name;
-            }
         }
 
         void RefreshStatus()
@@ -469,6 +402,9 @@ namespace System.Application.UI.Activities
             {
                 var sidecar = SniSidecarService.IsRunning
                     ? $"运行中 127.0.0.1:{SniSidecarService.ActivePort}"
+                    : "未运行";
+                var dnsProxy = DnsProxyService.IsRunning
+                    ? $"运行中 127.0.0.1:{DnsProxyService.ActivePort}"
                     : "未运行";
                 var cert = IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled
                     ? "已安装"
@@ -485,12 +421,14 @@ namespace System.Application.UI.Activities
 
                 statusView.Text =
                     $"Sidecar: {sidecar}\n" +
+                    $"DNS 代理: {dnsProxy}\n" +
                     $"根证书: {cert}\n" +
-                    $"规则组: {ProxySettings.DevSidecarRuleGroups.Value}\n" +
+                    $"远程分组: {ProxyRuleEngine.GroupStats.Count} 个，关闭组: {(string.IsNullOrWhiteSpace(ProxySettings.DevSidecarDisabledGroups.Value) ? "无" : ProxySettings.DevSidecarDisabledGroups.Value)}\n" +
                     $"自定义: {(ProxySettings.EnableCustomRules.Value ? "启用" : "关闭")}，{ProxyRuleEngine.CustomRuleCount} 条\n" +
                     $"规则: 实际启用 {ProxyRuleEngine.Current.Rules.Count} / 远程 {ProxyRuleEngine.Remote.Rules.Count} 条\n" +
                     $"上次同步: {sync}{error}{customError}\n" +
-                    $"统计: {SniSidecarStats.ToDisplayString()}\n" +
+                    $"SNI 统计: {SniSidecarStats.ToDisplayString()}\n" +
+                    $"DNS 统计: {DnsProxyServer.GetStats()}\n" +
                     $"回退缓存: {FragmentFallbackCache.Count} 个域名";
             }
             catch (Exception ex)

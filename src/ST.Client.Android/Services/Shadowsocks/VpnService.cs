@@ -45,6 +45,10 @@ namespace System.Application.Services.Native
                 // 免证书模式要在 tun2socks 计算 SOCKS 出口前就绪。
                 SniSidecarService.Start();
 
+                // DNS 单独走本地代理：tun2socks 的 SOCKS5 UDP ASSOCIATE 依赖上游支持，
+                // 而 --dnsgw 可以稳定接住 UDP:53，避免 ERR_NAME_NOT_RESOLVED。
+                DnsProxyService.Start();
+
                 // 启动本地代理服务
                 ProxyService.Current.ProxyStatus = true;
 
@@ -65,6 +69,8 @@ namespace System.Application.Services.Native
 
                 // 停止本地代理服务
                 ProxyService.Current.ProxyStatus = false;
+
+                DnsProxyService.Stop();
             }
 
             public override void OnRevoke()
@@ -107,10 +113,20 @@ namespace System.Application.Services.Native
                     // 有证书时仍然走 Titanium 的 SOCKS5，否则 DevSidecar 的 SNI 伪装、镜像和请求头规则不会生效。
                     var certificateLess = ProxySettings.IsCertificateLessMode.Value ||
                         !IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled;
-                    var port = certificateLess && SniSidecarService.IsRunning
-                        ? SniSidecarService.ActivePort
-                        : s.Socks5ProxyPortId;
-                    return $"{ip}:{port}";
+                    if (certificateLess)
+                    {
+                        SniSidecarService.Start();
+                        if (SniSidecarService.IsRunning)
+                        {
+                            return $"{ip}:{SniSidecarService.ActivePort}";
+                        }
+
+                        // 端口被占用等异常情况下退回 Titanium 的 SOCKS5，至少保证网络可用；
+                        // 具体原因已写入诊断日志，加速实验室可以查看。
+                        ProxyDiagnostics.Warn("Vpn", "SNI sidecar 未运行，临时回退到 Titanium SOCKS5");
+                    }
+
+                    return $"{ip}:{s.Socks5ProxyPortId}";
                 }
             }
 
@@ -128,6 +144,18 @@ namespace System.Application.Services.Native
                 builder.AddAddress("da26:2626::1", 126);
                 builder.AddRoute("2000::", 3);
                 builder.AddDisallowedApplication(PackageName!);
+
+                // 显式下发 DNS 服务器，保证应用把 DNS 查询送进 VPN。
+                // 真正的解析由 tun2socks --dnsgw 转到本地 DNS 代理（DoH）。
+                try
+                {
+                    builder.AddDnsServer("223.5.5.5");
+                    builder.AddDnsServer("119.29.29.29");
+                }
+                catch (Exception ex)
+                {
+                    ProxyDiagnostics.Warn("Vpn", $"添加 VPN DNS 服务器失败: {ex.Message}");
+                }
 
                 if (!ProxySettings.IsCertificateLessMode.Value && ProxySettings.EnableBrowserOnlyVpn.Value)
                 {
@@ -169,8 +197,7 @@ namespace System.Application.Services.Native
             {
                 get
                 {
-                    // https://github.com/2dust/v2rayNG/blob/master/AndroidLibV2rayLite/CoreI/Status.go#L28
-                    return new JavaList<string>
+                    var args = new JavaList<string>
                     {
                         Tun2socksExecutablePath,
                         "--netif-ipaddr",
@@ -184,11 +211,22 @@ namespace System.Application.Services.Native
                         "--loglevel",
                         "notice",
                         "--enable-udprelay",
+                        "--udprelay-max-connections",
+                        "64",
                         "--sock-path",
                         "sock_path",
                         "--netif-ip6addr",
                         "da26:2626::2"
                     };
+
+                    // 本地 DNS 代理优先级最高：DNS 不再依赖 SOCKS5 UDP ASSOCIATE。
+                    if (DnsProxyService.IsRunning)
+                    {
+                        args.Add("--dnsgw");
+                        args.Add($"127.0.0.1:{DnsProxyService.ActivePort}");
+                    }
+
+                    return args;
                 }
             }
 

@@ -41,6 +41,11 @@ namespace System.Application.ProxyRules
         public const string Other = "other";
 
         /// <summary>
+        /// 没有分组注释、也无法按站点归类的规则。
+        /// </summary>
+        public const string Unclassified = "未分组";
+
+        /// <summary>
         /// 用户自定义规则的组 ID。该组不属于远程配置，始终参与匹配。
         /// </summary>
         public const string Custom = "custom";
@@ -95,6 +100,42 @@ namespace System.Application.ProxyRules
         public static ProxyRuleGroupInfo? Get(string id)
             => All.FirstOrDefault(x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase));
 
+        /// <summary>
+        /// 解析预置 IP 的分组：优先使用配置注释里的组名，否则按域名归类。
+        /// </summary>
+        public static string? ResolvePresetGroup(string domainPattern, IReadOnlyDictionary<string, string> presetIpGroups)
+        {
+            if (presetIpGroups.TryGetValue(domainPattern, out var group) && !string.IsNullOrWhiteSpace(group))
+            {
+                return group;
+            }
+            return Classify(domainPattern);
+        }
+
+        public static bool IsValidGroupName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (name.Length > 64) return false;
+            foreach (var c in name)
+            {
+                if (char.IsControl(c)) return false;
+            }
+            return true;
+        }
+
+        public static string NormalizeGroupName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return Unclassified;
+            var sb = new System.Text.StringBuilder(name.Length);
+            foreach (var c in name)
+            {
+                if (!char.IsWhiteSpace(c) && !char.IsControl(c)) sb.Append(c);
+            }
+            var value = sb.ToString();
+            if (value.Length == 0) return Unclassified;
+            return value.Length > 64 ? value.Substring(0, 64) : value;
+        }
+
         public static HashSet<string> ParseEnabled(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -104,6 +145,23 @@ namespace System.Application.ProxyRules
 
             return new HashSet<string>(
                 value.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim())
+                    .Where(x => x.Length > 0),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 解析以分号分隔的关闭列表。空字符串表示全部开启。
+        /// </summary>
+        public static HashSet<string> ParseList(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return new HashSet<string>(
+                value.Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(x => x.Trim())
                     .Where(x => x.Length > 0),
                 StringComparer.OrdinalIgnoreCase);

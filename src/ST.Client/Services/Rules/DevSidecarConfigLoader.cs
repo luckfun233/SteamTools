@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,9 +16,12 @@ namespace System.Application.ProxyRules
     {
         public const string DefaultConfigUrl = "https://ds-official-config.bestar.de5.net/remote_config.json5";
 
+        const int MaxConfigBytes = 4 * 1024 * 1024;
+
         static readonly HttpClient httpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(20),
+            MaxResponseContentBufferSize = MaxConfigBytes,
         };
 
         public static string GetCacheFilePath()
@@ -54,7 +58,20 @@ namespace System.Application.ProxyRules
                 request.Headers.TryAddWithoutValidation("User-Agent", "WattToolkit-Android-DevSidecarCompat/1.0");
                 using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                var contentLength = response.Content.Headers.ContentLength;
+                if (contentLength.HasValue && contentLength.Value > MaxConfigBytes)
+                {
+                    throw new InvalidDataException($"DevSidecar 配置过大: {contentLength.Value} 字节");
+                }
+
+                var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+                if (bytes.Length > MaxConfigBytes)
+                {
+                    throw new InvalidDataException($"DevSidecar 配置过大: {bytes.Length} 字节");
+                }
+
+                var json = Encoding.UTF8.GetString(bytes);
                 if (string.IsNullOrWhiteSpace(json))
                 {
                     throw new InvalidDataException("DevSidecar 配置内容为空");
@@ -126,7 +143,7 @@ namespace System.Application.ProxyRules
                     CommentHandling = JsonCommentHandling.Skip,
                     MaxDepth = 64,
                 });
-                rules = Convert(doc.RootElement, groupOverride);
+                rules = Convert(doc.RootElement, groupOverride, json);
                 if (rules.Rules.Count == 0 &&
                     rules.PresetIps.Count == 0 &&
                     rules.ExcludePatterns.Count == 0)
@@ -143,11 +160,18 @@ namespace System.Application.ProxyRules
             }
         }
 
-        static ProxyRuleSet Convert(JsonElement root, string? groupOverride)
+        static ProxyRuleSet Convert(JsonElement root, string? groupOverride, string json)
         {
             var rules = new List<ProxyRule>();
             var excludes = new List<string>();
-            var presetIps = new Dictionary<string, IReadOnlyList<string>>();
+            var presetIps = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            var presetIpGroups = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var dnsMappings = new List<DnsMapping>();
+
+            // 分组名来自 // 注释，和 DevSidecar 2.3.x 的服务分组保持一致。
+            var commentGroups = groupOverride == null
+                ? DevSidecarCommentGroups.Parse(json)
+                : (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             JsonElement intercepts = default;
             var hasIntercepts = false;
@@ -156,7 +180,23 @@ namespace System.Application.ProxyRules
             {
                 if (TryGetObject(server, "preSetIpList", out var preset))
                 {
-                    ReadPresetIps(preset, presetIps);
+                    ReadPresetIps(preset, presetIps, presetIpGroups, commentGroups);
+                }
+                if (TryGetObject(server, "dns", out var dns) &&
+                    TryGetObject(dns, "mapping", out var dnsMapping))
+                {
+                    // dns.mapping 的值是 provider 名称，不是 IP；只使用 HTTPS provider。
+                    var providers = ReadDnsProviders(dns);
+                    ReadDnsMappings(dnsMapping, providers, dnsMappings, commentGroups);
+                }
+                if (TryGetObject(server, "whiteList", out var whiteList))
+                {
+                    ReadWhiteList(whiteList, excludes);
+                }
+                if (TryGetObject(server, "proxy", out var serverProxy) &&
+                    TryGetObject(serverProxy, "excludeIpList", out var serverExclude))
+                {
+                    ReadExcludes(serverExclude, excludes);
                 }
                 hasIntercepts = TryGetObject(server, "intercepts", out intercepts);
             }
@@ -165,7 +205,19 @@ namespace System.Application.ProxyRules
                 // 自定义规则允许省略 server 包装，直接写 intercepts / preSetIpList / excludeIpList。
                 if (TryGetObject(root, "preSetIpList", out var preset))
                 {
-                    ReadPresetIps(preset, presetIps);
+                    ReadPresetIps(preset, presetIps, presetIpGroups, commentGroups);
+                }
+
+                if (TryGetObject(root, "dns", out var dns) &&
+                    TryGetObject(dns, "mapping", out var dnsMapping))
+                {
+                    var providers = ReadDnsProviders(dns);
+                    ReadDnsMappings(dnsMapping, providers, dnsMappings, commentGroups);
+                }
+
+                if (TryGetObject(root, "whiteList", out var whiteList))
+                {
+                    ReadWhiteList(whiteList, excludes);
                 }
 
                 if (TryGetObject(root, "intercepts", out var directIntercepts))
@@ -182,7 +234,7 @@ namespace System.Application.ProxyRules
 
             if (hasIntercepts)
             {
-                ConvertIntercepts(intercepts, groupOverride, rules);
+                ConvertIntercepts(intercepts, groupOverride, rules, commentGroups);
             }
 
             if (TryGetObject(root, "proxy", out var proxy))
@@ -210,20 +262,28 @@ namespace System.Application.ProxyRules
                 }
             }
 
-            return new ProxyRuleSet(rules, excludes, presetIps);
+            return new ProxyRuleSet(rules, excludes, presetIps, presetIpGroups, dnsMappings);
         }
 
         static void ConvertIntercepts(
             JsonElement intercepts,
             string? groupOverride,
-            List<ProxyRule> rules)
+            List<ProxyRule> rules,
+            IReadOnlyDictionary<string, string> commentGroups)
         {
             foreach (var domainItem in intercepts.EnumerateObject())
             {
                 if (IsReservedKey(domainItem.Name)) continue;
                 if (domainItem.Value.ValueKind != JsonValueKind.Object) continue;
 
-                var group = groupOverride ?? ProxyRuleGroups.Classify(domainItem.Name);
+                var group = groupOverride;
+                if (string.IsNullOrEmpty(group) &&
+                    commentGroups.TryGetValue(domainItem.Name, out var commentGroup) &&
+                    ProxyRuleGroups.IsValidGroupName(commentGroup))
+                {
+                    group = ProxyRuleGroups.NormalizeGroupName(commentGroup);
+                }
+                group ??= ProxyRuleGroups.Classify(domainItem.Name);
 
                 foreach (var pathItem in domainItem.Value.EnumerateObject())
                 {
@@ -259,14 +319,85 @@ namespace System.Application.ProxyRules
             }
         }
 
+        static Dictionary<string, string> ReadDnsProviders(JsonElement dns)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!TryGetObject(dns, "providers", out var providers)) return result;
+
+            foreach (var item in providers.EnumerateObject())
+            {
+                if (item.Value.ValueKind != JsonValueKind.Object) continue;
+                var server = GetString(item.Value, "server");
+                if (string.IsNullOrWhiteSpace(server)) continue;
+
+                if (server.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                    Uri.TryCreate(server, UriKind.Absolute, out var uri) &&
+                    string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                {
+                    result[item.Name] = server;
+                }
+                else if (server.StartsWith("tls://", StringComparison.OrdinalIgnoreCase))
+                {
+                    // DoT 需要单独实现，当前版本先跳过，回退到默认 DoH。
+                    Log.Info("DevSidecarConfig", $"跳过 DoT DNS provider: {item.Name}");
+                }
+            }
+            return result;
+        }
+
+        static void ReadDnsMappings(
+            JsonElement mapping,
+            IReadOnlyDictionary<string, string> providers,
+            List<DnsMapping> result,
+            IReadOnlyDictionary<string, string> commentGroups)
+        {
+            foreach (var item in mapping.EnumerateObject())
+            {
+                if (item.Value.ValueKind != JsonValueKind.String) continue;
+                var providerId = item.Value.GetString();
+                if (string.IsNullOrWhiteSpace(providerId) ||
+                    !providers.TryGetValue(providerId!, out var endpoint))
+                {
+                    continue;
+                }
+
+                var group = commentGroups.TryGetValue(item.Name, out var commentGroup) &&
+                            ProxyRuleGroups.IsValidGroupName(commentGroup)
+                    ? ProxyRuleGroups.NormalizeGroupName(commentGroup)
+                    : ProxyRuleGroups.Classify(item.Name);
+
+                result.Add(new DnsMapping(item.Name, endpoint, group));
+            }
+        }
+
         static void ReadPresetIps(
             JsonElement preset,
-            Dictionary<string, IReadOnlyList<string>> presetIps)
+            Dictionary<string, IReadOnlyList<string>> presetIps,
+            Dictionary<string, string> presetIpGroups,
+            IReadOnlyDictionary<string, string> commentGroups)
         {
             foreach (var item in preset.EnumerateObject())
             {
                 var ips = ReadIpList(item.Value);
-                if (ips.Count > 0) presetIps[item.Name] = ips;
+                if (ips.Count == 0) continue;
+                presetIps[item.Name] = ips;
+
+                if (commentGroups.TryGetValue(item.Name, out var group) &&
+                    ProxyRuleGroups.IsValidGroupName(group))
+                {
+                    presetIpGroups[item.Name] = ProxyRuleGroups.NormalizeGroupName(group);
+                }
+            }
+        }
+
+        static void ReadWhiteList(JsonElement whiteList, List<string> excludes)
+        {
+            foreach (var item in whiteList.EnumerateObject())
+            {
+                // whiteList 表示不走代理的域名，空值/false 仍视为白名单键。
+                if (item.Value.ValueKind == JsonValueKind.False ||
+                    item.Value.ValueKind == JsonValueKind.Null) continue;
+                excludes.Add(item.Name);
             }
         }
 
@@ -370,14 +501,25 @@ namespace System.Application.ProxyRules
         static IReadOnlyList<string> ReadIpList(JsonElement element)
         {
             var result = new List<string>();
-            if (element.ValueKind == JsonValueKind.Array)
+            if (element.ValueKind == JsonValueKind.String)
+            {
+                var value = element.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    foreach (var ip in value.Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        result.Add(ip.Trim());
+                    }
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
             {
                 foreach (var ip in element.EnumerateArray())
                 {
                     if (ip.ValueKind == JsonValueKind.String)
                     {
-                        var value = ip.GetString();
-                        if (!string.IsNullOrWhiteSpace(value)) result.Add(value);
+                        var value = ip.GetString()?.Trim();
+                        if (!string.IsNullOrWhiteSpace(value)) result.Add(value!);
                     }
                 }
             }
@@ -388,7 +530,8 @@ namespace System.Application.ProxyRules
                     if (ip.Value.ValueKind == JsonValueKind.True ||
                         ip.Value.ValueKind == JsonValueKind.Object)
                     {
-                        result.Add(ip.Name);
+                        var value = ip.Name.Trim();
+                        if (value.Length > 0) result.Add(value);
                     }
                 }
             }

@@ -23,6 +23,9 @@ namespace System.Application.Services.Implementation
 
         /// <summary>随机大小分片。</summary>
         Random = 5,
+
+        /// <summary>把 ClientHello 重新封装成多个 TLS record，SNI 处必切，其余切点随机。</summary>
+        TlsRecordSplitRandom = 6,
     }
 
     /// <summary>
@@ -244,6 +247,52 @@ namespace System.Application.Services.Implementation
             return BuildTlsRecords(data, segments);
         }
 
+        /// <summary>
+        /// TLS record 随机拆分：强制在 SNI 内部切一刀，其余切点随机。
+        /// 比固定三段更难被指纹，同时保留 record 边界重组的兼容性。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentToTlsRecordsRandom(
+            ReadOnlySpan<byte> data,
+            int pieces = 4,
+            Random? random = null)
+        {
+            if (data.Length < 5 || data[0] != HandshakeContentType) return new[] { data.ToArray() };
+
+            var recordLength = ReadUInt16(data, 3);
+            var recordEnd = 5 + recordLength;
+            if (recordEnd > data.Length || recordLength < 8) return new[] { data.ToArray() };
+
+            pieces = Math.Max(3, Math.Min(8, pieces));
+            random ??= new Random(Guid.NewGuid().GetHashCode());
+
+            var cuts = new SortedSet<int>();
+            if (TryGetSniRange(data, out var sniOffset, out var sniLength) && sniLength >= 2)
+            {
+                var sniPayloadOffset = sniOffset - 5;
+                // 必须有一刀落在 SNI 内部，保证没有单个 record 包含完整域名。
+                var inside = random.Next(1, sniLength);
+                cuts.Add(Math.Max(1, Math.Min(recordLength - 1, sniPayloadOffset + inside)));
+            }
+
+            var attempts = 0;
+            while (cuts.Count < pieces - 1 && attempts++ < 64)
+            {
+                cuts.Add(random.Next(1, Math.Max(2, (int)recordLength)));
+            }
+
+            var segments = new List<(int Start, int Length)>();
+            var start = 0;
+            foreach (var cut in cuts)
+            {
+                if (cut <= start || cut >= recordLength) continue;
+                AddRecordSegment(segments, start, cut - start);
+                start = cut;
+            }
+            if (start < recordLength) AddRecordSegment(segments, start, recordLength - start);
+
+            return BuildTlsRecords(data, segments);
+        }
+
         public static IReadOnlyList<byte[]> FragmentRandom(ReadOnlySpan<byte> data, int maxChunkSize, Random? random = null)
         {
             maxChunkSize = Math.Max(1, maxChunkSize);
@@ -337,6 +386,7 @@ namespace System.Application.Services.Implementation
                 TlsFragmentStrategy.Record => FragmentByRecord(data),
                 TlsFragmentStrategy.SniPieces => FragmentBySniPieces(data, pieces),
                 TlsFragmentStrategy.TlsRecordSplit => FragmentToTlsRecords(data),
+                TlsFragmentStrategy.TlsRecordSplitRandom => FragmentToTlsRecordsRandom(data, pieces, random),
                 TlsFragmentStrategy.Random => FragmentRandom(data, chunkSize, random),
                 _ => Fragment(data, chunkSize),
             };

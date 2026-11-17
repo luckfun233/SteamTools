@@ -44,6 +44,14 @@ namespace System.Application.ProxyRules
 
         public static IReadOnlyList<ProxyRuleGroupInfo> Groups => ProxyRuleGroups.All;
 
+        /// <summary>
+        /// 远程配置里的动态分组（来自 // 注释），用于服务分组页面。
+        /// </summary>
+        public static IReadOnlyList<ProxyRuleGroupStat> GroupStats => Remote.GetGroups();
+
+        public static IReadOnlyList<string> MatchServices(string host)
+            => ProxyRuleSet.Combine(Custom, Remote).MatchServices(host);
+
         public static int GetRuleCount(string groupId)
             => Remote.Rules.Count(x => string.Equals(x.Group, groupId, StringComparison.OrdinalIgnoreCase));
 
@@ -151,8 +159,10 @@ namespace System.Application.ProxyRules
             var remoteFiltered = ProxyRuleSet.Empty;
             if (ProxySettings.EnableDevSidecarRules.Value && Remote.Rules.Count > 0)
             {
-                var groups = ProxyRuleGroups.ParseEnabled(ProxySettings.DevSidecarRuleGroups.Value);
-                remoteFiltered = Remote.FilterGroups(groups);
+                // 默认全部开启；关闭列表为空表示不过滤。新增的分组会自动生效。
+                var disabledGroups = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledGroups.Value);
+                var disabledServices = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledServices.Value);
+                remoteFiltered = Remote.FilterDisabled(disabledGroups, disabledServices);
             }
 
             var customSet = ProxySettings.EnableCustomRules.Value ? Custom : ProxyRuleSet.Empty;
@@ -162,7 +172,8 @@ namespace System.Application.ProxyRules
             Volatile.Write(ref current, combined);
 
             ProxyDiagnostics.Info("Rules",
-                $"自定义 {customSet.Rules.Count} 条 + 远程启用 {remoteFiltered.Rules.Count} 条 = {combined.Rules.Count} 条");
+                $"自定义 {customSet.Rules.Count} 条 + 远程启用 {remoteFiltered.Rules.Count} 条 = {combined.Rules.Count} 条，" +
+                $"关闭组 {ProxySettings.DevSidecarDisabledGroups.Value}，关闭服务 {ProxySettings.DevSidecarDisabledServices.Value}");
         }
 
         static void ClearRemote()

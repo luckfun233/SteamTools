@@ -2,6 +2,7 @@ using System;
 using System.Application.Settings;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -19,9 +20,11 @@ namespace System.Application.Services.Implementation
         static readonly HttpClient httpClient = new()
         {
             Timeout = TimeSpan.FromSeconds(6),
+            MaxResponseContentBufferSize = 1024 * 1024,
         };
 
         static readonly ConcurrentDictionary<string, CacheItem> cache = new(StringComparer.OrdinalIgnoreCase);
+        const int MaxCacheEntries = 1024;
 
         public static async Task<IReadOnlyList<IPAddress>> ResolveAsync(
             string host,
@@ -50,6 +53,15 @@ namespace System.Application.Services.Implementation
                 var addresses = await QueryAsync(endpoint, host, cancellationToken).ConfigureAwait(false);
                 if (addresses.Count > 0)
                 {
+                    if (cache.Count >= MaxCacheEntries)
+                    {
+                        var now = DateTime.UtcNow;
+                        foreach (var pair in cache)
+                        {
+                            if (pair.Value.ExpireAt <= now) cache.TryRemove(pair.Key, out _);
+                        }
+                        if (cache.Count >= MaxCacheEntries) cache.Clear();
+                    }
                     cache[host] = new CacheItem(addresses, DateTime.UtcNow.AddSeconds(300));
                     ProxyDiagnostics.Info("DoH", $"{host} -> {string.Join(",", addresses)}");
                 }
@@ -83,6 +95,10 @@ namespace System.Application.Services.Implementation
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            if (json.Length > 1024 * 1024)
+            {
+                throw new InvalidDataException("DoH 响应过大");
+            }
             using var doc = JsonDocument.Parse(json);
 
             var result = new List<IPAddress>();

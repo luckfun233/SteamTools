@@ -22,6 +22,9 @@ namespace System.Application.Services.Implementation
         readonly TcpListener listener;
         readonly CancellationTokenSource cts = new();
         Task? acceptTask;
+        static int activeConnections;
+        const int MaxConnections = 512;
+        const int MaxUdpDatagram = 65507;
 
         public SniFragmentSocks5Server(int port)
         {
@@ -77,7 +80,27 @@ namespace System.Application.Services.Implementation
 
         async Task HandleAsync(TcpClient client)
         {
+            if (Interlocked.Increment(ref activeConnections) > MaxConnections)
+            {
+                Interlocked.Decrement(ref activeConnections);
+                ProxyDiagnostics.Warn("SniSidecar", "并发连接超过上限，已拒绝新连接");
+                client.Dispose();
+                return;
+            }
+
             SniSidecarStats.OnConnection();
+            try
+            {
+                await HandleCoreAsync(client).ConfigureAwait(false);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref activeConnections);
+            }
+        }
+
+        async Task HandleCoreAsync(TcpClient client)
+        {
             using (client)
             {
                 client.NoDelay = true;
@@ -91,6 +114,12 @@ namespace System.Application.Services.Implementation
                     var request = await ReadRequestAsync(clientStream).ConfigureAwait(false);
                     if (request == null) return;
                     var req = request.Value;
+
+                    if (req.Command == SocksCommand.UdpAssociate)
+                    {
+                        await RunUdpAssociateAsync(clientStream, connectionCts.Token).ConfigureAwait(false);
+                        return;
+                    }
 
                     if (req.Command != SocksCommand.Connect)
                     {
@@ -148,16 +177,29 @@ namespace System.Application.Services.Implementation
                         return;
                     }
 
-                    var payload = MaybeRewriteSni(firstPayload.Data, host);
+                    // VPN/tun2socks 只能拿到目标 IP，真正的域名在 ClientHello 的 SNI 里。
+                    // 规则匹配、分片白名单和 SNI 改写都必须使用这个域名，否则在 VPN 模式下
+                    // 所有域名规则都会因为 host 是 IP 而失效。
+                    var effectiveHost = host;
+                    if (IPAddress.TryParse(host, out _) &&
+                        TlsClientHello.TryGetSni(firstPayload.Data, out var payloadSni) &&
+                        !string.IsNullOrWhiteSpace(payloadSni))
+                    {
+                        effectiveHost = payloadSni!;
+                        ProxyDiagnostics.Info("SniSidecar", $"从 ClientHello 识别域名: {host} -> {effectiveHost}");
+                    }
 
-                    var fragment = ShouldFragment(host, payload, excluded) &&
-                                   !FragmentFallbackCache.ShouldSkip(host);
+                    var payload = MaybeRewriteSni(firstPayload.Data, effectiveHost);
+                    var excludedBySni = excluded || rules.IsExcluded(effectiveHost);
+
+                    var fragment = ShouldFragment(effectiveHost, payload, excludedBySni) &&
+                                   !FragmentFallbackCache.ShouldSkip(effectiveHost);
 
                     var probe = await SendFirstPayloadAsync(
                         targetStream,
                         payload,
                         fragment,
-                        host,
+                        effectiveHost,
                         req.Port,
                         connectionCts.Token).ConfigureAwait(false);
 
@@ -166,9 +208,9 @@ namespace System.Application.Services.Implementation
                         // 分片被重置：记住该域名，换一条连接用不分片方式重试一次。
                         FragmentFallbackCache.Duration = TimeSpan.FromMinutes(
                             Math.Max(1, ProxySettings.SniFragmentFallbackCacheMinutes.Value));
-                        FragmentFallbackCache.MarkFailure(host);
+                        FragmentFallbackCache.MarkFailure(effectiveHost);
                         SniSidecarStats.OnFallback();
-                        ProxyDiagnostics.Warn("SniSidecar", $"分片握手被重置，回退直连重试: {host}");
+                        ProxyDiagnostics.Warn("SniSidecar", $"分片握手被重置，回退直连重试: {effectiveHost}");
 
                         target.Dispose();
                         try
@@ -180,7 +222,7 @@ namespace System.Application.Services.Implementation
                                 targetStream,
                                 payload,
                                 fragment: false,
-                                host,
+                                effectiveHost,
                                 req.Port,
                                 connectionCts.Token).ConfigureAwait(false);
                             SniSidecarStats.OnReconnect();
@@ -188,7 +230,7 @@ namespace System.Application.Services.Implementation
                         catch (Exception ex)
                         {
                             SniSidecarStats.OnFailure();
-                            ProxyDiagnostics.Warn("SniSidecar", $"回退重试失败: {host}: {ex.Message}");
+                            ProxyDiagnostics.Warn("SniSidecar", $"回退重试失败: {effectiveHost}: {ex.Message}");
                             return;
                         }
                     }
@@ -213,6 +255,203 @@ namespace System.Application.Services.Implementation
                     connectionCts.Dispose();
                 }
             }
+        }
+
+        /// <summary>
+        /// SOCKS5 UDP ASSOCIATE：tun2socks 的 --enable-udprelay 需要它。
+        /// DNS（UDP:53）优先走 DoH，其它 UDP 按目标直接转发。
+        /// </summary>
+        async Task RunUdpAssociateAsync(NetworkStream control, CancellationToken cancellationToken)
+        {
+            using var udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+            var bound = (IPEndPoint)udp.Client.LocalEndPoint!;
+            await WriteReplyAsync(control, SocksReply.Succeeded, bound).ConfigureAwait(false);
+            ProxyDiagnostics.Info("SniSidecar", $"UDP ASSOCIATE 已建立 127.0.0.1:{bound.Port}");
+
+            var concurrency = new SemaphoreSlim(32, 32);
+            var controlMonitor = MonitorControlConnectionAsync(control, cancellationToken);
+            var lifetime = Task.Delay(TimeSpan.FromMinutes(10), cancellationToken);
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var receiveTask = udp.ReceiveAsync();
+                    var completed = await Task.WhenAny(receiveTask, controlMonitor, lifetime).ConfigureAwait(false);
+                    if (completed != receiveTask) break;
+
+                    var result = receiveTask.Result;
+                    _ = HandleUdpDatagramAsync(udp, result, concurrency, cancellationToken);
+                }
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                ProxyDiagnostics.Warn("SniSidecar", $"UDP ASSOCIATE 结束: {ex.Message}");
+            }
+            finally
+            {
+                // 不 Dispose：fire-and-forget 的 UDP 处理可能仍在释放信号量。
+                // 每个 UDP ASSOCIATE 只创建一次，连接结束后由 GC 回收。
+            }
+        }
+
+        static async Task MonitorControlConnectionAsync(NetworkStream control, CancellationToken cancellationToken)
+        {
+            var buffer = new byte[64];
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var read = await control.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+                    if (read <= 0) return;
+                }
+            }
+            catch
+            {
+                // 控制连接关闭即代表 UDP 关联结束
+            }
+        }
+
+        async Task HandleUdpDatagramAsync(
+            UdpClient udp,
+            UdpReceiveResult result,
+            SemaphoreSlim concurrency,
+            CancellationToken cancellationToken)
+        {
+            var datagram = result.Buffer;
+            if (datagram == null || datagram.Length < 4 || datagram.Length > MaxUdpDatagram) return;
+            if (datagram[2] != 0) return; // 不支持 SOCKS5 UDP 分片
+
+            var acquired = false;
+            try
+            {
+                await concurrency.WaitAsync(cancellationToken).ConfigureAwait(false);
+                acquired = true;
+
+                var offset = 4;
+                IPAddress? address = null;
+                string? host = null;
+                switch (datagram[3])
+                {
+                    case 0x01:
+                        if (datagram.Length < offset + 4 + 2) return;
+                        address = new IPAddress(datagram.AsSpan(offset, 4).ToArray());
+                        offset += 4;
+                        break;
+                    case 0x04:
+                        if (datagram.Length < offset + 16 + 2) return;
+                        address = new IPAddress(datagram.AsSpan(offset, 16).ToArray());
+                        offset += 16;
+                        break;
+                    case 0x03:
+                        if (datagram.Length < offset + 1) return;
+                        var length = datagram[offset];
+                        offset += 1;
+                        if (datagram.Length < offset + length + 2) return;
+                        host = Encoding.ASCII.GetString(datagram, offset, length);
+                        offset += length;
+                        break;
+                    default:
+                        return;
+                }
+
+                if (datagram.Length < offset + 2) return;
+                var targetPort = (datagram[offset] << 8) | datagram[offset + 1];
+                offset += 2;
+                if (targetPort <= 0) return;
+
+                var payloadLength = datagram.Length - offset;
+                if (payloadLength <= 0) return;
+                var payload = new byte[payloadLength];
+                Buffer.BlockCopy(datagram, offset, payload, 0, payloadLength);
+
+                byte[]? response = null;
+                if (targetPort == 53 && ProxySettings.EnableDoh.Value)
+                {
+                    response = await DohWireResolver.QueryAsync(payload, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (response == null)
+                {
+                    response = await ForwardUdpAsync(address, host, targetPort, payload, cancellationToken).ConfigureAwait(false);
+                }
+                if (response == null) return;
+
+                var responsePacket = BuildUdpResponse(address, host, targetPort, response);
+                await udp.SendAsync(responsePacket, responsePacket.Length, result.RemoteEndPoint).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                ProxyDiagnostics.Warn("SniSidecar", $"UDP 转发失败: {ex.Message}");
+            }
+            finally
+            {
+                if (acquired) concurrency.Release();
+            }
+        }
+
+        static async Task<byte[]?> ForwardUdpAsync(
+            IPAddress? address,
+            string? host,
+            int port,
+            byte[] payload,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (address == null && !string.IsNullOrEmpty(host))
+                {
+                    var addresses = await Dns.GetHostAddressesAsync(host).ConfigureAwait(false);
+                    address = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork) ??
+                              addresses.FirstOrDefault();
+                }
+                if (address == null) return null;
+
+                using var client = new UdpClient(address.AddressFamily);
+                client.Connect(new IPEndPoint(address, port));
+                await client.SendAsync(payload, payload.Length).ConfigureAwait(false);
+
+                var receiveTask = client.ReceiveAsync();
+                var completed = await Task.WhenAny(
+                    receiveTask,
+                    Task.Delay(TimeSpan.FromSeconds(3), cancellationToken)).ConfigureAwait(false);
+                if (completed != receiveTask) return null;
+                return receiveTask.Result.Buffer;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                ProxyDiagnostics.Warn("SniSidecar", $"UDP 目标 {host ?? address?.ToString()}:{port} 不可达: {ex.Message}");
+                return null;
+            }
+        }
+
+        static byte[] BuildUdpResponse(IPAddress? address, string? host, int port, byte[] data)
+        {
+            byte[] header;
+            if (address != null)
+            {
+                var bytes = address.GetAddressBytes();
+                header = new byte[4 + bytes.Length + 2];
+                header[3] = address.AddressFamily == AddressFamily.InterNetworkV6 ? (byte)0x04 : (byte)0x01;
+                bytes.CopyTo(header, 4);
+                header[^2] = (byte)(port >> 8);
+                header[^1] = (byte)(port & 0xFF);
+            }
+            else
+            {
+                var name = Encoding.ASCII.GetBytes(host ?? string.Empty);
+                header = new byte[4 + 1 + name.Length + 2];
+                header[3] = 0x03;
+                header[4] = (byte)name.Length;
+                name.CopyTo(header, 5);
+                header[^2] = (byte)(port >> 8);
+                header[^1] = (byte)(port & 0xFF);
+            }
+
+            var result = new byte[header.Length + data.Length];
+            header.CopyTo(result, 0);
+            data.CopyTo(result, header.Length);
+            return result;
         }
 
         async Task<TcpClient> ConnectAsync(string host, int port, bool excluded, CancellationToken cancellationToken)
@@ -415,7 +654,39 @@ namespace System.Application.Services.Implementation
 
         static async Task WriteReplyAsync(NetworkStream stream, SocksReply reply)
         {
-            var buffer = new byte[] { 0x05, (byte)reply, 0x00, 0x01, 0, 0, 0, 0, 0, 0 };
+            await WriteReplyAsync(stream, reply, null).ConfigureAwait(false);
+        }
+
+        static async Task WriteReplyAsync(NetworkStream stream, SocksReply reply, IPEndPoint? bound)
+        {
+            byte[] buffer;
+            if (bound == null)
+            {
+                buffer = new byte[] { 0x05, (byte)reply, 0x00, 0x01, 0, 0, 0, 0, 0, 0 };
+            }
+            else if (bound.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                var address = bound.Address.GetAddressBytes();
+                buffer = new byte[4 + 16 + 2];
+                buffer[0] = 0x05;
+                buffer[1] = (byte)reply;
+                buffer[3] = 0x04;
+                address.CopyTo(buffer, 4);
+                buffer[^2] = (byte)(bound.Port >> 8);
+                buffer[^1] = (byte)(bound.Port & 0xFF);
+            }
+            else
+            {
+                var address = bound.Address.GetAddressBytes();
+                buffer = new byte[4 + 4 + 2];
+                buffer[0] = 0x05;
+                buffer[1] = (byte)reply;
+                buffer[3] = 0x01;
+                address.CopyTo(buffer, 4);
+                buffer[^2] = (byte)(bound.Port >> 8);
+                buffer[^1] = (byte)(bound.Port & 0xFF);
+            }
+
             try
             {
                 await stream.WriteAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
@@ -947,17 +1218,36 @@ namespace System.Application.Services.Implementation
                     server.Dispose();
                     server = null;
                 }
-                try
+
+                var startPort = Math.Max(1, Math.Min(65535, Port));
+                for (var i = 0; i < 30; i++)
                 {
-                    var instance = new SniFragmentSocks5Server(Port);
-                    instance.Start();
-                    server = instance;
+                    var candidate = startPort + i;
+                    if (candidate > 65535) break;
+                    try
+                    {
+                        var instance = new SniFragmentSocks5Server(candidate);
+                        instance.Start();
+                        server = instance;
+                        if (candidate != startPort)
+                        {
+                            ProxyDiagnostics.Warn("SniSidecar", $"端口 {startPort} 被占用，改用 {candidate}");
+                        }
+                        return;
+                    }
+                    catch (SocketException)
+                    {
+                        // 端口占用，尝试下一个
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn("SniSidecar", ex, "启动 SNI sidecar 失败");
+                        ProxyDiagnostics.Warn("SniSidecar", $"启动失败: {ex.Message}");
+                        break;
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Log.Warn("SniSidecar", ex, "启动 SNI sidecar 失败");
-                    ProxyDiagnostics.Warn("SniSidecar", $"启动失败: {ex.Message}");
-                }
+
+                ProxyDiagnostics.Warn("SniSidecar", $"端口 {startPort} 起连续 30 个端口均不可用");
             }
         }
 

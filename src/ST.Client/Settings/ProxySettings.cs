@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Net;
 using System.Application.ProxyRules;
 using System.Application.Services;
 using System.Application.Services.Implementation;
@@ -195,9 +196,10 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
 
     /// <summary>
     /// 是否加载 DevSidecar 兼容规则（remote_config.json5）。
+    /// 默认开启：不再依赖 Steam++ 自带的内置规则，直接使用 DevSidecar 远程配置。
     /// </summary>
     public static SerializableProperty<bool> EnableDevSidecarRules { get; }
-        = GetProperty(defaultValue: false, autoSave: true);
+        = GetProperty(defaultValue: true, autoSave: true);
 
     /// <summary>
     /// DevSidecar 远程配置地址。
@@ -211,13 +213,25 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 启动加速时是否同步 DevSidecar 配置。
     /// </summary>
     public static SerializableProperty<bool> SyncDevSidecarConfigOnStartup { get; }
-        = GetProperty(defaultValue: false, autoSave: true);
+        = GetProperty(defaultValue: true, autoSave: true);
 
     /// <summary>
-    /// 启用的 DevSidecar 规则组，分号分隔。未选中的组不会参与匹配。
+    /// 后台自动同步 DevSidecar 配置的间隔（小时），0 表示只在启动时同步。
     /// </summary>
-    public static SerializableProperty<string> DevSidecarRuleGroups { get; }
-        = GetProperty(defaultValue: ProxyRuleGroups.DefaultEnabled, autoSave: true);
+    public static SerializableProperty<int> DevSidecarAutoSyncHours { get; }
+        = GetProperty(defaultValue: 6, autoSave: false);
+
+    /// <summary>
+    /// 已关闭的 DevSidecar 规则组，分号分隔。默认全部开启，新增组也会自动开启。
+    /// </summary>
+    public static SerializableProperty<string> DevSidecarDisabledGroups { get; }
+        = GetProperty(defaultValue: string.Empty, autoSave: true);
+
+    /// <summary>
+    /// 已关闭的 DevSidecar 服务（域名），分号分隔。对应 DevSidecar 服务分组里的单个开关。
+    /// </summary>
+    public static SerializableProperty<string> DevSidecarDisabledServices { get; }
+        = GetProperty(defaultValue: string.Empty, autoSave: true);
 
     /// <summary>
     /// 是否启用用户自定义规则。自定义规则与远程规则合并，且优先匹配。
@@ -229,13 +243,15 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 启用免证书 SNI 分片（通过本地 sidecar SOCKS5）。
     /// </summary>
     public static SerializableProperty<bool> EnableSniFragment { get; }
-        = GetProperty(defaultValue: false, autoSave: false);
+        = GetProperty(defaultValue: true, autoSave: false);
 
     /// <summary>
-    /// SNI 分片策略：0=固定大小，1=按 SNI 边界拆分，2=按 TLS 记录头拆分。
+    /// SNI 分片策略：0=固定大小，1=按 SNI 边界拆分，2=按 TLS 记录头拆分，
+    /// 3=SNI 多段，4=TLS record 拆分，5=随机。
+    /// 默认使用 TLS record 拆分：对会重组 TCP、但按 record 解析的 DPI 更有效。
     /// </summary>
     public static SerializableProperty<int> SniFragmentStrategy { get; }
-        = GetProperty(defaultValue: SniFragmentStrategySniBoundary, autoSave: false);
+        = GetProperty(defaultValue: SniFragmentStrategyTlsRecordSplit, autoSave: false);
 
     public const int SniFragmentStrategyFixed = 0;
     public const int SniFragmentStrategySniBoundary = 1;
@@ -243,6 +259,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public const int SniFragmentStrategySniPieces = 3;
     public const int SniFragmentStrategyTlsRecordSplit = 4;
     public const int SniFragmentStrategyRandom = 5;
+    public const int SniFragmentStrategyTlsRecordSplitRandom = 6;
 
     /// <summary>
     /// SNI 多段分片时把域名拆成几段。
@@ -322,9 +339,10 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
 
     /// <summary>
     /// 单次 TLS ClientHello 最多缓冲的字节数，防止异常流量占用内存。
+    /// 新版浏览器会带后量子密钥共享，ClientHello 可能接近 16KB，默认放宽到 64KB。
     /// </summary>
     public static SerializableProperty<int> SniFragmentMaxBufferBytes { get; }
-        = GetProperty(defaultValue: 16384, autoSave: false);
+        = GetProperty(defaultValue: 65536, autoSave: false);
 
     /// <summary>
     /// 等待剩余 ClientHello 字节的超时时间（毫秒）。
@@ -366,10 +384,10 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// 是否使用 DoH 解析域名，避免 DNS 污染。
     /// </summary>
     public static SerializableProperty<bool> EnableDoh { get; }
-        = GetProperty(defaultValue: false, autoSave: false);
+        = GetProperty(defaultValue: true, autoSave: false);
 
     /// <summary>
-    /// DoH JSON 接口地址。
+    /// DoH JSON 接口地址（用于 sidecar 选路解析）。
     /// </summary>
     public static SerializableProperty<string> DohEndpoint { get; }
         = GetProperty(defaultValue: DefaultDohEndpoint, autoSave: false);
@@ -377,10 +395,76 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public const string DefaultDohEndpoint = "https://dns.alidns.com/resolve";
 
     /// <summary>
+    /// DoH wire format 接口地址（用于本地 DNS 代理转发完整 DNS 报文）。
+    /// </summary>
+    public static SerializableProperty<string> DohWireEndpoint { get; }
+        = GetProperty(defaultValue: DefaultDohWireEndpoint, autoSave: false);
+
+    public const string DefaultDohWireEndpoint = "https://dns.alidns.com/dns-query";
+
+    /// <summary>
     /// DoH 失败时是否回退到系统 DNS。
     /// </summary>
     public static SerializableProperty<bool> DohFallbackToSystem { get; }
         = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// 是否启用本地 DNS 代理。VPN 模式通过 tun2socks --dnsgw 把 UDP:53 送到本机。
+    /// </summary>
+    public static SerializableProperty<bool> EnableDnsProxy { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// 本地 DNS 代理监听端口（仅 127.0.0.1）。
+    /// </summary>
+    public static SerializableProperty<int> DnsProxyPortId { get; }
+        = GetProperty(defaultValue: 8870, autoSave: false);
+
+    /// <summary>
+    /// DoH 不可用时回退使用的 DNS 服务器，分号分隔，可写 ip 或 ip:port。
+    /// </summary>
+    public static SerializableProperty<string> DnsFallbackServers { get; }
+        = GetProperty(defaultValue: DefaultDnsFallbackServers, autoSave: false);
+
+    public const string DefaultDnsFallbackServers = "223.5.5.5;119.29.29.29";
+
+    /// <summary>
+    /// 解析回退 DNS 服务器列表。
+    /// </summary>
+    public static IReadOnlyList<IPEndPoint> GetDnsFallbackServers()
+    {
+        var result = new List<IPEndPoint>();
+        var text = DnsFallbackServers.Value;
+        if (string.IsNullOrWhiteSpace(text)) text = DefaultDnsFallbackServers;
+
+        foreach (var item in text.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var value = item.Trim();
+            if (value.Length == 0) continue;
+
+            var port = 53;
+            var host = value;
+            var colon = value.LastIndexOf(':');
+            if (colon > 0 && colon < value.Length - 1 && value.IndexOf(':') == colon &&
+                int.TryParse(value.Substring(colon + 1), out var parsedPort))
+            {
+                host = value.Substring(0, colon);
+                port = parsedPort;
+            }
+
+            if (IPAddress.TryParse(host, out var address) && port > 0 && port <= 65535)
+            {
+                result.Add(new IPEndPoint(address, port));
+            }
+        }
+
+        if (result.Count == 0)
+        {
+            result.Add(new IPEndPoint(IPAddress.Parse("223.5.5.5"), 53));
+            result.Add(new IPEndPoint(IPAddress.Parse("119.29.29.29"), 53));
+        }
+        return result;
+    }
 
     /// <summary>
     /// 是否写入代理诊断日志。
@@ -419,20 +503,46 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: false, autoSave: false);
 
     /// <summary>
+    /// 实验性设置版本，用于把旧版本的弱默认值升级到新默认值（只迁移一次）。
+    /// </summary>
+    public static SerializableProperty<int> ExperimentalSettingsVersion { get; }
+        = GetProperty(defaultValue: 0, autoSave: true);
+
+    /// <summary>
+    /// 把旧版本的实验性默认值迁移到当前版本。不会覆盖用户在当前版本里主动改过的值。
+    /// </summary>
+    public static void MigrateExperimentalDefaults()
+    {
+        if (ExperimentalSettingsVersion.Value >= 1) return;
+
+        EnableDevSidecarRules.Value = true;
+        SyncDevSidecarConfigOnStartup.Value = true;
+        EnableDoh.Value = true;
+        EnableDnsProxy.Value = true;
+        EnableSniFragment.Value = true;
+        SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;
+        SniFragmentMaxBufferBytes.Value = 65536;
+        ExperimentalSettingsVersion.Value = 1;
+        SettingsHost.Save();
+    }
+
+    /// <summary>
     /// 恢复实验性设置的默认值。不会修改代理端口、二级代理等基础设置。
     /// </summary>
     public static void RestoreExperimentalDefaults()
     {
-        EnableDevSidecarRules.Value = false;
-        SyncDevSidecarConfigOnStartup.Value = false;
+        EnableDevSidecarRules.Value = true;
+        SyncDevSidecarConfigOnStartup.Value = true;
+        DevSidecarAutoSyncHours.Value = 6;
         DevSidecarConfigUrl.Value = DefaultDevSidecarConfigUrl;
-        DevSidecarRuleGroups.Value = ProxyRuleGroups.DefaultEnabled;
+        DevSidecarDisabledGroups.Value = string.Empty;
+        DevSidecarDisabledServices.Value = string.Empty;
         EnableCustomRules.Value = true;
 
         IsCertificateLessMode.Value = false;
 
-        EnableSniFragment.Value = false;
-        SniFragmentStrategy.Value = SniFragmentStrategySniBoundary;
+        EnableSniFragment.Value = true;
+        SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;
         SniFragmentChunkSize.Value = 64;
         SniFragmentDelayMilliseconds.Value = 10;
         SniSplitPieces.Value = 3;
@@ -440,7 +550,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         EnableSniFragmentFallback.Value = true;
         SniFragmentFallbackProbeMilliseconds.Value = 1200;
         SniFragmentFallbackCacheMinutes.Value = 10;
-        SniFragmentMaxBufferBytes.Value = 16384;
+        SniFragmentMaxBufferBytes.Value = 65536;
         SniFragmentReadTimeoutMilliseconds.Value = 300;
         SniFragmentPortId.Value = 8869;
         SniFragmentDomains.Value = DefaultSniFragmentDomains;
@@ -456,9 +566,13 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         SniUpstreamRelayUserName.Value = string.Empty;
         SniUpstreamRelayPassword.Value = string.Empty;
 
-        EnableDoh.Value = false;
+        EnableDoh.Value = true;
         DohEndpoint.Value = DefaultDohEndpoint;
+        DohWireEndpoint.Value = DefaultDohWireEndpoint;
         DohFallbackToSystem.Value = true;
+        EnableDnsProxy.Value = true;
+        DnsProxyPortId.Value = 8870;
+        DnsFallbackServers.Value = DefaultDnsFallbackServers;
 
         EnableProxyDiagnostics.Value = true;
         ProxyDiagnosticsMinimumLevel.Value = 0;
@@ -468,6 +582,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
 
         EnableBrowserOnlyVpn.Value = false;
 
+        ExperimentalSettingsVersion.Value = 1;
         DohResolver.ClearCache();
         SettingsHost.Save();
     }

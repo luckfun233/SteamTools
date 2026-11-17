@@ -61,6 +61,8 @@ namespace System.Application.Services.Implementation
             results.Add(CheckSettings());
             results.Add(await CheckSystemDnsAsync(host, cancellationToken).ConfigureAwait(false));
             results.Add(await CheckDohAsync(host, cancellationToken).ConfigureAwait(false));
+            results.Add(await CheckDohWireAsync(host, cancellationToken).ConfigureAwait(false));
+            results.Add(await CheckDnsProxyAsync(host, cancellationToken).ConfigureAwait(false));
             results.Add(await CheckTcpAsync(host, 443, cancellationToken).ConfigureAwait(false));
 
             var direct = await SniConnectivityTester.ProbeDirectAsync(
@@ -82,10 +84,23 @@ namespace System.Application.Services.Implementation
                     viaSidecar.Success,
                     viaSidecar.ElapsedMs,
                     viaSidecar.Success ? $"成功（策略 {SniConnectivityTester.GetStrategyName(ProxySettings.SniFragmentStrategy.Value)}）" : viaSidecar.Error ?? "失败"));
+
+                // 真实 VPN 路径：tun2socks 只传 IP，SNI 由 ClientHello 提供。
+                var viaSidecarIp = await SniConnectivityTester.ProbeViaSidecarIpAsync(
+                    host, 443, SniSidecarService.ActivePort, 8, cancellationToken).ConfigureAwait(false);
+                results.Add(new LabTestResult(
+                    "Sidecar TLS（IP + SNI）",
+                    viaSidecarIp.Success,
+                    viaSidecarIp.ElapsedMs,
+                    viaSidecarIp.Success ? "成功：VPN 仅传 IP 时也能识别 SNI" : viaSidecarIp.Error ?? "失败"));
+
+                results.Add(await CheckUdpAssociateAsync(host, SniSidecarService.ActivePort, cancellationToken).ConfigureAwait(false));
             }
             else
             {
                 results.Add(new LabTestResult("Sidecar TLS 握手", false, 0, "本地 sidecar 未启动，可能端口被占用"));
+                results.Add(new LabTestResult("Sidecar TLS（IP + SNI）", false, 0, "本地 sidecar 未启动"));
+                results.Add(new LabTestResult("Sidecar UDP ASSOCIATE", false, 0, "本地 sidecar 未启动"));
             }
             if (!wasRunning) SniSidecarService.Stop();
 
@@ -187,6 +202,221 @@ namespace System.Application.Services.Implementation
             }
         }
 
+        static async Task<LabTestResult> CheckDohWireAsync(string host, CancellationToken cancellationToken)
+        {
+            if (!ProxySettings.EnableDoh.Value)
+            {
+                return new LabTestResult("DoH wire", true, 0, "未启用", informational: true);
+            }
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var query = BuildDnsQuery(host);
+                var response = await DohWireResolver.QueryAsync(query, cancellationToken).ConfigureAwait(false);
+                if (response == null)
+                {
+                    return new LabTestResult("DoH wire", false, sw.ElapsedMilliseconds, "无响应");
+                }
+                return new LabTestResult(
+                    "DoH wire",
+                    response.Length >= 12,
+                    sw.ElapsedMilliseconds,
+                    $"响应 {response.Length} 字节，RCODE={response[3] & 0x0F}，{DohWireResolver.GetEndpoint()}");
+            }
+            catch (Exception ex)
+            {
+                return new LabTestResult("DoH wire", false, sw.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        static async Task<LabTestResult> CheckDnsProxyAsync(string host, CancellationToken cancellationToken)
+        {
+            if (!DnsProxyService.IsRunning)
+            {
+                var started = DnsProxyService.Start();
+                if (!started)
+                {
+                    return new LabTestResult("本地 DNS 代理", false, 0, "未运行且无法启动");
+                }
+            }
+
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var query = BuildDnsQuery(host);
+                var response = await QueryUdpAsync(
+                    new IPEndPoint(IPAddress.Loopback, DnsProxyService.ActivePort),
+                    query,
+                    6000,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (response == null)
+                {
+                    return new LabTestResult("本地 DNS 代理", false, sw.ElapsedMilliseconds, "查询超时");
+                }
+
+                var idMatches = response.Length >= 2 && response[0] == query[0] && response[1] == query[1];
+                return new LabTestResult(
+                    "本地 DNS 代理",
+                    idMatches,
+                    sw.ElapsedMilliseconds,
+                    $"127.0.0.1:{DnsProxyService.ActivePort}，响应 {response.Length} 字节，RCODE={response[3] & 0x0F}");
+            }
+            catch (Exception ex)
+            {
+                return new LabTestResult("本地 DNS 代理", false, sw.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        static async Task<LabTestResult> CheckUdpAssociateAsync(string host, int sidecarPort, CancellationToken cancellationToken)
+        {
+            var sw = Stopwatch.StartNew();
+            using var client = new TcpClient();
+            try
+            {
+                await client.ConnectAsync(IPAddress.Loopback, sidecarPort).ConfigureAwait(false);
+                var stream = client.GetStream();
+
+                await stream.WriteAsync(new byte[] { 0x05, 0x01, 0x00 }, 0, 3, cancellationToken).ConfigureAwait(false);
+                var greeting = new byte[2];
+                if (!await ReadExactAsync(stream, greeting, cancellationToken).ConfigureAwait(false) || greeting[1] != 0x00)
+                {
+                    return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "SOCKS5 协商失败");
+                }
+
+                await stream.WriteAsync(new byte[] { 0x05, 0x03, 0x00, 0x01, 0, 0, 0, 0, 0, 0 }, 0, 10, cancellationToken).ConfigureAwait(false);
+                var reply = new byte[4];
+                if (!await ReadExactAsync(stream, reply, cancellationToken).ConfigureAwait(false) || reply[1] != 0x00)
+                {
+                    return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, $"UDP ASSOCIATE 被拒绝: {reply[1]}");
+                }
+
+                IPAddress? boundAddress = null;
+                if (reply[3] == 0x01)
+                {
+                    var buf = new byte[4];
+                    if (!await ReadExactAsync(stream, buf, cancellationToken).ConfigureAwait(false)) return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "响应不完整");
+                    boundAddress = new IPAddress(buf);
+                }
+                else if (reply[3] == 0x04)
+                {
+                    var buf = new byte[16];
+                    if (!await ReadExactAsync(stream, buf, cancellationToken).ConfigureAwait(false)) return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "响应不完整");
+                    boundAddress = new IPAddress(buf);
+                }
+                else
+                {
+                    var len = new byte[1];
+                    if (!await ReadExactAsync(stream, len, cancellationToken).ConfigureAwait(false)) return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "响应不完整");
+                    var buf = new byte[len[0]];
+                    if (!await ReadExactAsync(stream, buf, cancellationToken).ConfigureAwait(false)) return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "响应不完整");
+                    boundAddress = IPAddress.Loopback;
+                }
+
+                var portBuf = new byte[2];
+                if (!await ReadExactAsync(stream, portBuf, cancellationToken).ConfigureAwait(false))
+                {
+                    return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "响应不完整");
+                }
+                var boundPort = (portBuf[0] << 8) | portBuf[1];
+                if (boundAddress == null || boundPort <= 0)
+                {
+                    return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "未返回有效 UDP 端点");
+                }
+
+                var query = BuildDnsQuery(host);
+                var dnsServer = new byte[] { 223, 5, 5, 5 };
+                var packet = new byte[10 + query.Length];
+                packet[3] = 0x01;
+                dnsServer.CopyTo(packet, 4);
+                packet[8] = 0;
+                packet[9] = 53;
+                query.CopyTo(packet, 10);
+
+                var response = await QueryUdpAsync(
+                    new IPEndPoint(boundAddress, boundPort),
+                    packet,
+                    6000,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (response == null || response.Length <= 10)
+                {
+                    return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, "UDP 无响应");
+                }
+
+                var payload = new byte[response.Length - 10];
+                Buffer.BlockCopy(response, 10, payload, 0, payload.Length);
+                var ok = payload.Length >= 12 && payload[0] == query[0] && payload[1] == query[1];
+                return new LabTestResult(
+                    "Sidecar UDP ASSOCIATE",
+                    ok,
+                    sw.ElapsedMilliseconds,
+                    $"UDP 端点 {boundAddress}:{boundPort}，DNS 响应 {payload.Length} 字节");
+            }
+            catch (Exception ex)
+            {
+                return new LabTestResult("Sidecar UDP ASSOCIATE", false, sw.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        static async Task<byte[]?> QueryUdpAsync(
+            IPEndPoint endpoint,
+            byte[] payload,
+            int timeoutMilliseconds,
+            CancellationToken cancellationToken)
+        {
+            using var udp = new UdpClient(endpoint.AddressFamily);
+            await udp.SendAsync(payload, payload.Length, endpoint).ConfigureAwait(false);
+
+            var receiveTask = udp.ReceiveAsync();
+            var completed = await Task.WhenAny(
+                receiveTask,
+                Task.Delay(timeoutMilliseconds, cancellationToken)).ConfigureAwait(false);
+            if (completed != receiveTask) return null;
+            return receiveTask.Result.Buffer;
+        }
+
+        static byte[] BuildDnsQuery(string host)
+        {
+            var id = (ushort)new Random().Next(1, ushort.MaxValue);
+            var labels = host.Split('.');
+            var length = 12 + 1;
+            foreach (var label in labels) length += 1 + label.Length;
+            length += 4;
+
+            var buffer = new byte[length];
+            buffer[0] = (byte)(id >> 8);
+            buffer[1] = (byte)(id & 0xFF);
+            buffer[2] = 0x01; // RD
+            buffer[4] = 0x00; buffer[5] = 0x01; // QDCOUNT
+
+            var offset = 12;
+            foreach (var label in labels)
+            {
+                var bytes = Encoding.ASCII.GetBytes(label);
+                buffer[offset++] = (byte)bytes.Length;
+                bytes.CopyTo(buffer, offset);
+                offset += bytes.Length;
+            }
+            buffer[offset++] = 0;
+            buffer[offset++] = 0x00; buffer[offset++] = 0x01; // A
+            buffer[offset++] = 0x00; buffer[offset] = 0x01;   // IN
+            return buffer;
+        }
+
+        static async Task<bool> ReadExactAsync(System.IO.Stream stream, byte[] buffer, CancellationToken cancellationToken)
+        {
+            var total = 0;
+            while (total < buffer.Length)
+            {
+                var read = await stream.ReadAsync(buffer, total, buffer.Length - total, cancellationToken).ConfigureAwait(false);
+                if (read <= 0) return false;
+                total += read;
+            }
+            return true;
+        }
+
         static async Task<LabTestResult> CheckTcpAsync(string host, int port, CancellationToken cancellationToken)
         {
             var sw = Stopwatch.StartNew();
@@ -264,16 +494,18 @@ namespace System.Application.Services.Implementation
             var sb = new StringBuilder();
             sb.AppendLine($"代理模式: {ProxySettings.ProxyModeValue}");
             sb.AppendLine($"免证书模式: {ProxySettings.IsCertificateLessMode.Value}");
-            sb.AppendLine($"DevSidecar 规则: {ProxySettings.EnableDevSidecarRules.Value}（组: {ProxySettings.DevSidecarRuleGroups.Value}）");
+            sb.AppendLine($"DevSidecar 规则: {ProxySettings.EnableDevSidecarRules.Value}（分组 {ProxyRuleEngine.GroupStats.Count} 个，关闭组: {ProxySettings.DevSidecarDisabledGroups.Value}）");
+            sb.AppendLine($"远程规则: {ProxyRuleEngine.Remote.Rules.Count} 条，实际启用 {ProxyRuleEngine.Current.Rules.Count} 条，预置 IP {ProxyRuleEngine.Remote.PresetIps.Count} 组");
             sb.AppendLine($"自定义规则: {ProxySettings.EnableCustomRules.Value}，{ProxyRuleEngine.CustomRuleCount} 条");
             sb.AppendLine($"SNI 分片: {ProxySettings.EnableSniFragment.Value}，策略: {SniConnectivityTester.GetStrategyName(ProxySettings.SniFragmentStrategy.Value)}");
             sb.AppendLine($"分片参数: 大小 {ProxySettings.SniFragmentChunkSize.Value}B，段数 {ProxySettings.SniSplitPieces.Value}，延迟 {ProxySettings.SniFragmentDelayMilliseconds.Value}ms，抖动 {ProxySettings.SniFragmentJitterMilliseconds.Value}ms");
             sb.AppendLine($"分片域名: {ProxySettings.SniFragmentDomains.Value}");
             sb.AppendLine($"分片回退: {ProxySettings.EnableSniFragmentFallback.Value}，探测 {ProxySettings.SniFragmentFallbackProbeMilliseconds.Value}ms，缓存 {ProxySettings.SniFragmentFallbackCacheMinutes.Value} 分钟");
             sb.AppendLine($"SNI 改写: {ProxySettings.EnableSniRewrite.Value}，目标: {ProxySettings.SniRewriteHost.Value}");
-            sb.AppendLine($"Sidecar 端口: {ProxySettings.SniFragmentPortId.Value}");
+            sb.AppendLine($"Sidecar 端口: {ProxySettings.SniFragmentPortId.Value}，实际: {(SniSidecarService.IsRunning ? SniSidecarService.ActivePort : 0)}");
             sb.AppendLine($"上游中继: {ProxySettings.EnableSniUpstreamRelay.Value}，{ProxySettings.SniUpstreamRelayHost.Value}:{ProxySettings.SniUpstreamRelayPort.Value}，域名: {(string.IsNullOrWhiteSpace(ProxySettings.SniUpstreamRelayDomains.Value) ? "全部" : ProxySettings.SniUpstreamRelayDomains.Value)}");
-            sb.AppendLine($"DoH: {ProxySettings.EnableDoh.Value}，{ProxySettings.DohEndpoint.Value}，回退系统 DNS: {ProxySettings.DohFallbackToSystem.Value}");
+            sb.AppendLine($"DoH: {ProxySettings.EnableDoh.Value}，JSON: {ProxySettings.DohEndpoint.Value}，wire: {ProxySettings.DohWireEndpoint.Value}，回退: {ProxySettings.DohFallbackToSystem.Value}");
+            sb.AppendLine($"DNS 代理: {ProxySettings.EnableDnsProxy.Value}，端口: {ProxySettings.DnsProxyPortId.Value}，实际: {(DnsProxyService.IsRunning ? DnsProxyService.ActivePort : 0)}，回退 DNS: {ProxySettings.DnsFallbackServers.Value}");
             sb.AppendLine($"诊断日志: {ProxySettings.EnableProxyDiagnostics.Value}，级别 {ProxySettings.ProxyDiagnosticsMinimumLevel.Value}，保留 {ProxySettings.ProxyDiagnosticsRetentionDays.Value} 天");
             sb.AppendLine($"仅浏览器 VPN: {ProxySettings.EnableBrowserOnlyVpn.Value}");
             return sb.ToString();
@@ -304,7 +536,9 @@ namespace System.Application.Services.Implementation
             sb.AppendLine(SniSidecarStats.ToDisplayString());
             sb.AppendLine("策略命中: " + SniSidecarStats.GetStrategySummary());
             sb.AppendLine("回退域名: " + SniSidecarStats.GetHostFallbackSummary());
+            sb.AppendLine("DNS 代理: " + DnsProxyServer.GetStats());
             sb.AppendLine($"回退缓存条目: {FragmentFallbackCache.Count}");
+            sb.AppendLine("规则分组: " + string.Join("，", ProxyRuleEngine.GroupStats.Select(x => $"{x.Name}={x.ServiceCount}")));
 
             if (includeLog)
             {

@@ -2,6 +2,7 @@ using System;
 using System.Application.Settings;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -123,6 +124,7 @@ namespace System.Application.Services.Implementation
                     TlsFragmentStrategy.SniBoundary,
                     TlsFragmentStrategy.SniPieces,
                     TlsFragmentStrategy.TlsRecordSplit,
+                    TlsFragmentStrategy.TlsRecordSplitRandom,
                     TlsFragmentStrategy.Fixed,
                     TlsFragmentStrategy.Record,
                     TlsFragmentStrategy.Random,
@@ -179,6 +181,7 @@ namespace System.Application.Services.Implementation
             ProxySettings.SniFragmentStrategyRecord => "TLS 记录头",
             ProxySettings.SniFragmentStrategySniPieces => "SNI 多段",
             ProxySettings.SniFragmentStrategyTlsRecordSplit => "TLS record 拆分",
+            ProxySettings.SniFragmentStrategyTlsRecordSplitRandom => "TLS record 随机拆分",
             ProxySettings.SniFragmentStrategyRandom => "随机分片",
             _ => "SNI 边界",
         };
@@ -223,6 +226,50 @@ namespace System.Application.Services.Implementation
                 var stream = client.GetStream();
 
                 if (!await SocksConnectAsync(stream, host, port, timeout.Token).ConfigureAwait(false))
+                {
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "SOCKS5 连接被拒绝");
+                }
+
+                if (!await HandshakeAsync(stream, host, timeoutSeconds, cancellationToken).ConfigureAwait(false))
+                {
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
+                }
+                return SniProbeResult.Ok(sw.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                return SniProbeResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
+            }
+        }
+
+        /// <summary>
+        /// 模拟 VPN/tun2socks 的真实路径：SOCKS CONNECT 只给 IP，TLS 握手再提供 SNI。
+        /// 用于验证 sidecar 是否真的会从 ClientHello 里识别域名并执行分片。
+        /// </summary>
+        public static async Task<SniProbeResult> ProbeViaSidecarIpAsync(
+            string host,
+            int port,
+            int sidecarPort,
+            int timeoutSeconds,
+            CancellationToken cancellationToken)
+        {
+            using var client = new TcpClient();
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var addresses = await Dns.GetHostAddressesAsync(host).ConfigureAwait(false);
+                var address = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork) ??
+                              addresses.FirstOrDefault();
+                if (address == null)
+                {
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "无法解析目标 IP");
+                }
+
+                using var timeout = CreateTimeout(cancellationToken, timeoutSeconds);
+                await ConnectWithTimeoutAsync(client, IPAddress.Loopback.ToString(), sidecarPort, timeout.Token).ConfigureAwait(false);
+                var stream = client.GetStream();
+
+                if (!await SocksConnectAsync(stream, address.ToString(), port, timeout.Token).ConfigureAwait(false))
                 {
                     return SniProbeResult.Fail(sw.ElapsedMilliseconds, "SOCKS5 连接被拒绝");
                 }

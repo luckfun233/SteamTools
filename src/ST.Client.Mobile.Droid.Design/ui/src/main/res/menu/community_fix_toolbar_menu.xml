@@ -4,6 +4,14 @@
   xmlns:tools="http://schemas.android.com/tools">
 
   <item
+    android:id="@+id/menu_rule_groups"
+    android:icon="@drawable/baseline_checklist_black_24"
+    android:title="规则组"
+    app:iconTint="@color/icon_background"
+    app:showAsAction="always"
+    tools:title="规则组 / 服务" />
+
+  <item
     android:id="@+id/menu_settings_proxy"
     android:icon="@drawable/baseline_settings_black_24"
     android:title=""
