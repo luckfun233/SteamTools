@@ -215,7 +215,19 @@ namespace System.Application.Services.Implementation
                         target.Dispose();
                         try
                         {
-                            target = await ConnectAsync(host, req.Port, excluded, connectionCts.Token).ConfigureAwait(false);
+                            // VPN 只传 IP 时，优先用 DevSidecar preSetIpList 里延迟最低的 IP 重试，
+                            // 避免继续连到被污染/被黑洞的地址。
+                            var retryHost = host;
+                            var preferredIp = await ResolveFallbackIpAsync(
+                                effectiveHost, req.Port, rules, excludedBySni, connectionCts.Token).ConfigureAwait(false);
+                            if (preferredIp != null && !string.Equals(preferredIp.ToString(), host, StringComparison.OrdinalIgnoreCase))
+                            {
+                                retryHost = preferredIp.ToString();
+                                ProxyDiagnostics.Info("SniSidecar", $"回退改用预置 IP: {effectiveHost} -> {retryHost}");
+                                SniSidecarStats.OnPresetIp();
+                            }
+
+                            target = await ConnectAsync(retryHost, req.Port, excludedBySni, connectionCts.Token).ConfigureAwait(false);
                             target.NoDelay = true;
                             targetStream = target.GetStream();
                             probe = await SendFirstPayloadAsync(
@@ -553,6 +565,31 @@ namespace System.Application.Services.Implementation
                 TimeSpan.FromMilliseconds(800),
                 cancellationToken).ConfigureAwait(false);
             return best ?? dohIps[0];
+        }
+
+        /// <summary>
+        /// 分片失败、需要换 IP 重试时，从 DevSidecar 预置 IP 里选一个延迟最低的。
+        /// </summary>
+        static async Task<IPAddress?> ResolveFallbackIpAsync(
+            string host,
+            int port,
+            ProxyRuleSet rules,
+            bool excluded,
+            CancellationToken cancellationToken)
+        {
+            if (excluded || IPAddress.TryParse(host, out _)) return null;
+
+            var candidates = rules.GetPresetIps(host)
+                .Concat(GetBuiltInPresetIps(host))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (candidates.Count == 0) return null;
+
+            return await PresetIpSelector.PickAsync(
+                candidates,
+                port,
+                TimeSpan.FromMilliseconds(800),
+                cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
