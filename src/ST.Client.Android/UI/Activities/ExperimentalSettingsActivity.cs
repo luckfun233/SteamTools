@@ -244,6 +244,9 @@ namespace System.Application.UI.Activities
             AddSwitch(card, "Hugging Face 兜底 IP",
                 "为 Hugging Face 域名补充 CloudFront 兜底 IP；远程配置里的 IP 会优先。",
                 ProxySettings.EnableHuggingFaceFallback);
+            AddSwitch(card, "允许 UDP / HTTP/3（QUIC）",
+                "允许应用通过 UDP 443 直连，可能绕过只针对 TCP SNI 的 DPI。关闭后 tun2socks 不再启用 UDP 转发。",
+                ProxySettings.EnableUdpRelay);
 
             var advanced = AddExpander(card, "高级 DNS 与 DoH");
             AddSwitch(advanced, "仅 DoH（不启用本地 DNS 代理）", "调试用。一般保持上面的“安全 DNS”开启即可。", ProxySettings.EnableDoh);

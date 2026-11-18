@@ -196,6 +196,70 @@ public class DnsAndSniIntegrationTest
     }
 
     [Test]
+    public async Task SniSidecar_Uses_PresetIp_When_Requested_Ip_Is_Blackholed()
+    {
+        var originalFragment = ProxySettings.EnableSniFragment.Value;
+        var originalStrategy = ProxySettings.SniFragmentStrategy.Value;
+        var originalDomains = ProxySettings.SniFragmentDomains.Value;
+        var originalPort = ProxySettings.SniFragmentPortId.Value;
+        var originalDoh = ProxySettings.EnableDoh.Value;
+        var sidecarPort = GetFreeTcpPort();
+
+        using var server = new LocalTlsServer();
+        server.Start();
+
+        var rules = DevSidecarConfigLoader.Parse(@"{
+  preSetIpList: {
+    ""hf.test"": [""127.0.0.1""],
+  },
+}");
+        ProxyRuleEngine.Apply(rules);
+
+        try
+        {
+            ProxySettings.EnableSniFragment.Value = true;
+            ProxySettings.SniFragmentStrategy.Value = ProxySettings.SniFragmentStrategyTlsRecordSplit;
+            ProxySettings.SniFragmentDomains.Value = "hf.test";
+            ProxySettings.SniFragmentPortId.Value = sidecarPort;
+            ProxySettings.EnableDoh.Value = false;
+            SniSidecarService.Start(force: true);
+            Assert.That(SniSidecarService.IsRunning, Is.True);
+
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, SniSidecarService.ActivePort);
+            var stream = client.GetStream();
+            await stream.WriteAsync(new byte[] { 0x05, 0x01, 0x00 }, 0, 3);
+            var greeting = new byte[2];
+            await ReadExactAsync(stream, greeting);
+
+            // 请求一个不可达 IP，SNI 才是真实域名；sidecar 应在读到 SNI 后改用预置 IP。
+            var request = new byte[] { 0x05, 0x01, 0x00, 0x01, 10, 255, 255, 1, (byte)(server.Port >> 8), (byte)(server.Port & 0xFF) };
+            await stream.WriteAsync(request, 0, request.Length);
+            var reply = new byte[10];
+            await ReadExactAsync(stream, reply);
+            Assert.That(reply[1], Is.EqualTo(0x00));
+
+            using var ssl = new SslStream(stream, true, (_, _, _, _) => true);
+            await ssl.AuthenticateAsClientAsync("hf.test");
+            var payload = Encoding.ASCII.GetBytes("hello");
+            await ssl.WriteAsync(payload, 0, payload.Length);
+            var buffer = new byte[2];
+            await ReadExactAsync(ssl, buffer);
+            Assert.That(Encoding.ASCII.GetString(buffer), Is.EqualTo("ok"));
+        }
+        finally
+        {
+            SniSidecarService.Stop();
+            ProxyRuleEngine.Apply(ProxyRuleSet.Empty);
+            ProxySettings.EnableSniFragment.Value = originalFragment;
+            ProxySettings.SniFragmentStrategy.Value = originalStrategy;
+            ProxySettings.SniFragmentDomains.Value = originalDomains;
+            ProxySettings.SniFragmentPortId.Value = originalPort;
+            ProxySettings.EnableDoh.Value = originalDoh;
+        }
+    }
+
+    [Test]
     public async Task DnsProxy_Uses_Doh_When_Enabled()
     {
         var originalDoh = ProxySettings.EnableDoh.Value;

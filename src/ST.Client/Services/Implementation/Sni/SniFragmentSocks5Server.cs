@@ -140,30 +140,53 @@ namespace System.Application.Services.Implementation
                     var rules = ProxyRuleEngine.Current;
                     var excluded = rules.IsExcluded(host);
 
-                    try
-                    {
-                        target = await ConnectAsync(host, req.Port, excluded, connectionCts.Token).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        SniSidecarStats.OnFailure();
-                        ProxyDiagnostics.Warn("SniSidecar", $"连接 {host}:{req.Port} 失败: {ex.Message}");
-                        await WriteReplyAsync(clientStream, SocksReply.HostUnreachable).ConfigureAwait(false);
-                        return;
-                    }
-
-                    target.NoDelay = true;
-                    var targetStream = target.GetStream();
+                    // 先回 SOCKS 成功，再读 ClientHello、选 IP、连目标。
+                    // 否则目标 IP 被黑洞时，tun2socks 会一直等 SOCKS 响应，连 SNI 都拿不到，
+                    // 预置 IP / 上游中继也就没有机会生效。
                     await WriteReplyAsync(clientStream, SocksReply.Succeeded).ConfigureAwait(false);
 
-                    // 先拿到客户端的第一个负载；TLS 客户端会立即发送 ClientHello。
-                    // 对 SMTP/IMAP 等“服务器先说”的协议，等一小段时间后按普通双向转发处理。
                     var firstPayload = await ReadFirstPayloadAsync(
                         clientStream,
                         Math.Max(100, ProxySettings.SniFragmentReadTimeoutMilliseconds.Value),
                         connectionCts.Token).ConfigureAwait(false);
 
-                    if (firstPayload.Data == null)
+                    // VPN/tun2socks 只能拿到目标 IP，真正的域名在 ClientHello 的 SNI 里。
+                    var effectiveHost = host;
+                    if (firstPayload.Data != null &&
+                        TlsClientHello.TryGetSni(firstPayload.Data, out var payloadSni) &&
+                        !string.IsNullOrWhiteSpace(payloadSni))
+                    {
+                        effectiveHost = payloadSni!;
+                        if (!string.Equals(effectiveHost, host, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ProxyDiagnostics.Info("SniSidecar", $"从 ClientHello 识别域名: {host} -> {effectiveHost}");
+                        }
+                    }
+
+                    var payload = firstPayload.Data == null ? null : MaybeRewriteSni(firstPayload.Data, effectiveHost);
+                    var excludedBySni = excluded || rules.IsExcluded(effectiveHost);
+
+                    try
+                    {
+                        target = await ConnectWithFallbackAsync(
+                            host,
+                            effectiveHost,
+                            req.Port,
+                            excludedBySni,
+                            connectionCts.Token).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        SniSidecarStats.OnFailure();
+                        ProxyDiagnostics.Warn("SniSidecar", $"连接 {effectiveHost}:{req.Port} 失败: {ex.Message}");
+                        // SOCKS 成功已经发出，只能关闭连接让客户端尽快重试。
+                        return;
+                    }
+
+                    target.NoDelay = true;
+                    var targetStream = target.GetStream();
+
+                    if (payload == null)
                     {
                         if (!firstPayload.TimedOut) return;
 
@@ -177,27 +200,12 @@ namespace System.Application.Services.Implementation
                         return;
                     }
 
-                    // VPN/tun2socks 只能拿到目标 IP，真正的域名在 ClientHello 的 SNI 里。
-                    // 规则匹配、分片白名单和 SNI 改写都必须使用这个域名，否则在 VPN 模式下
-                    // 所有域名规则都会因为 host 是 IP 而失效。
-                    var effectiveHost = host;
-                    if (IPAddress.TryParse(host, out _) &&
-                        TlsClientHello.TryGetSni(firstPayload.Data, out var payloadSni) &&
-                        !string.IsNullOrWhiteSpace(payloadSni))
-                    {
-                        effectiveHost = payloadSni!;
-                        ProxyDiagnostics.Info("SniSidecar", $"从 ClientHello 识别域名: {host} -> {effectiveHost}");
-                    }
-
-                    var payload = MaybeRewriteSni(firstPayload.Data, effectiveHost);
-                    var excludedBySni = excluded || rules.IsExcluded(effectiveHost);
-
-                    var fragment = ShouldFragment(effectiveHost, payload, excludedBySni) &&
+                    var fragment = ShouldFragment(effectiveHost, payload!, excludedBySni) &&
                                    !FragmentFallbackCache.ShouldSkip(effectiveHost);
 
                     var probe = await SendFirstPayloadAsync(
                         targetStream,
-                        payload,
+                        payload!,
                         fragment,
                         effectiveHost,
                         req.Port,
@@ -215,24 +223,18 @@ namespace System.Application.Services.Implementation
                         target.Dispose();
                         try
                         {
-                            // VPN 只传 IP 时，优先用 DevSidecar preSetIpList 里延迟最低的 IP 重试，
-                            // 避免继续连到被污染/被黑洞的地址。
-                            var retryHost = host;
-                            var preferredIp = await ResolveFallbackIpAsync(
-                                effectiveHost, req.Port, rules, excludedBySni, connectionCts.Token).ConfigureAwait(false);
-                            if (preferredIp != null && !string.Equals(preferredIp.ToString(), host, StringComparison.OrdinalIgnoreCase))
-                            {
-                                retryHost = preferredIp.ToString();
-                                ProxyDiagnostics.Info("SniSidecar", $"回退改用预置 IP: {effectiveHost} -> {retryHost}");
-                                SniSidecarStats.OnPresetIp();
-                            }
-
-                            target = await ConnectAsync(retryHost, req.Port, excludedBySni, connectionCts.Token).ConfigureAwait(false);
+                            target = await ConnectWithFallbackAsync(
+                                host,
+                                effectiveHost,
+                                req.Port,
+                                excludedBySni,
+                                connectionCts.Token,
+                                preferOriginalFirst: true).ConfigureAwait(false);
                             target.NoDelay = true;
                             targetStream = target.GetStream();
                             probe = await SendFirstPayloadAsync(
                                 targetStream,
-                                payload,
+                                payload!,
                                 fragment: false,
                                 effectiveHost,
                                 req.Port,
@@ -466,52 +468,154 @@ namespace System.Application.Services.Implementation
             return result;
         }
 
-        async Task<TcpClient> ConnectAsync(string host, int port, bool excluded, CancellationToken cancellationToken)
+        async Task<TcpClient> ConnectWithFallbackAsync(
+            string requestedHost,
+            string effectiveHost,
+            int port,
+            bool excluded,
+            CancellationToken cancellationToken,
+            bool preferOriginalFirst = false)
         {
-            if (ProxySettings.EnableSniUpstreamRelay.Value && !excluded &&
-                IsDomainAllowed(host, ProxySettings.SniUpstreamRelayDomains.Value))
+            // 有上游中继时优先走中继，并把真实域名交给中继解析。
+            if (!excluded &&
+                ProxySettings.EnableSniUpstreamRelay.Value &&
+                IsDomainAllowed(effectiveHost, ProxySettings.SniUpstreamRelayDomains.Value) &&
+                !IPAddress.TryParse(effectiveHost, out _))
             {
-                var relayHost = ProxySettings.SniUpstreamRelayHost.Value?.Trim();
-                var relayPort = ProxySettings.SniUpstreamRelayPort.Value;
-                if (string.IsNullOrWhiteSpace(relayHost) || relayPort <= 0 || relayPort > 65535)
-                {
-                    throw new InvalidOperationException("上游中继地址无效");
-                }
+                return await ConnectViaRelayAsync(effectiveHost, port, cancellationToken).ConfigureAwait(false);
+            }
 
-                var relay = new TcpClient { NoDelay = true };
-                try
+            var attempts = new List<string>();
+            var presetSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!excluded)
+            {
+                var presetIps = ProxyPresetIpProvider.GetCandidates(effectiveHost)
+                    .Concat(GetBuiltInPresetIps(effectiveHost))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (presetIps.Count > 0)
                 {
-                    await relay.ConnectAsync(relayHost, relayPort).ConfigureAwait(false);
-                    await NegotiateUpstreamAsync(
-                        relay.GetStream(),
-                        host,
+                    var selected = await PresetIpSelector.PickAsync(
+                        presetIps,
                         port,
-                        ProxySettings.SniUpstreamRelayUserName.Value,
-                        ProxySettings.SniUpstreamRelayPassword.Value,
+                        TimeSpan.FromMilliseconds(600),
                         cancellationToken).ConfigureAwait(false);
-                    SniSidecarStats.OnRelay();
-                    ProxyDiagnostics.Info("SniSidecar", $"经中继 {relayHost}:{relayPort} -> {host}:{port}");
-                    return relay;
-                }
-                catch
-                {
-                    relay.Dispose();
-                    throw;
+                    if (selected != null)
+                    {
+                        attempts.Add(selected.ToString());
+                        presetSet.Add(selected.ToString());
+                    }
+
+                    foreach (var ip in presetIps)
+                    {
+                        if (!attempts.Contains(ip, StringComparer.OrdinalIgnoreCase))
+                        {
+                            attempts.Add(ip);
+                        }
+                        presetSet.Add(ip);
+                    }
                 }
             }
 
+            if (preferOriginalFirst)
+            {
+                attempts.Insert(0, requestedHost);
+            }
+            else
+            {
+                attempts.Add(requestedHost);
+            }
+
+            if (!IPAddress.TryParse(effectiveHost, out _) &&
+                !attempts.Contains(effectiveHost, StringComparer.OrdinalIgnoreCase))
+            {
+                attempts.Add(effectiveHost);
+            }
+
+            Exception? lastError = null;
+            foreach (var candidate in attempts.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var target = await ConnectOnceAsync(candidate, port, cancellationToken).ConfigureAwait(false);
+                    if (presetSet.Contains(candidate))
+                    {
+                        SniSidecarStats.OnPresetIp();
+                        ProxyDiagnostics.Info("SniSidecar", $"使用预置 IP 连接: {effectiveHost} -> {candidate}:{port}");
+                    }
+                    else
+                    {
+                        ProxyDiagnostics.Info("SniSidecar", $"直连: {effectiveHost} -> {candidate}:{port}");
+                    }
+                    return target;
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    lastError = ex;
+                    ProxyDiagnostics.Warn("SniSidecar", $"连接 {candidate}:{port} 失败: {ex.Message}");
+                }
+            }
+
+            throw lastError ?? new IOException($"无法连接 {effectiveHost}:{port}");
+        }
+
+        async Task<TcpClient> ConnectViaRelayAsync(string host, int port, CancellationToken cancellationToken)
+        {
+            var relayHost = ProxySettings.SniUpstreamRelayHost.Value?.Trim();
+            var relayPort = ProxySettings.SniUpstreamRelayPort.Value;
+            if (string.IsNullOrWhiteSpace(relayHost) || relayPort <= 0 || relayPort > 65535)
+            {
+                throw new InvalidOperationException("上游中继地址无效");
+            }
+
+            var relay = new TcpClient { NoDelay = true };
+            try
+            {
+                var connectTask = relay.ConnectAsync(relayHost, relayPort);
+                var completed = await Task.WhenAny(
+                    connectTask,
+                    Task.Delay(TimeSpan.FromSeconds(8), cancellationToken)).ConfigureAwait(false);
+                if (completed != connectTask)
+                {
+                    relay.Dispose();
+                    throw new TimeoutException($"中继 {relayHost}:{relayPort} 连接超时");
+                }
+                await connectTask.ConfigureAwait(false);
+
+                await NegotiateUpstreamAsync(
+                    relay.GetStream(),
+                    host,
+                    port,
+                    ProxySettings.SniUpstreamRelayUserName.Value,
+                    ProxySettings.SniUpstreamRelayPassword.Value,
+                    cancellationToken).ConfigureAwait(false);
+                SniSidecarStats.OnRelay();
+                ProxyDiagnostics.Info("SniSidecar", $"经中继 {relayHost}:{relayPort} -> {host}:{port}");
+                return relay;
+            }
+            catch
+            {
+                relay.Dispose();
+                throw;
+            }
+        }
+
+        static async Task<TcpClient> ConnectOnceAsync(string host, int port, CancellationToken cancellationToken)
+        {
             var target = new TcpClient { NoDelay = true };
             try
             {
-                var presetIp = await ResolveTargetIpAsync(host, port, excluded, cancellationToken).ConfigureAwait(false);
-                if (presetIp != null)
+                var connectTask = target.ConnectAsync(host, port);
+                var completed = await Task.WhenAny(
+                    connectTask,
+                    Task.Delay(TimeSpan.FromSeconds(6), cancellationToken)).ConfigureAwait(false);
+                if (completed != connectTask)
                 {
-                    await target.ConnectAsync(new IPEndPoint(presetIp, port)).ConfigureAwait(false);
+                    throw new TimeoutException($"连接 {host}:{port} 超时");
                 }
-                else
-                {
-                    await target.ConnectAsync(host, port).ConfigureAwait(false);
-                }
+                await connectTask.ConfigureAwait(false);
                 return target;
             }
             catch
@@ -526,14 +630,12 @@ namespace System.Application.Services.Implementation
             if (excluded) return null;
             if (IPAddress.TryParse(host, out var literal)) return literal;
 
-            var rules = ProxyRuleEngine.Current;
-            var presetIps = rules.GetPresetIps(host);
-            var builtInIps = GetBuiltInPresetIps(host);
-            if (presetIps.Count > 0 || builtInIps.Count > 0)
+            var candidates = ProxyPresetIpProvider.GetCandidates(host)
+                .Concat(GetBuiltInPresetIps(host))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (candidates.Count > 0)
             {
-                var candidates = presetIps.Concat(builtInIps)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
                 var selected = await PresetIpSelector.PickAsync(
                     candidates,
                     port,
@@ -565,31 +667,6 @@ namespace System.Application.Services.Implementation
                 TimeSpan.FromMilliseconds(800),
                 cancellationToken).ConfigureAwait(false);
             return best ?? dohIps[0];
-        }
-
-        /// <summary>
-        /// 分片失败、需要换 IP 重试时，从 DevSidecar 预置 IP 里选一个延迟最低的。
-        /// </summary>
-        static async Task<IPAddress?> ResolveFallbackIpAsync(
-            string host,
-            int port,
-            ProxyRuleSet rules,
-            bool excluded,
-            CancellationToken cancellationToken)
-        {
-            if (excluded || IPAddress.TryParse(host, out _)) return null;
-
-            var candidates = rules.GetPresetIps(host)
-                .Concat(GetBuiltInPresetIps(host))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (candidates.Count == 0) return null;
-
-            return await PresetIpSelector.PickAsync(
-                candidates,
-                port,
-                TimeSpan.FromMilliseconds(800),
-                cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>

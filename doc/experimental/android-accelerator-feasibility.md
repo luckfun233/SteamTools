@@ -568,14 +568,18 @@ ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 真机实验室报告暴露的问题与处理：
 
 1. **Hugging Face 仍然打不开**
-   - 官方远程配置里 `*.huggingface.co` 的规则是 `sni: huggingface.cn` + `verifyHost: huggingface.cn`，这需要 MITM/根证书；免证书模式无法改写 SNI 后通过证书校验。
-   - 官方 `preSetIpList` 里有 `3.167.200.113`，但原来的 VPN 只把 IP 交给 sidecar，预置 IP 没有被 DNS 使用。
-   - 修复：本地 DNS 代理现在会把 `preSetIpList` 直接写进 A/AAAA 响应；Hugging Face 额外提供 CloudFront 兜底 IP。这样应用会主动连接预置 IP，再由 sidecar 做 TLS record 分片。
-   - 仍不承诺所有网络可用：如果该 IP 也被封，或 DPI 会完整重组 TLS handshake，只能走中继。HTTP/3（UDP 443）现在通过 UDP ASSOCIATE 直连转发，是另一条免证书路径。
+   - 官方远程配置里 `*.huggingface.co` 的规则是 `sni: huggingface.cn` + `verifyHost: huggingface.cn`，这需要 MITM/根证书；免证书模式无法改写 SNI 后通过证书校验。桌面端之所以“100% 能用”，是因为它在 MITM 层同时改写 SNI/Host 并用自己的证书答复客户端。
+   - 官方 `preSetIpList` 里有 `3.167.200.113`，但原来的 VPN 只把 IP 交给 sidecar，预置 IP 没有被 DNS 使用；而且浏览器可能开启 Private DNS/DoH，完全绕过本地 DNS 代理。
+   - 修复：
+     - 本地 DNS 代理把 `preSetIpList` 直接写进 A/AAAA 响应；
+     - sidecar 改为 **先回 SOCKS 成功、再读 ClientHello、再连目标**，因此即使目标 IP 被黑洞、DNS 被绕过，也能从 SNI 认出域名并改用预置 IP；
+     - Hugging Face 额外提供 CloudFront 兜底 IP；
+     - 设置页新增“允许 UDP / HTTP/3（QUIC）”开关。
+   - 仍不承诺所有网络可用：如果预置 IP 也被封、或 DPI 会完整重组 TLS handshake，免证书模式无法像桌面 MITM 一样保证 100%，只能走中继或 HTTP/3。
 
 2. **远端规则“看起来太少”**
    - 旧实现只把带 `sni`/`proxy`/`redirect`/头替换/abort 的规则计入分组，所以只有 69 条、25 组。
-   - 现在额外收集 `intercepts` 里所有域名、`preSetIpList`、`dns.mapping`、`whiteList`、`dns.ech.domains`、`dns.nat64.domains`、`familyMapping`、`overwall.targets`，形成完整服务目录；服务分组页面会展示所有组和服务，即使该服务当前没有可执行的 MITM 规则。
+   - 现在额外收集 `intercepts` 里所有域名、`preSetIpList`、`dns.mapping`、`whiteList`、`dns.ech.domains`、`dns.nat64.domains`、`familyMapping`、`overwall.targets`，形成完整服务目录；实测 **30 组 / 174 个服务**。服务分组页面会展示所有组和服务，即使该服务当前没有可执行的 MITM 规则。
 
 3. **客户端错误 1006 / 加速页空白**
    - `api/Accelerate/All` 需要登录，未登录或返回非 MessagePack 时会反复抛 `ClientException`（1006），加速页图标和列表都加载失败。

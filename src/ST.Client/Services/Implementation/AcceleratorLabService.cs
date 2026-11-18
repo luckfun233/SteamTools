@@ -508,7 +508,7 @@ namespace System.Application.Services.Implementation
             sb.AppendLine($"上游中继: {ProxySettings.EnableSniUpstreamRelay.Value}，{ProxySettings.SniUpstreamRelayHost.Value}:{ProxySettings.SniUpstreamRelayPort.Value}，域名: {(string.IsNullOrWhiteSpace(ProxySettings.SniUpstreamRelayDomains.Value) ? "全部" : ProxySettings.SniUpstreamRelayDomains.Value)}");
             sb.AppendLine($"DoH: {ProxySettings.EnableDoh.Value}，JSON: {ProxySettings.DohEndpoint.Value}，wire: {ProxySettings.DohWireEndpoint.Value}，回退: {ProxySettings.DohFallbackToSystem.Value}");
             sb.AppendLine($"DNS 代理: {ProxySettings.EnableDnsProxy.Value}，端口: {ProxySettings.DnsProxyPortId.Value}，实际: {(DnsProxyService.IsRunning ? DnsProxyService.ActivePort : 0)}，回退 DNS: {ProxySettings.DnsFallbackServers.Value}");
-            sb.AppendLine($"DNS 预置 IP: {ProxySettings.EnableDnsPresetIp.Value}，HuggingFace 兜底: {ProxySettings.EnableHuggingFaceFallback.Value}");
+            sb.AppendLine($"DNS 预置 IP: {ProxySettings.EnableDnsPresetIp.Value}，HuggingFace 兜底: {ProxySettings.EnableHuggingFaceFallback.Value}，UDP/QUIC: {ProxySettings.EnableUdpRelay.Value}");
             sb.AppendLine($"诊断日志: {ProxySettings.EnableProxyDiagnostics.Value}，级别 {ProxySettings.ProxyDiagnosticsMinimumLevel.Value}，保留 {ProxySettings.ProxyDiagnosticsRetentionDays.Value} 天");
             sb.AppendLine($"仅浏览器 VPN: {ProxySettings.EnableBrowserOnlyVpn.Value}");
             return sb.ToString();

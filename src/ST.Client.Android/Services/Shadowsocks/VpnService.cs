@@ -210,14 +210,19 @@ namespace System.Application.Services.Native
                         VPN_MTU_STR,
                         "--loglevel",
                         "notice",
-                        "--enable-udprelay",
-                        "--udprelay-max-connections",
-                        "64",
                         "--sock-path",
                         "sock_path",
                         "--netif-ip6addr",
                         "da26:2626::2"
                     };
+
+                    // QUIC/HTTP/3 走 UDP。默认开启；如果运营商 QoS/阻断 UDP，可在设置里关闭。
+                    if (ProxySettings.EnableUdpRelay.Value)
+                    {
+                        args.Add("--enable-udprelay");
+                        args.Add("--udprelay-max-connections");
+                        args.Add("64");
+                    }
 
                     // 本地 DNS 代理优先级最高：DNS 不再依赖 SOCKS5 UDP ASSOCIATE。
                     if (DnsProxyService.IsRunning)

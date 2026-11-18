@@ -257,11 +257,7 @@ namespace System.Application.Services.Implementation
             if (qtype != 1 && qtype != 28) return null;
             if (!ProxyRuleEngine.IsServiceEnabled(host)) return null;
 
-            var candidates = ProxyRuleEngine.Current.GetPresetIps(host).ToList();
-            if (ProxySettings.EnableHuggingFaceFallback.Value && IsHuggingFaceHost(host))
-            {
-                candidates.AddRange(GetHuggingFaceFallbackIps(host));
-            }
+            var candidates = ProxyPresetIpProvider.GetCandidates(host);
 
             var addresses = new List<IPAddress>();
             foreach (var candidate in candidates)
@@ -312,28 +308,6 @@ namespace System.Application.Services.Implementation
             }
 
             return null;
-        }
-
-        static bool IsHuggingFaceHost(string host)
-        {
-            if (string.IsNullOrEmpty(host)) return false;
-            return host.Equals("hf.co", StringComparison.OrdinalIgnoreCase) ||
-                   host.EndsWith(".hf.co", StringComparison.OrdinalIgnoreCase) ||
-                   host.EndsWith(".huggingface.co", StringComparison.OrdinalIgnoreCase) ||
-                   host.Equals("huggingface.co", StringComparison.OrdinalIgnoreCase);
-        }
-
-        static IEnumerable<string> GetHuggingFaceFallbackIps(string host)
-        {
-            if (host.Equals("hf.co", StringComparison.OrdinalIgnoreCase))
-            {
-                return ProxySettings.HfCoIpList.Split(';');
-            }
-            if (host.EndsWith(".hf.co", StringComparison.OrdinalIgnoreCase))
-            {
-                return ProxySettings.HfCdnIpList.Split(';');
-            }
-            return ProxySettings.HuggingFaceApexIpList.Split(';');
         }
 
         static bool TryGetCache(string key, byte[] query, out byte[] response)

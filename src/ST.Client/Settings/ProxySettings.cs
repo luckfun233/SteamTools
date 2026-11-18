@@ -409,6 +409,12 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: true, autoSave: false);
 
     /// <summary>
+    /// 是否允许 UDP 转发（QUIC/HTTP/3、部分游戏/语音）。关闭后 tun2socks 不再启用 UDP relay。
+    /// </summary>
+    public static SerializableProperty<bool> EnableUdpRelay { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
     /// 是否启用本地 DNS 代理。VPN 模式通过 tun2socks --dnsgw 把 UDP:53 送到本机。
     /// </summary>
     public static SerializableProperty<bool> EnableDnsProxy { get; }
@@ -547,6 +553,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         EnableDnsProxy.Value = true;
         EnableDnsPresetIp.Value = true;
         EnableHuggingFaceFallback.Value = true;
+        EnableUdpRelay.Value = true;
         EnableSniFragment.Value = true;
         SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;
         SniFragmentMaxBufferBytes.Value = 65536;
@@ -602,6 +609,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         DnsProxyPortId.Value = 8870;
         EnableDnsPresetIp.Value = true;
         EnableHuggingFaceFallback.Value = true;
+        EnableUdpRelay.Value = true;
         DnsFallbackServers.Value = DefaultDnsFallbackServers;
 
         EnableProxyDiagnostics.Value = true;
