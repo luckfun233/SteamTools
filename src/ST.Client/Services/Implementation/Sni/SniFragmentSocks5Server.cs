@@ -228,8 +228,7 @@ namespace System.Application.Services.Implementation
                                 effectiveHost,
                                 req.Port,
                                 excludedBySni,
-                                connectionCts.Token,
-                                preferOriginalFirst: true).ConfigureAwait(false);
+                                connectionCts.Token).ConfigureAwait(false);
                             target.NoDelay = true;
                             targetStream = target.GetStream();
                             probe = await SendFirstPayloadAsync(
@@ -535,30 +534,95 @@ namespace System.Application.Services.Implementation
             }
 
             Exception? lastError = null;
-            foreach (var candidate in attempts.Distinct(StringComparer.OrdinalIgnoreCase))
+            var candidates = attempts
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(8)
+                .ToList();
+
+            // 并发连接（happy eyeballs）：预置 IP 可能有好几个，顺序试会太慢。
+            // 有预置 IP 时，原始 IP 延迟 500ms 再试，避免被污染的 IP 抢先连上。
+            using var raceCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var originalDelay = presetSet.Count > 0 && !preferOriginalFirst ? 500 : 0;
+            var tasks = candidates
+                .Select(candidate => TryConnectAfterAsync(
+                    candidate,
+                    port,
+                    presetSet.Contains(candidate) ? 0 : originalDelay,
+                    raceCts.Token))
+                .ToList();
+
+            while (tasks.Count > 0)
             {
-                try
+                var completed = await Task.WhenAny(tasks).ConfigureAwait(false);
+                tasks.Remove(completed);
+                var result = await completed.ConfigureAwait(false);
+                if (result.Client == null)
                 {
-                    var target = await ConnectOnceAsync(candidate, port, cancellationToken).ConfigureAwait(false);
-                    if (presetSet.Contains(candidate))
-                    {
-                        SniSidecarStats.OnPresetIp();
-                        ProxyDiagnostics.Info("SniSidecar", $"使用预置 IP 连接: {effectiveHost} -> {candidate}:{port}");
-                    }
-                    else
-                    {
-                        ProxyDiagnostics.Info("SniSidecar", $"直连: {effectiveHost} -> {candidate}:{port}");
-                    }
-                    return target;
+                    lastError = result.Error ?? lastError;
+                    continue;
                 }
-                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+
+                raceCts.Cancel();
+                foreach (var task in tasks)
                 {
-                    lastError = ex;
-                    ProxyDiagnostics.Warn("SniSidecar", $"连接 {candidate}:{port} 失败: {ex.Message}");
+                    _ = task.ContinueWith(t =>
+                    {
+                        if (t.Status == TaskStatus.RanToCompletion && t.Result.Client != null)
+                        {
+                            t.Result.Client.Dispose();
+                        }
+                    }, TaskScheduler.Default);
                 }
+
+                if (presetSet.Contains(result.Host))
+                {
+                    SniSidecarStats.OnPresetIp();
+                    ProxyDiagnostics.Info("SniSidecar", $"使用预置 IP 连接: {effectiveHost} -> {result.Host}:{port}");
+                }
+                else
+                {
+                    ProxyDiagnostics.Info("SniSidecar", $"直连: {effectiveHost} -> {result.Host}:{port}");
+                }
+                return result.Client;
             }
 
             throw lastError ?? new IOException($"无法连接 {effectiveHost}:{port}");
+        }
+
+        static async Task<(string Host, TcpClient? Client, Exception? Error)> TryConnectAfterAsync(
+            string host,
+            int port,
+            int delayMilliseconds,
+            CancellationToken cancellationToken)
+        {
+            if (delayMilliseconds > 0)
+            {
+                try
+                {
+                    await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return (host, null, null);
+                }
+            }
+            return await TryConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
+        }
+
+        static async Task<(string Host, TcpClient? Client, Exception? Error)> TryConnectAsync(
+            string host,
+            int port,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var client = await ConnectOnceAsync(host, port, cancellationToken).ConfigureAwait(false);
+                return (host, client, null);
+            }
+            catch (Exception ex)
+            {
+                return (host, null, ex);
+            }
         }
 
         async Task<TcpClient> ConnectViaRelayAsync(string host, int port, CancellationToken cancellationToken)
