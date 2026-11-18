@@ -1,0 +1,72 @@
+Watt Toolkit 加速实验室报告
+时间: 2026-11-18 21:57:48 +08:00
+设备: OPPO PDSM00 / Android 13 (API 33) / arm64-v8a,armeabi-v7a,armeabi
+VPN: 未授权，根证书: 未安装
+
+== 设置快照 ==
+代理模式: VPN
+免证书模式: True
+DevSidecar 规则: True（分组 25 个，关闭组: ）
+远程规则: 69 条，实际启用 69 条，预置 IP 59 组
+自定义规则: True，0 条
+SNI 分片: True，策略: TLS record 拆分
+分片参数: 大小 64B，段数 3，延迟 10ms，抖动 0ms
+分片域名: github.com;*.githubusercontent.com;*.githubassets.com;github.dev;huggingface.co;*.huggingface.co;*.hf.co;pixiv.net;*.pixiv.net;*.pixiv.org;pximg.net;*.pximg.net;*.fanbox.cc
+分片回退: True，探测 1200ms，缓存 10 分钟
+SNI 改写: False，目标: baidu.com
+Sidecar 端口: 8869，实际: 8869
+上游中继: False，127.0.0.1:7890，域名: 全部
+DoH: True，JSON: https://dns.alidns.com/resolve，wire: https://dns.alidns.com/dns-query，回退: True
+DNS 代理: True，端口: 8870，实际: 8870，回退 DNS: 223.5.5.5;119.29.29.29
+诊断日志: True，级别 0，保留 7 天
+仅浏览器 VPN: False
+
+== 测试结果 ==
+[PASS] 规则集 (0ms) 自定义 0 条，远程启用 69 条，排除 53 条，预置 IP 59 组
+[INFO] 当前设置 (0ms) 模式=VPN，免证书=True，SNI 分片=True，策略=TLS record 拆分，DoH=True，中继=False
+[PASS] 系统 DNS (66ms) 20.205.243.166
+[PASS] DoH 解析 (0ms) 20.205.243.166
+[PASS] DoH wire (84ms) 响应 55 字节，RCODE=0，https://dns.alidns.com/dns-query
+[PASS] 本地 DNS 代理 (78ms) 127.0.0.1:8870，响应 55 字节，RCODE=0
+[FAIL] TCP 443 (6003ms) 连接超时
+[PASS] 直连 TLS 握手 (562ms) 成功
+[PASS] Sidecar TLS 握手 (1640ms) 成功（策略 TLS record 拆分）
+[FAIL] Sidecar TLS（IP + SNI） (8092ms) 超时/已取消
+[PASS] Sidecar UDP ASSOCIATE (115ms) UDP 端点 127.0.0.1:35897，DNS 响应 55 字节
+[INFO] Titanium 代理 HTTP (0ms) 代理未运行，已跳过
+[INFO] UDP 443 探测 (335ms) 已发送探测包；UDP 无连接，无法据此判断是否被阻断
+[INFO] 根证书 (0ms) 未安装，只能使用免证书隧道或 IP/预置 IP
+[INFO] 设备 (0ms) OPPO PDSM00 / Android 13 (API 33) / arm64-v8a,armeabi-v7a,armeabi
+VPN: 未授权，根证书: 未安装
+
+== 运行统计 ==
+连接 9 / 分片 4 / 改写 0 / 预置IP 3 / 中继 0 / 回退 0 / 重连 0 / 失败 0
+策略命中: TlsRecordSplit=4
+回退域名: 无
+DNS 代理: 查询 3，缓存 1，DoH 尝试 2 成功 8，回退 0，失败 0，上行 84B，下行 165B
+回退缓存条目: 0
+规则分组: apkmirror=1，Claude.ai=1，DockerHub=3，Dropbox=1，DuckDuckGo=2，f-droid=3，GitHub=11，Google=16，GreasyFork=5，HuggingFace=1，Microsoft=1，OneDrive=1，Pixiv=5，Pixiv站点相关=2，Reddit=5，startpage=1，Steam=8，vueJS=1，WebArchive=2，Wikipedia=4，X/Twitter=4，YouTube=6，Z-lib=2，其它站点=6，未分组=1
+
+== 最近诊断日志 ==
+--- proxy-2026-11-18.log ---
+2026-11-18 21:55:34.484 [INFO] [Rules] 自定义 0 条 + 远程启用 0 条 = 0 条，关闭组 ，关闭服务 
+2026-11-18 21:55:34.502 [INFO] [SniSidecar] SOCKS5 已启动 127.0.0.1:8869
+2026-11-18 21:55:34.513 [INFO] [DnsProxy] 本地 DNS 代理已启动 127.0.0.1:8870
+2026-11-18 21:55:36.758 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-18 21:55:36.759 [INFO] [Rules] 启动后台同步 DevSidecar 配置完成
+2026-11-18 21:56:11.822 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-18 21:56:16.538 [INFO] [DoH] github.com -> 20.205.243.166
+2026-11-18 21:56:18.541 [INFO] [IPSelector] 选择 20.27.177.113 (166ms): 20.200.245.247,20.27.177.113,20.205.243.166:443
+2026-11-18 21:56:18.543 [INFO] [SniSidecar] 预置 IP: github.com -> 20.27.177.113
+2026-11-18 21:56:18.906 [INFO] [SniSidecar] 分片: github.com:443 策略=TlsRecordSplit 段数=3 大小=256 延迟=10ms 抖动=0ms
+2026-11-18 21:56:19.548 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.247.166.64 -> github.com
+2026-11-18 21:56:19.584 [INFO] [SniSidecar] 分片: github.com:443 策略=TlsRecordSplit 段数=3 大小=256 延迟=10ms 抖动=0ms
+2026-11-18 21:56:19.953 [INFO] [SniSidecar] UDP ASSOCIATE 已建立 127.0.0.1:51692
+2026-11-18 21:56:51.216 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-18 21:57:17.795 [INFO] [SniSidecar] 预置 IP: github.com -> 20.27.177.113
+2026-11-18 21:57:17.993 [INFO] [SniSidecar] 分片: github.com:443 策略=TlsRecordSplit 段数=3 大小=256 延迟=10ms 抖动=0ms
+2026-11-18 21:57:26.451 [INFO] [SniSidecar] UDP ASSOCIATE 已建立 127.0.0.1:32889
+2026-11-18 21:57:38.182 [INFO] [SniSidecar] 预置 IP: github.com -> 20.27.177.113
+2026-11-18 21:57:39.361 [INFO] [SniSidecar] 分片: github.com:443 策略=TlsRecordSplit 段数=3 大小=256 延迟=10ms 抖动=0ms
+2026-11-18 21:57:47.916 [INFO] [SniSidecar] UDP ASSOCIATE 已建立 127.0.0.1:35897
+
