@@ -133,7 +133,9 @@ namespace System.Application.Services.Implementation
                 var remoteActive = Math.Max(0, current.Rules.Count - customActive);
                 var detail =
                     $"自定义 {ProxyRuleEngine.CustomRuleCount} 条，远程启用 {remoteActive} 条，" +
-                    $"排除 {current.ExcludePatterns.Count} 条，预置 IP {current.PresetIps.Count} 组";
+                    $"服务 {ProxyRuleEngine.Remote.Services.Count} 个，分组 {ProxyRuleEngine.GroupStats.Count} 个，" +
+                    $"排除 {current.ExcludePatterns.Count} 条，预置 IP {current.PresetIps.Count} 组，" +
+                    $"dns.mapping {current.DnsMappings.Count} 条";
                 if (!string.IsNullOrEmpty(ProxyRuleEngine.LastCustomError))
                 {
                     detail += $"；自定义规则错误: {ProxyRuleEngine.LastCustomError}";
@@ -494,7 +496,7 @@ namespace System.Application.Services.Implementation
             var sb = new StringBuilder();
             sb.AppendLine($"代理模式: {ProxySettings.ProxyModeValue}");
             sb.AppendLine($"免证书模式: {ProxySettings.IsCertificateLessMode.Value}");
-            sb.AppendLine($"DevSidecar 规则: {ProxySettings.EnableDevSidecarRules.Value}（分组 {ProxyRuleEngine.GroupStats.Count} 个，关闭组: {ProxySettings.DevSidecarDisabledGroups.Value}）");
+            sb.AppendLine($"DevSidecar 规则: {ProxySettings.EnableDevSidecarRules.Value}（分组 {ProxyRuleEngine.GroupStats.Count} 个，服务 {ProxyRuleEngine.Remote.Services.Count} 个，关闭组: {ProxySettings.DevSidecarDisabledGroups.Value}）");
             sb.AppendLine($"远程规则: {ProxyRuleEngine.Remote.Rules.Count} 条，实际启用 {ProxyRuleEngine.Current.Rules.Count} 条，预置 IP {ProxyRuleEngine.Remote.PresetIps.Count} 组");
             sb.AppendLine($"自定义规则: {ProxySettings.EnableCustomRules.Value}，{ProxyRuleEngine.CustomRuleCount} 条");
             sb.AppendLine($"SNI 分片: {ProxySettings.EnableSniFragment.Value}，策略: {SniConnectivityTester.GetStrategyName(ProxySettings.SniFragmentStrategy.Value)}");
@@ -506,6 +508,7 @@ namespace System.Application.Services.Implementation
             sb.AppendLine($"上游中继: {ProxySettings.EnableSniUpstreamRelay.Value}，{ProxySettings.SniUpstreamRelayHost.Value}:{ProxySettings.SniUpstreamRelayPort.Value}，域名: {(string.IsNullOrWhiteSpace(ProxySettings.SniUpstreamRelayDomains.Value) ? "全部" : ProxySettings.SniUpstreamRelayDomains.Value)}");
             sb.AppendLine($"DoH: {ProxySettings.EnableDoh.Value}，JSON: {ProxySettings.DohEndpoint.Value}，wire: {ProxySettings.DohWireEndpoint.Value}，回退: {ProxySettings.DohFallbackToSystem.Value}");
             sb.AppendLine($"DNS 代理: {ProxySettings.EnableDnsProxy.Value}，端口: {ProxySettings.DnsProxyPortId.Value}，实际: {(DnsProxyService.IsRunning ? DnsProxyService.ActivePort : 0)}，回退 DNS: {ProxySettings.DnsFallbackServers.Value}");
+            sb.AppendLine($"DNS 预置 IP: {ProxySettings.EnableDnsPresetIp.Value}，HuggingFace 兜底: {ProxySettings.EnableHuggingFaceFallback.Value}");
             sb.AppendLine($"诊断日志: {ProxySettings.EnableProxyDiagnostics.Value}，级别 {ProxySettings.ProxyDiagnosticsMinimumLevel.Value}，保留 {ProxySettings.ProxyDiagnosticsRetentionDays.Value} 天");
             sb.AppendLine($"仅浏览器 VPN: {ProxySettings.EnableBrowserOnlyVpn.Value}");
             return sb.ToString();

@@ -199,13 +199,15 @@ namespace System.Application.ProxyRules
             IReadOnlyList<string> excludePatterns,
             IReadOnlyDictionary<string, IReadOnlyList<string>> presetIps,
             IReadOnlyDictionary<string, string>? presetIpGroups = null,
-            IReadOnlyList<DnsMapping>? dnsMappings = null)
+            IReadOnlyList<DnsMapping>? dnsMappings = null,
+            IReadOnlyList<ProxyServiceInfo>? services = null)
         {
             Rules = rules;
             ExcludePatterns = excludePatterns;
             PresetIps = presetIps;
             PresetIpGroups = presetIpGroups ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             DnsMappings = dnsMappings ?? Array.Empty<DnsMapping>();
+            Services = services ?? Array.Empty<ProxyServiceInfo>();
         }
 
         public IReadOnlyList<ProxyRule> Rules { get; }
@@ -223,6 +225,12 @@ namespace System.Application.ProxyRules
         /// DevSidecar 的 dns.mapping：域名 → HTTPS DoH 接口。只保留能直接使用的 HTTPS provider。
         /// </summary>
         public IReadOnlyList<DnsMapping> DnsMappings { get; }
+
+        /// <summary>
+        /// 配置里出现的全部服务（域名），即使没有可执行的 MITM 规则也会保留，
+        /// 这样服务分组页面能与桌面端 DevSidecar 一致地展示所有组。
+        /// </summary>
+        public IReadOnlyList<ProxyServiceInfo> Services { get; }
 
         /// <summary>
         /// 为指定域名选择 DevSidecar dns.mapping 里的 DoH 接口。
@@ -408,7 +416,26 @@ namespace System.Application.ProxyRules
                 }
             }
 
-            return new ProxyRuleSet(rules, excludes, presetIps, presetIpGroups, lowPriority.DnsMappings);
+            var services = new Dictionary<string, ProxyServiceInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in lowPriority.Services)
+            {
+                services[item.DomainPattern] = item;
+            }
+            foreach (var item in highPriority.Services)
+            {
+                services[item.DomainPattern] = item;
+            }
+
+            var dnsMappings = new List<DnsMapping>(highPriority.DnsMappings);
+            foreach (var item in lowPriority.DnsMappings)
+            {
+                if (!dnsMappings.Any(x => string.Equals(x.DomainPattern, item.DomainPattern, StringComparison.OrdinalIgnoreCase)))
+                {
+                    dnsMappings.Add(item);
+                }
+            }
+
+            return new ProxyRuleSet(rules, excludes, presetIps, presetIpGroups, dnsMappings, services.Values.ToList());
         }
 
         /// <summary>
@@ -441,7 +468,12 @@ namespace System.Application.ProxyRules
                 }
             }
 
-            return new ProxyRuleSet(rules, ExcludePatterns, presetIps, presetIpGroups, DnsMappings);
+            var services = Services.Where(x =>
+                string.IsNullOrEmpty(x.Group) ||
+                string.Equals(x.Group, ProxyRuleGroups.Custom, StringComparison.OrdinalIgnoreCase) ||
+                enabledGroups.Contains(x.Group!)).ToList();
+
+            return new ProxyRuleSet(rules, ExcludePatterns, presetIps, presetIpGroups, DnsMappings, services);
         }
 
         /// <summary>
@@ -478,7 +510,15 @@ namespace System.Application.ProxyRules
                 dnsMappings.Add(item);
             }
 
-            return new ProxyRuleSet(rules, ExcludePatterns, presetIps, presetIpGroups, dnsMappings);
+            var services = new List<ProxyServiceInfo>(Services.Count);
+            foreach (var item in Services)
+            {
+                if (disabledServices.Contains(item.DomainPattern)) continue;
+                if (!string.IsNullOrEmpty(item.Group) && disabledGroups.Contains(item.Group!)) continue;
+                services.Add(item);
+            }
+
+            return new ProxyRuleSet(rules, ExcludePatterns, presetIps, presetIpGroups, dnsMappings, services);
         }
 
         string? ResolveGroup(string domain)
@@ -496,9 +536,46 @@ namespace System.Application.ProxyRules
         public IReadOnlyList<ProxyRuleGroupStat> GetGroups()
         {
             var map = new Dictionary<string, ProxyRuleGroupStat>(StringComparer.OrdinalIgnoreCase);
-            var seenServices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            void AddRule(string? group, string service)
+            if (Services.Count > 0)
+            {
+                foreach (var service in Services)
+                {
+                    var group = string.IsNullOrEmpty(service.Group)
+                        ? ResolveGroup(service.DomainPattern)
+                        : service.Group;
+                    Add(group, service.DomainPattern, service.RuleCount);
+                }
+            }
+            else
+            {
+                // 兼容没有服务目录的旧缓存/自定义规则。
+                var seenServices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                void AddRule(string? group, string service)
+                {
+                    if (string.Equals(group, ProxyRuleGroups.Custom, StringComparison.OrdinalIgnoreCase)) return;
+                    var id = string.IsNullOrEmpty(group) ? ProxyRuleGroups.Unclassified : group!;
+                    if (!map.TryGetValue(id, out var stat))
+                    {
+                        stat = new ProxyRuleGroupStat(id, id);
+                        map[id] = stat;
+                    }
+                    if (seenServices.Add(id + "\u0001" + service))
+                    {
+                        stat.Services.Add(service);
+                    }
+                    stat.RuleCount++;
+                }
+
+                foreach (var rule in Rules) AddRule(rule.Group, rule.DomainPattern);
+                foreach (var item in PresetIps) AddRule(ResolveGroup(item.Key), item.Key);
+                foreach (var item in DnsMappings)
+                {
+                    AddRule(string.IsNullOrEmpty(item.Group) ? ResolveGroup(item.DomainPattern) : item.Group, item.DomainPattern);
+                }
+            }
+
+            void Add(string? group, string service, int ruleCount)
             {
                 if (string.Equals(group, ProxyRuleGroups.Custom, StringComparison.OrdinalIgnoreCase)) return;
                 var id = string.IsNullOrEmpty(group) ? ProxyRuleGroups.Unclassified : group!;
@@ -507,24 +584,11 @@ namespace System.Application.ProxyRules
                     stat = new ProxyRuleGroupStat(id, id);
                     map[id] = stat;
                 }
-                if (seenServices.Add(id + "\u0001" + service))
+                if (!stat.Services.Contains(service, StringComparer.OrdinalIgnoreCase))
                 {
                     stat.Services.Add(service);
                 }
-                stat.RuleCount++;
-            }
-
-            foreach (var rule in Rules)
-            {
-                AddRule(rule.Group, rule.DomainPattern);
-            }
-            foreach (var item in PresetIps)
-            {
-                AddRule(ResolveGroup(item.Key), item.Key);
-            }
-            foreach (var item in DnsMappings)
-            {
-                AddRule(string.IsNullOrEmpty(item.Group) ? ResolveGroup(item.DomainPattern) : item.Group, item.DomainPattern);
+                stat.RuleCount += ruleCount;
             }
 
             var list = map.Values.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -539,6 +603,19 @@ namespace System.Application.ProxyRules
         {
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(host)) return Array.Empty<string>();
+
+            if (Services.Count > 0)
+            {
+                foreach (var item in Services)
+                {
+                    if (DomainPatternMatcher.IsMatch(host, item.DomainPattern))
+                    {
+                        result.Add(item.DomainPattern);
+                    }
+                }
+                return result.ToList();
+            }
+
             foreach (var rule in Rules)
             {
                 if (DomainPatternMatcher.IsMatch(host, rule.DomainPattern))
@@ -600,6 +677,52 @@ namespace System.Application.ProxyRules
         public string Endpoint { get; }
 
         public string? Group { get; }
+    }
+
+    /// <summary>
+    /// 服务目录中的一项。一个服务 = 配置里出现的一个域名/通配符。
+    /// </summary>
+    public sealed class ProxyServiceInfo
+    {
+        public ProxyServiceInfo(string domainPattern, string? group)
+        {
+            DomainPattern = domainPattern;
+            Group = group;
+        }
+
+        public string DomainPattern { get; }
+
+        public string? Group { get; set; }
+
+        /// <summary>可执行的 MITM/分片规则数量。</summary>
+        public int RuleCount { get; set; }
+
+        /// <summary>预置 IP 数量。</summary>
+        public int PresetIpCount { get; set; }
+
+        /// <summary>DevSidecar dns.mapping 里配置的 provider 名称。</summary>
+        public string? DnsProvider { get; set; }
+
+        /// <summary>可直接使用的 HTTPS DoH 接口。</summary>
+        public string? DnsEndpoint { get; set; }
+
+        public bool InWhiteList { get; set; }
+
+        public bool InEch { get; set; }
+
+        public bool InNat64 { get; set; }
+
+        public ProxyServiceInfo Clone()
+            => new(DomainPattern, Group)
+            {
+                RuleCount = RuleCount,
+                PresetIpCount = PresetIpCount,
+                DnsProvider = DnsProvider,
+                DnsEndpoint = DnsEndpoint,
+                InWhiteList = InWhiteList,
+                InEch = InEch,
+                InNat64 = InNat64,
+            };
     }
 
     /// <summary>

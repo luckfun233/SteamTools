@@ -35,6 +35,8 @@ namespace System.Application.UI.Activities
         LinearLayout? container;
         TextView? statusView;
         bool building = true;
+        const int ExportLogRequestCode = 4301;
+        string? pendingLogExport;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -161,37 +163,12 @@ namespace System.Application.UI.Activities
         void BuildDevSidecarSection()
         {
             var card = AddSection(
-                "DevSidecar 兼容规则",
-                "读取官方 remote_config.json5，只执行代理相关子集：域名/路径匹配、SNI、镜像、反代、预置 IP、请求/响应头替换。不会执行它的 Node 脚本。自定义规则会和远程规则合并，并优先匹配。");
+                "DevSidecar 规则",
+                "规则和分组来自 DevSidecar 的 remote_config.json5。主界面只需要管理分组；下面的高级项一般不用改。");
 
-            AddSwitch(card, "启用 DevSidecar 规则", "总开关。关闭后仍可使用自定义规则。", ProxySettings.EnableDevSidecarRules);
-            AddSwitch(card, "启动时同步配置", "启动加速时重新下载；关闭则优先使用本地缓存。", ProxySettings.SyncDevSidecarConfigOnStartup);
-            AddNumber(card, "后台同步间隔（小时）", "0 表示只在启动时同步；默认 6 小时。", ProxySettings.DevSidecarAutoSyncHours, 0, 168);
-            AddText(card, "配置地址", "仅支持 HTTPS，修改后点“立即同步”。", ProxySettings.DevSidecarConfigUrl, false, InputTypes.ClassText | InputTypes.TextVariationUri);
+            AddSwitch(card, "启用 DevSidecar 远程规则", "总开关。关闭后规则组和自定义规则都不生效。", ProxySettings.EnableDevSidecarRules);
 
-            AddSubTitle(card, "自定义规则");
-            AddSwitch(card, "启用自定义规则", "与远程规则合并，优先匹配；关闭后自定义规则不参与任何链路。", ProxySettings.EnableCustomRules);
-            AddParagraphTo(card, "使用 DevSidecar 的 intercepts 格式，可省略 server 包装。支持 SNI、镜像、反代、阻断、请求/响应头替换和预置 IP。");
-
-            var customRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-            customRow.AddView(CreateButton("管理自定义规则", () =>
-            {
-                StartActivity(new Intent(this, typeof(CustomRulesActivity)));
-            }, true), WeightedButtonParams());
-            customRow.AddView(CreateButton("重新加载", () =>
-            {
-                ProxyRuleEngine.ReloadCustom();
-                RefreshStatus();
-                ShowToast($"已加载 {ProxyRuleEngine.CustomRuleCount} 条自定义规则");
-            }, false), WeightedButtonParams());
-            card.AddView(customRow);
-
-            AddSubTitle(card, "服务分组");
-            AddParagraphTo(card, "分组名读取自 remote_config.json5 的 // 注释，与 DevSidecar 2.3.x 一致。可以按组开关，也可以单独关闭某个服务；支持包含、正则和匹配域名三种搜索。");
-            AddText(card, "已关闭的分组", "分号分隔，默认全部开启。留空表示所有组都启用。", ProxySettings.DevSidecarDisabledGroups, false);
-            AddText(card, "已关闭的服务", "分号分隔的域名/通配符，例如 ads.example.com。", ProxySettings.DevSidecarDisabledServices, false);
-
-            var groupButton = CreateButton("打开规则组 / 服务分组（可搜索）", () =>
+            var groupButton = CreateButton("打开规则组 / 服务分组（搜索、开关、全部开启）", () =>
             {
                 StartActivity(new Intent(this, typeof(RuleGroupsActivity)));
             }, true);
@@ -199,101 +176,201 @@ namespace System.Application.UI.Activities
                 ViewGroup.LayoutParams.MatchParent, Dp(44));
             card.AddView(groupButton);
 
+            var customButton = CreateButton("管理自定义规则", () =>
+            {
+                StartActivity(new Intent(this, typeof(CustomRulesActivity)));
+            }, false);
+            customButton.LayoutParameters = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, Dp(42));
+            card.AddView(customButton);
+
+            var advanced = AddExpander(card, "高级规则设置");
+            AddSwitch(advanced, "启动时同步配置", "启动加速时重新下载；关闭则优先使用本地缓存。", ProxySettings.SyncDevSidecarConfigOnStartup);
+            AddNumber(advanced, "后台同步间隔（小时）", "0 表示只在启动时同步。", ProxySettings.DevSidecarAutoSyncHours, 0, 168);
+            AddText(advanced, "配置地址", "仅支持 HTTPS。", ProxySettings.DevSidecarConfigUrl, false, InputTypes.ClassText | InputTypes.TextVariationUri);
+            AddSwitch(advanced, "启用自定义规则", "与远程规则合并，优先匹配。", ProxySettings.EnableCustomRules);
+            AddText(advanced, "已关闭的分组", "分号分隔；一般通过规则组页面操作。", ProxySettings.DevSidecarDisabledGroups, false);
+            AddText(advanced, "已关闭的服务", "分号分隔的域名/通配符；一般通过规则组页面操作。", ProxySettings.DevSidecarDisabledServices, false);
+
             var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             actions.AddView(CreateButton("立即同步并应用", SyncRulesAsync, true), WeightedButtonParams());
             actions.AddView(CreateButton("重新应用本地规则", ApplyRules, false), WeightedButtonParams());
-            card.AddView(actions);
+            advanced.AddView(actions);
         }
 
         void BuildCertificateLessSection()
         {
             var card = AddSection(
                 "免证书模式与 SNI 分片",
-                "不安装根证书时使用：本地 SOCKS5 只做 TCP 转发，不终止 TLS。分片把 ClientHello 拆成多段，绕过只检查首包的 DPI；对会重组流的设备无效。");
+                "不安装根证书时使用：本地 SOCKS5 只做 TCP 转发，不终止 TLS。默认已经开启；只有遇到问题时才需要改下面的参数。");
 
-            AddSwitch(card, "免证书模式", "开启后 VPN 出口切换到本地 SNI sidecar，不再做 MITM、镜像和脚本注入。", ProxySettings.IsCertificateLessMode);
-            AddParagraphTo(card, "只有免证书模式或系统未安装根证书时，VPN 才会使用 sidecar；已安装根证书且关闭免证书模式时，流量仍走 Titanium 的 MITM/规则链路，此时 SNI 分片设置不会生效。");
-
-            AddSwitch(card, "启用 SNI 分片", "只对下方列出的域名做分片，其它流量原样转发。", ProxySettings.EnableSniFragment);
-            AddChoice(card, "分片策略", "TLS record 拆分：重封装成多个 TLS record，可绕过重组 TCP 但仍按 record 检查的 DPI。TLS record 随机拆分：在 SNI 内部强制切一刀，其余切点随机，更难被指纹。SNI 边界/多段只拆 TCP 段，对能重组 TCP 的 DPI 无效。固定大小/TLS 记录头/随机为兼容选项。",
+            AddSwitch(card, "免证书模式", "开启后 VPN 出口切换到本地 SNI sidecar，不做 MITM/证书安装。", ProxySettings.IsCertificateLessMode);
+            AddSwitch(card, "启用 SNI 分片", "对下方域名拆分 ClientHello，绕过 SNI 阻断。", ProxySettings.EnableSniFragment);
+            AddChoice(card, "分片策略", "推荐 TLS record 拆分；TLS record 随机拆分更难被指纹。SNI 边界/多段只拆 TCP 段，对能重组 TCP 的 DPI 无效。",
                 new[] { "固定大小", "SNI 边界", "TLS 记录头", "SNI 多段", "TLS record 拆分（推荐）", "随机分片", "TLS record 随机拆分" },
                 ProxySettings.SniFragmentStrategy.Value,
                 value => ProxySettings.SniFragmentStrategy.Value = value);
+            AddText(card, "分片生效域名", "分号分隔，支持 * 通配符。默认包含 GitHub/Hugging Face/Pixiv。", ProxySettings.SniFragmentDomains, false);
+            AddSwitch(card, "启用自动回退", "分片失败时自动换 IP/不分片重试一次。", ProxySettings.EnableSniFragmentFallback);
 
-            AddNumber(card, "SNI 多段数", "仅 SNI 多段策略生效。段数越多越难包含完整域名，但握手延迟越高。", ProxySettings.SniSplitPieces, 2, 8);
-            AddNumber(card, "固定分片大小（字节）", "固定大小和随机分片策略使用。过小会产生大量 TCP 段并明显变慢。", ProxySettings.SniFragmentChunkSize, 1, 4096);
-            AddNumber(card, "分片间隔（毫秒）", "每段之间的延迟。0 表示不等待；10~30ms 通常足够。增加延迟可能跨过 DPI 的重组窗口，但会变慢。", ProxySettings.SniFragmentDelayMilliseconds, 0, 1000);
-            AddNumber(card, "随机抖动（毫秒）", "在固定间隔上再加 0~N ms 的随机等待，降低时序指纹。", ProxySettings.SniFragmentJitterMilliseconds, 0, 500);
-            AddNumber(card, "ClientHello 最大缓冲（字节）", "超过后不再等待剩余字节，直接按已有内容转发。", ProxySettings.SniFragmentMaxBufferBytes, 1024, 65536);
-            AddNumber(card, "等待剩余字节超时（毫秒）", "ClientHello 被拆到多个 TCP 包时，等待剩余部分的超时。", ProxySettings.SniFragmentReadTimeoutMilliseconds, 50, 3000);
-            AddText(card, "分片生效域名", "分号分隔，支持 * 通配符。留空表示全部域名。", ProxySettings.SniFragmentDomains, false);
-            AddSwitch(card, "只对 TLS 连接分片", "建议开启，避免影响普通 HTTP 和自定义协议。", ProxySettings.SniFragmentOnlyTls);
+            var advanced = AddExpander(card, "高级分片参数（一般不用改）");
+            AddNumber(advanced, "SNI 多段数", "仅 SNI 多段策略生效。", ProxySettings.SniSplitPieces, 2, 8);
+            AddNumber(advanced, "固定分片大小（字节）", "固定大小和随机分片策略使用。", ProxySettings.SniFragmentChunkSize, 1, 4096);
+            AddNumber(advanced, "分片间隔（毫秒）", "每段之间的延迟，10~30ms 通常足够。", ProxySettings.SniFragmentDelayMilliseconds, 0, 1000);
+            AddNumber(advanced, "随机抖动（毫秒）", "在固定间隔上增加随机等待。", ProxySettings.SniFragmentJitterMilliseconds, 0, 500);
+            AddNumber(advanced, "ClientHello 最大缓冲（字节）", "新版浏览器 ClientHello 可能接近 16KB。", ProxySettings.SniFragmentMaxBufferBytes, 1024, 65536);
+            AddNumber(advanced, "首字节探测超时（毫秒）", "分片后等待上游响应的最长时间。", ProxySettings.SniFragmentFallbackProbeMilliseconds, 100, 5000);
+            AddNumber(advanced, "跳过分片缓存（分钟）", "失败后对该域名暂停分片的时间。", ProxySettings.SniFragmentFallbackCacheMinutes, 1, 1440);
+            AddNumber(advanced, "Sidecar 端口", "本地 SOCKS5 监听端口，仅绑定 127.0.0.1。", ProxySettings.SniFragmentPortId, 1024, 65535);
 
-            AddSubTitle(card, "分片失败自动回退");
-            AddParagraphTo(card, "分片后如果上游立刻断开，sidecar 会换一条连接、改用不分片方式重试一次，并在一段时间内对该域名跳过分片，避免每次连接都先失败。");
-            AddSwitch(card, "启用自动回退", "对分片不友好的网络/中间设备更稳定。", ProxySettings.EnableSniFragmentFallback);
-            AddNumber(card, "首字节探测超时（毫秒）", "分片后等待上游响应的最长时间；超时但没有断开时不视为失败。", ProxySettings.SniFragmentFallbackProbeMilliseconds, 100, 5000);
-            AddNumber(card, "跳过分片缓存（分钟）", "失败后对该域名暂停自动分片的时间。", ProxySettings.SniFragmentFallbackCacheMinutes, 1, 1440);
-
-            AddSubTitle(card, "SNI 改写（实验）");
-            AddParagraphTo(card, "直接改 ClientHello 里的域名。客户端仍按原域名校验证书，只有源站忽略 SNI 或返回原域名证书时才成立，不能作为通用方案。");
-            AddSwitch(card, "启用 SNI 改写", "高风险，仅用于明确知道源站行为的域名。", ProxySettings.EnableSniRewrite);
-            AddText(card, "改写目标", "例如 baidu.com 或 none（none 表示删除 SNI 扩展）。", ProxySettings.SniRewriteHost, false);
-            AddText(card, "允许改写的域名", "分号分隔，支持 * 通配符。", ProxySettings.SniRewriteDomains, false);
-
-            AddNumber(card, "Sidecar 端口", "本地 SOCKS5 监听端口，仅绑定 127.0.0.1。", ProxySettings.SniFragmentPortId, 1024, 65535);
+            var rewrite = AddExpander(advanced, "SNI 改写（高风险，仅特殊站点）");
+            AddParagraphTo(rewrite, "客户端仍按原域名校验证书，只有源站忽略 SNI 或返回原域名证书时才成立，不能作为通用方案。");
+            AddSwitch(rewrite, "启用 SNI 改写", "仅用于明确知道源站行为的域名。", ProxySettings.EnableSniRewrite);
+            AddText(rewrite, "改写目标", "例如 baidu.com 或 none（删除 SNI 扩展）。", ProxySettings.SniRewriteHost, false);
+            AddText(rewrite, "允许改写的域名", "分号分隔，支持 * 通配符。", ProxySettings.SniRewriteDomains, false);
         }
 
         void BuildRelaySection()
         {
             var card = AddSection(
-                "上游中继与 DNS",
-                "中继是免证书场景下最可靠的兜底方式：TLS 端到端，中继看不到 Authorization/Cookie。DoH 只解决 DNS 污染，不解决 IP 黑洞或 SNI 阻断。");
+                "DNS 与上游中继",
+                "安全 DNS 默认开启，负责把被污染的域名解析换成可用 IP。中继只在直连/分片都失败时才需要。");
 
-            AddSwitch(card, "启用上游 SOCKS5 中继", "所有 TCP 流量先到中继，再由中继连接目标；支持用户名/密码认证。", ProxySettings.EnableSniUpstreamRelay);
-            AddText(card, "中继地址", "IP 或域名。", ProxySettings.SniUpstreamRelayHost, false);
-            AddNumber(card, "中继端口", "常见本地代理端口：7890、1080、10808。", ProxySettings.SniUpstreamRelayPort, 1, 65535);
-            AddText(card, "中继生效域名", "分号分隔，支持 * 通配符；留空表示全部（排除列表除外）。", ProxySettings.SniUpstreamRelayDomains, false);
-            AddText(card, "中继用户名", "没有认证时留空。", ProxySettings.SniUpstreamRelayUserName, false);
-            AddText(card, "中继密码", "没有认证时留空。", ProxySettings.SniUpstreamRelayPassword, true);
+            AddSecureDnsSwitch(card);
 
-            AddDivider(card);
-            AddSwitch(card, "启用 DoH", "通过 HTTPS 查询 DNS，避免污染；失败时按下方开关决定是否回退。", ProxySettings.EnableDoh);
-            AddText(card, "DoH JSON 接口", "用于 sidecar 选路，例如 https://dns.alidns.com/resolve。仅支持 HTTPS。", ProxySettings.DohEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
-            AddText(card, "DoH wire 接口", "用于本地 DNS 代理转发完整 DNS 报文，例如 https://dns.alidns.com/dns-query。", ProxySettings.DohWireEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
-            AddSwitch(card, "DoH 失败回退系统 DNS", "关闭后 DoH 失败会返回 SERVFAIL，便于确认 DoH 本身是否可用。", ProxySettings.DohFallbackToSystem);
+            AddSwitch(card, "使用 DevSidecar 预置 IP",
+                "把 remote_config 的 preSetIpList 直接写进 DNS 响应。免证书模式下 GitHub/Hugging Face 依赖它。",
+                ProxySettings.EnableDnsPresetIp);
+            AddSwitch(card, "Hugging Face 兜底 IP",
+                "为 Hugging Face 域名补充 CloudFront 兜底 IP；远程配置里的 IP 会优先。",
+                ProxySettings.EnableHuggingFaceFallback);
 
-            AddDivider(card);
-            AddSwitch(card, "启用本地 DNS 代理", "VPN 模式通过 tun2socks --dnsgw 把 UDP:53 送到 127.0.0.1。这是修复 ERR_NAME_NOT_RESOLVED 的关键开关。", ProxySettings.EnableDnsProxy);
-            AddNumber(card, "DNS 代理端口", "仅绑定 127.0.0.1；被占用时自动向后寻找可用端口。", ProxySettings.DnsProxyPortId, 1024, 65535);
-            AddText(card, "回退 DNS 服务器", "分号分隔，可写 ip 或 ip:port，例如 223.5.5.5;119.29.29.29。", ProxySettings.DnsFallbackServers, false);
+            var advanced = AddExpander(card, "高级 DNS 与 DoH");
+            AddSwitch(advanced, "仅 DoH（不启用本地 DNS 代理）", "调试用。一般保持上面的“安全 DNS”开启即可。", ProxySettings.EnableDoh);
+            AddSwitch(advanced, "本地 DNS 代理", "通过 tun2socks --dnsgw 接管 UDP:53。", ProxySettings.EnableDnsProxy);
+            AddText(advanced, "DoH wire 接口", "用于本地 DNS 代理转发完整 DNS 报文。", ProxySettings.DohWireEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
+            AddText(advanced, "DoH JSON 接口", "用于 sidecar 选路。", ProxySettings.DohEndpoint, false, InputTypes.ClassText | InputTypes.TextVariationUri);
+            AddSwitch(advanced, "DoH 失败回退系统 DNS", "关闭后 DoH 失败会返回 SERVFAIL，便于确认 DoH 是否可用。", ProxySettings.DohFallbackToSystem);
+            AddNumber(advanced, "DNS 代理端口", "仅绑定 127.0.0.1；被占用时自动向后寻找。", ProxySettings.DnsProxyPortId, 1024, 65535);
+            AddText(advanced, "回退 DNS 服务器", "分号分隔，例如 223.5.5.5;119.29.29.29。", ProxySettings.DnsFallbackServers, false);
+
+            var relay = AddExpander(advanced, "上游 SOCKS5 中继（有本地代理时可开）");
+            AddSwitch(relay, "启用上游 SOCKS5 中继", "所有 TCP 先到中继，再由中继连接目标。", ProxySettings.EnableSniUpstreamRelay);
+            AddText(relay, "中继地址", "IP 或域名。", ProxySettings.SniUpstreamRelayHost, false);
+            AddNumber(relay, "中继端口", "常见端口：7890、1080、10808。", ProxySettings.SniUpstreamRelayPort, 1, 65535);
+            AddText(relay, "中继生效域名", "留空表示全部（排除列表除外）。", ProxySettings.SniUpstreamRelayDomains, false);
+            AddText(relay, "中继用户名", "没有认证时留空。", ProxySettings.SniUpstreamRelayUserName, false);
+            AddText(relay, "中继密码", "没有认证时留空。", ProxySettings.SniUpstreamRelayPassword, true);
         }
 
         void BuildVpnAndLogSection()
         {
-            var card = AddSection("VPN 与诊断日志", "日志只写本地应用目录，不记录 Authorization/Cookie/请求体。");
+            var card = AddSection("VPN 与诊断日志", "日志只写本地应用目录，不记录 Authorization/Cookie/请求体。可以先导出再发给别人。");
 
             AddSwitch(card, "增强模式仅浏览器走 VPN", "未安装系统证书时，其它应用可能因 MITM 断网；开启后只把常见浏览器加入 VPN。", ProxySettings.EnableBrowserOnlyVpn);
             AddSwitch(card, "写代理诊断日志", "关闭后不再新增日志，已有日志保留。", ProxySettings.EnableProxyDiagnostics);
-            AddChoice(card, "日志最低级别", "Info 最详细；Warn 只记录警告和错误；Error 只记录错误。",
-                new[] { "Info", "Warn", "Error" },
-                ProxySettings.ProxyDiagnosticsMinimumLevel.Value,
-                value => ProxySettings.ProxyDiagnosticsMinimumLevel.Value = value);
-            AddSwitch(card, "日志保留主机名", "关闭后会把日志里形似域名的文本替换为 ***，便于分享日志。", ProxySettings.ProxyDiagnosticsIncludeHost);
-            AddNumber(card, "日志保留天数", "启动时会清理超过天数的 proxy-*.log。", ProxySettings.ProxyDiagnosticsRetentionDays, 1, 365);
-            AddNumber(card, "单文件上限（KB）", "超过后写入新的时间戳文件。", ProxySettings.ProxyDiagnosticsMaxFileSizeKB, 64, 1048576);
 
             var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-            row.AddView(CreateButton("清理日志", () =>
+            row.AddView(CreateButton("导出日志", ExportLogs, true), WeightedButtonParams());
+            row.AddView(CreateButton("分享日志", ShareLogs, false), WeightedButtonParams());
+            card.AddView(row);
+
+            var row2 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row2.AddView(CreateButton("清理日志", () =>
             {
                 ProxyDiagnostics.Clear();
                 ShowToast("日志已清理");
             }, false), WeightedButtonParams());
-            row.AddView(CreateButton("日志目录", () =>
+            row2.AddView(CreateButton("日志目录", () =>
             {
                 Android.Widget.Toast.MakeText(this, new Java.Lang.String(ProxyDiagnostics.LogDirectory), Android.Widget.ToastLength.Long)?.Show();
             }, false), WeightedButtonParams());
-            card.AddView(row);
+            card.AddView(row2);
+
+            var advanced = AddExpander(card, "高级日志设置");
+            AddChoice(advanced, "日志最低级别", "Info 最详细；Warn 只记录警告和错误；Error 只记录错误。",
+                new[] { "Info", "Warn", "Error" },
+                ProxySettings.ProxyDiagnosticsMinimumLevel.Value,
+                value => ProxySettings.ProxyDiagnosticsMinimumLevel.Value = value);
+            AddSwitch(advanced, "日志保留主机名", "关闭后会把日志里形似域名的文本替换为 ***，便于分享日志。", ProxySettings.ProxyDiagnosticsIncludeHost);
+            AddNumber(advanced, "日志保留天数", "启动时会清理超过天数的 proxy-*.log。", ProxySettings.ProxyDiagnosticsRetentionDays, 1, 365);
+            AddNumber(advanced, "单文件上限（KB）", "超过后写入新的时间戳文件。", ProxySettings.ProxyDiagnosticsMaxFileSizeKB, 64, 1048576);
+        }
+
+        string BuildLogBundle()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Watt Toolkit Android 诊断日志");
+            sb.AppendLine($"时间: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+            sb.AppendLine($"设备: {Build.Manufacturer} {Build.Model} / Android {Build.VERSION.Release} (API {(int)Build.VERSION.SdkInt}) / {string.Join(",", Build.SupportedAbis ?? Array.Empty<string>())}");
+            sb.AppendLine();
+            sb.AppendLine(AcceleratorLabService.BuildSettingsSnapshot());
+            sb.AppendLine("== 最近日志 ==");
+            var logs = ProxyDiagnostics.GetRecentLogText(2000);
+            sb.AppendLine(string.IsNullOrWhiteSpace(logs) ? "(无日志)" : logs);
+            return sb.ToString();
+        }
+
+        void ExportLogs()
+        {
+            pendingLogExport = BuildLogBundle();
+            try
+            {
+                var intent = new Intent(Intent.ActionCreateDocument);
+                intent.AddCategory(Intent.CategoryOpenable);
+                intent.SetType("text/plain");
+                intent.PutExtra(Intent.ExtraTitle, $"watt-logs-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+                StartActivityForResult(intent, ExportLogRequestCode);
+            }
+            catch (Exception ex)
+            {
+                pendingLogExport = null;
+                ShowToast("无法打开文件选择器: " + ex.Message);
+            }
+        }
+
+        void ShareLogs()
+        {
+            try
+            {
+                var text = BuildLogBundle();
+                var intent = new Intent(Intent.ActionSend);
+                intent.SetType("text/plain");
+                intent.PutExtra(Intent.ExtraText, text);
+                StartActivity(Intent.CreateChooser(intent, "分享诊断日志"));
+            }
+            catch (Exception ex)
+            {
+                ShowToast("分享失败: " + ex.Message);
+            }
+        }
+
+        protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+        {
+            base.OnActivityResult(requestCode, resultCode, data);
+            if (requestCode != ExportLogRequestCode) return;
+            if (resultCode != Result.Ok || data?.Data == null || pendingLogExport == null) return;
+
+            try
+            {
+                using var stream = ContentResolver?.OpenOutputStream(data.Data);
+                if (stream == null)
+                {
+                    ShowToast("无法写入所选文件");
+                    return;
+                }
+                using var writer = new System.IO.StreamWriter(stream);
+                writer.Write(pendingLogExport);
+                ShowToast("日志已导出");
+            }
+            catch (Exception ex)
+            {
+                ShowToast("导出失败: " + ex.Message);
+            }
+            finally
+            {
+                pendingLogExport = null;
+            }
         }
 
         void BuildBottomActions()
@@ -503,6 +580,35 @@ namespace System.Application.UI.Activities
                 .Show();
         }
 
+        /// <summary>
+        /// 可折叠的高级设置区域，减少主界面的重复开关。
+        /// </summary>
+        LinearLayout AddExpander(LinearLayout parent, string title)
+        {
+            var header = new TextView(this)
+            {
+                Text = "▸ " + title,
+                TextSize = 13,
+                Typeface = Typeface.DefaultBold,
+            };
+            header.SetTextColor(ResColor(Resource.Color.text_primary));
+            header.SetPadding(0, Dp(12), 0, Dp(6));
+
+            var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            content.Visibility = ViewStates.Gone;
+
+            header.Click += (_, _) =>
+            {
+                var open = content.Visibility != ViewStates.Visible;
+                content.Visibility = open ? ViewStates.Visible : ViewStates.Gone;
+                header.Text = (open ? "▾ " : "▸ ") + title;
+            };
+
+            parent.AddView(header);
+            parent.AddView(content);
+            return content;
+        }
+
         LinearLayout AddSection(string title, string description)
         {
             var titleView = new TextView(this)
@@ -536,6 +642,53 @@ namespace System.Application.UI.Activities
             layout.BottomMargin = Dp(4);
             container.AddView(card, layout);
             return card;
+        }
+
+        /// <summary>
+        /// 一个开关同时控制 DoH 和本地 DNS 代理，避免用户面对两个重复开关。
+        /// </summary>
+        void AddSecureDnsSwitch(LinearLayout parent)
+        {
+            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row.SetGravity(GravityFlags.CenterVertical);
+            row.SetPadding(0, Dp(10), 0, Dp(10));
+            row.Clickable = true;
+            row.Focusable = true;
+
+            var textLayout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var titleView = new TextView(this) { Text = "启用安全 DNS（DoH + 本地 DNS 代理）", TextSize = 14 };
+            titleView.SetTextColor(ResColor(Resource.Color.text_primary));
+            textLayout.AddView(titleView);
+
+            var descView = new TextView(this)
+            {
+                Text = "VPN 的 DNS 会送到 127.0.0.1，避免 ERR_NAME_NOT_RESOLVED 和 DNS 污染。一般保持开启。",
+                TextSize = 11,
+            };
+            descView.SetTextColor(ResColor(Resource.Color.text_secondary));
+            descView.SetPadding(0, Dp(2), Dp(8), 0);
+            textLayout.AddView(descView);
+
+            row.AddView(textLayout, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+
+            var switchView = new Switch(this)
+            {
+                Checked = ProxySettings.EnableDoh.Value && ProxySettings.EnableDnsProxy.Value,
+                Clickable = false,
+                Focusable = false,
+            };
+            switchView.CheckedChange += (_, e) =>
+            {
+                if (building) return;
+                ProxySettings.EnableDoh.Value = e.IsChecked;
+                ProxySettings.EnableDnsProxy.Value = e.IsChecked;
+                SettingsHost.Save();
+            };
+            row.AddView(switchView);
+            row.Click += (_, _) => switchView.Checked = !switchView.Checked;
+
+            parent.AddView(row);
+            AddRowDivider(parent);
         }
 
         void AddSwitch(

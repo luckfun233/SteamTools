@@ -297,7 +297,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public static SerializableProperty<string> SniFragmentDomains { get; }
         = GetProperty(defaultValue: DefaultSniFragmentDomains, autoSave: false);
 
-    public const string DefaultSniFragmentDomains = "github.com;*.githubusercontent.com;*.githubassets.com;github.dev;huggingface.co;*.huggingface.co;*.hf.co;pixiv.net;*.pixiv.net;*.pixiv.org;pximg.net;*.pximg.net;*.fanbox.cc";
+    public const string DefaultSniFragmentDomains = "github.com;*.githubusercontent.com;*.githubassets.com;github.dev;huggingface.co;*.huggingface.co;hf.co;*.hf.co;*.xethub.hf.co;pixiv.net;*.pixiv.net;*.pixiv.org;pximg.net;*.pximg.net;*.fanbox.cc";
 
     /// <summary>
     /// 只对 TLS 连接做分片，非 TLS 直接透传。
@@ -421,6 +421,32 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: 8870, autoSave: false);
 
     /// <summary>
+    /// 是否把 DevSidecar preSetIpList 的 IP 直接写进 DNS 响应。
+    /// 这是免证书模式下让 GitHub/Hugging Face 等站点用上预置 IP 的关键。
+    /// </summary>
+    public static SerializableProperty<bool> EnableDnsPresetIp { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// 是否为 Hugging Face 相关域名补充兜底 IP 和预置 IP。
+    /// </summary>
+    public static SerializableProperty<bool> EnableHuggingFaceFallback { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// Hugging Face 域名的兜底 IP。远程配置里的 preSetIpList 会优先，
+    /// 这里只在远程没有可用 IP 或 DNS 返回被污染时补充。
+    /// </summary>
+    public const string HuggingFaceApexIpList =
+        "3.167.200.113;18.155.129.4;18.155.129.31;18.155.129.60;18.155.129.129";
+
+    public const string HfCoIpList =
+        "34.202.8.246;44.212.132.255;34.198.14.237;18.213.84.241;34.204.155.59;3.210.66.237";
+
+    public const string HfCdnIpList =
+        "99.86.109.7;99.86.109.19;99.86.109.21;99.86.109.57;52.84.174.69;52.84.174.83;52.84.174.92;52.84.174.98";
+
+    /// <summary>
     /// DoH 不可用时回退使用的 DNS 服务器，分号分隔，可写 ip 或 ip:port。
     /// </summary>
     public static SerializableProperty<string> DnsFallbackServers { get; }
@@ -513,16 +539,18 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// </summary>
     public static void MigrateExperimentalDefaults()
     {
-        if (ExperimentalSettingsVersion.Value >= 1) return;
+        if (ExperimentalSettingsVersion.Value >= 2) return;
 
         EnableDevSidecarRules.Value = true;
         SyncDevSidecarConfigOnStartup.Value = true;
         EnableDoh.Value = true;
         EnableDnsProxy.Value = true;
+        EnableDnsPresetIp.Value = true;
+        EnableHuggingFaceFallback.Value = true;
         EnableSniFragment.Value = true;
         SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;
         SniFragmentMaxBufferBytes.Value = 65536;
-        ExperimentalSettingsVersion.Value = 1;
+        ExperimentalSettingsVersion.Value = 2;
         SettingsHost.Save();
     }
 
@@ -572,6 +600,8 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         DohFallbackToSystem.Value = true;
         EnableDnsProxy.Value = true;
         DnsProxyPortId.Value = 8870;
+        EnableDnsPresetIp.Value = true;
+        EnableHuggingFaceFallback.Value = true;
         DnsFallbackServers.Value = DefaultDnsFallbackServers;
 
         EnableProxyDiagnostics.Value = true;

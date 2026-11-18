@@ -6,6 +6,7 @@ using AndroidX.RecyclerView.Widget;
 using AndroidX.SwipeRefreshLayout.Widget;
 using Binding;
 using ReactiveUI;
+using System.Application.ProxyRules;
 using System.Application.Services;
 using System.Application.Services.Native;
 using System.Application.Settings;
@@ -14,6 +15,7 @@ using System.Application.UI.Adapters.Internals;
 using System.Application.UI.Resx;
 using System.Application.UI.ViewModels;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -152,7 +154,56 @@ namespace System.Application.UI.Fragments
             binding.swipeRefreshLayout.InitDefaultStyles();
             binding.swipeRefreshLayout.SetOnRefreshListener(this);
 
+            binding.btnDevSidecarGroups.Click += (_, _) =>
+            {
+                StartActivity(new Intent(RequireContext(), typeof(RuleGroupsActivity)));
+            };
+            UpdateDevSidecarSummary();
+
             SetOnClickListener(binding.btnStartProxyService, binding.btnStopProxyService);
+        }
+
+        public override void OnResume()
+        {
+            base.OnResume();
+            UpdateDevSidecarSummary();
+        }
+
+        void UpdateDevSidecarSummary()
+        {
+            if (binding == null) return;
+
+            var enabledRules = ProxySettings.EnableDevSidecarRules.Value;
+            binding.layoutDevSidecarSummary.Visibility = enabledRules ? ViewStates.Visible : ViewStates.Gone;
+            binding.rvAccelerateProjectGroup.Visibility =
+                ProxyService.Current.ProxyDomainsList.Count > 0 ? ViewStates.Visible : ViewStates.Gone;
+
+            if (!enabledRules)
+            {
+                binding.tvDevSidecarSummary.Text =
+                    "DevSidecar 远程规则已关闭。可在“实验性加速设置”中重新启用。";
+                return;
+            }
+
+            var groups = ProxyRuleEngine.GroupStats;
+            var totalServices = groups.Sum(x => x.ServiceCount);
+            var disabledGroups = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledGroups.Value);
+            var disabledServices = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledServices.Value);
+            var enabledServices = groups.Sum(g => g.Services.Count(s =>
+                !disabledGroups.Contains(g.Id) && !disabledServices.Contains(s)));
+
+            if (groups.Count == 0)
+            {
+                binding.tvDevSidecarSummary.Text =
+                    "DevSidecar 规则尚未加载。点下方按钮进入规则组页面，再点“同步”。";
+            }
+            else
+            {
+                binding.tvDevSidecarSummary.Text =
+                    $"DevSidecar 远程规则：{groups.Count} 个分组 / {totalServices} 个服务，" +
+                    $"已开启 {enabledServices} 个。\n" +
+                    $"实际生效 {ProxyRuleEngine.Current.Rules.Count} 条规则。";
+            }
         }
 
         public override void OnStop()

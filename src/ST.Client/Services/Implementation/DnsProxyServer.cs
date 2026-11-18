@@ -38,6 +38,7 @@ namespace System.Application.Services.Implementation
         static long cacheHits;
         static long fallbackQueries;
         static long failures;
+        static long presetOverrides;
         static long bytesUp;
         static long bytesDown;
 
@@ -97,7 +98,7 @@ namespace System.Application.Services.Implementation
                 Interlocked.Add(ref bytesUp, query.Length);
 
                 // DevSidecar dns.mapping：按域名选择配置里指定的 DoH provider。
-                var queryHost = TryGetQueryName(query, out var name) ? name : null;
+                var hasQueryInfo = TryGetQueryInfo(query, out var queryHost, out var queryType);
                 var endpoint = string.IsNullOrEmpty(queryHost)
                     ? null
                     : ProxyRuleEngine.Current.GetDohEndpoint(queryHost!);
@@ -121,6 +122,16 @@ namespace System.Application.Services.Implementation
                 {
                     Interlocked.Increment(ref fallbackQueries);
                     response = await QueryFallbackDnsAsync(query, cts.Token).ConfigureAwait(false);
+                }
+
+                if (response != null && hasQueryInfo && ProxySettings.EnableDnsPresetIp.Value)
+                {
+                    var rewritten = ApplyPresetIps(query, queryHost!, queryType);
+                    if (rewritten != null)
+                    {
+                        response = rewritten;
+                        Interlocked.Increment(ref presetOverrides);
+                    }
                 }
 
                 if (response == null)
@@ -208,12 +219,13 @@ namespace System.Application.Services.Implementation
         }
 
         /// <summary>
-        /// 读取 DNS 查询的 QNAME。只处理未压缩的问题名（查询报文不会压缩）。
+        /// 读取 DNS 查询的 QNAME 和 QTYPE。只处理未压缩的问题名（查询报文不会压缩）。
         /// </summary>
-        static bool TryGetQueryName(byte[] query, out string name)
+        static bool TryGetQueryInfo(byte[] query, out string name, out ushort qtype)
         {
             name = string.Empty;
-            if (query.Length < 13) return false;
+            qtype = 0;
+            if (query.Length < 17) return false;
 
             var offset = 12;
             var sb = new StringBuilder();
@@ -222,6 +234,8 @@ namespace System.Application.Services.Implementation
                 var length = query[offset++];
                 if (length == 0)
                 {
+                    if (offset + 4 > query.Length) return false;
+                    qtype = (ushort)((query[offset] << 8) | query[offset + 1]);
                     name = sb.ToString();
                     return name.Length > 0;
                 }
@@ -232,6 +246,94 @@ namespace System.Application.Services.Implementation
                 if (sb.Length > 253) return false;
             }
             return false;
+        }
+
+        /// <summary>
+        /// 用 DevSidecar preSetIpList 重写 DNS A/AAAA 响应。
+        /// VPN/tun2socks 只拿到 IP，只有把预置 IP 直接写进 DNS，免证书模式才能用上它们。
+        /// </summary>
+        static byte[]? ApplyPresetIps(byte[] query, string host, ushort qtype)
+        {
+            if (qtype != 1 && qtype != 28) return null;
+            if (!ProxyRuleEngine.IsServiceEnabled(host)) return null;
+
+            var candidates = ProxyRuleEngine.Current.GetPresetIps(host).ToList();
+            if (ProxySettings.EnableHuggingFaceFallback.Value && IsHuggingFaceHost(host))
+            {
+                candidates.AddRange(GetHuggingFaceFallbackIps(host));
+            }
+
+            var addresses = new List<IPAddress>();
+            foreach (var candidate in candidates)
+            {
+                if (!IPAddress.TryParse(candidate.Trim(), out var address)) continue;
+                var isV6 = address.AddressFamily == AddressFamily.InterNetworkV6;
+                if (qtype == 1 && isV6) continue;
+                if (qtype == 28 && !isV6) continue;
+                if (addresses.Contains(address)) continue;
+                addresses.Add(address);
+            }
+
+            if (addresses.Count == 0) return null;
+
+            if (TryGetQuestionEnd(query, out var questionEnd))
+            {
+                var answerBytes = addresses.Sum(x => x.AddressFamily == AddressFamily.InterNetworkV6 ? 28 : 16);
+                var response = new byte[questionEnd + answerBytes];
+                Buffer.BlockCopy(query, 0, response, 0, questionEnd);
+                response[2] = 0x81; // QR + RD
+                response[3] = 0x80; // RA, RCODE=0
+                response[4] = 0x00; response[5] = 0x01;
+                response[6] = (byte)(addresses.Count >> 8); response[7] = (byte)(addresses.Count & 0xFF);
+                response[8] = 0; response[9] = 0;
+                response[10] = 0; response[11] = 0;
+
+                var offset = questionEnd;
+                foreach (var address in addresses)
+                {
+                    var bytes = address.GetAddressBytes();
+                    response[offset++] = 0xC0;
+                    response[offset++] = 0x0C;
+                    response[offset++] = 0x00;
+                    response[offset++] = (byte)(qtype == 1 ? 1 : 28);
+                    response[offset++] = 0x00;
+                    response[offset++] = 0x01;
+                    response[offset++] = 0x00; response[offset++] = 0x00;
+                    response[offset++] = 0x00; response[offset++] = 0x3C;
+                    response[offset++] = 0x00;
+                    response[offset++] = (byte)bytes.Length;
+                    bytes.CopyTo(response, offset);
+                    offset += bytes.Length;
+                }
+
+                ProxyDiagnostics.Info("DnsProxy",
+                    $"预置 IP: {host} -> {string.Join(",", addresses.Select(x => x.ToString()))}");
+                return response;
+            }
+
+            return null;
+        }
+
+        static bool IsHuggingFaceHost(string host)
+        {
+            if (string.IsNullOrEmpty(host)) return false;
+            return host.Equals("hf.co", StringComparison.OrdinalIgnoreCase) ||
+                   host.EndsWith(".hf.co", StringComparison.OrdinalIgnoreCase) ||
+                   host.EndsWith(".huggingface.co", StringComparison.OrdinalIgnoreCase) ||
+                   host.Equals("huggingface.co", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static IEnumerable<string> GetHuggingFaceFallbackIps(string host)
+        {
+            if (host.Equals("hf.co", StringComparison.OrdinalIgnoreCase))
+            {
+                return ProxySettings.HfCoIpList.Split(';');
+            }
+            if (host.EndsWith(".hf.co", StringComparison.OrdinalIgnoreCase))
+            {
+                return ProxySettings.HfCdnIpList.Split(';');
+            }
+            return ProxySettings.HuggingFaceApexIpList.Split(';');
         }
 
         static bool TryGetCache(string key, byte[] query, out byte[] response)
@@ -335,8 +437,8 @@ namespace System.Application.Services.Implementation
         {
             return $"查询 {Interlocked.Read(ref totalQueries)}，缓存 {Interlocked.Read(ref cacheHits)}，" +
                    $"DoH 尝试 {Interlocked.Read(ref dohQueries)} 成功 {Interlocked.Read(ref dohSuccesses)}，" +
-                   $"回退 {Interlocked.Read(ref fallbackQueries)}，失败 {Interlocked.Read(ref failures)}，" +
-                   $"上行 {Interlocked.Read(ref bytesUp)}B，下行 {Interlocked.Read(ref bytesDown)}B";
+                   $"回退 {Interlocked.Read(ref fallbackQueries)}，预置IP改写 {Interlocked.Read(ref presetOverrides)}，" +
+                   $"失败 {Interlocked.Read(ref failures)}，上行 {Interlocked.Read(ref bytesUp)}B，下行 {Interlocked.Read(ref bytesDown)}B";
         }
 
         public static void ResetStats()
@@ -347,6 +449,7 @@ namespace System.Application.Services.Implementation
             Interlocked.Exchange(ref cacheHits, 0);
             Interlocked.Exchange(ref fallbackQueries, 0);
             Interlocked.Exchange(ref failures, 0);
+            Interlocked.Exchange(ref presetOverrides, 0);
             Interlocked.Exchange(ref bytesUp, 0);
             Interlocked.Exchange(ref bytesDown, 0);
             cache.Clear();

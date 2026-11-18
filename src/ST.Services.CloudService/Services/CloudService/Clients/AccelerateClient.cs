@@ -19,7 +19,8 @@ namespace System.Application.Services.CloudService.Clients
                 isSecurity: false,
                 method: HttpMethod.Get,
                 requestUri: "api/Accelerate/Scripts",
-                cancellationToken: default);
+                cancellationToken: default,
+                isShowResponseErrorMessage: false);
 
         public Task<IApiResponse<List<AccelerateProjectGroupDTO>>> All()
             => conn.SendAsync<List<AccelerateProjectGroupDTO>>(
@@ -28,7 +29,8 @@ namespace System.Application.Services.CloudService.Clients
                 isSecurity: false,
                 method: HttpMethod.Get,
                 requestUri: "api/Accelerate/All",
-                cancellationToken: default);
+                cancellationToken: default,
+                isShowResponseErrorMessage: false);
 
         public Task<IApiResponse<List<AccelerateProjectGroupDTO>>> All(EReverseProxyEngine reverseProxyEngine)
             => conn.SendAsync<List<AccelerateProjectGroupDTO>>(
@@ -37,6 +39,7 @@ namespace System.Application.Services.CloudService.Clients
                 isSecurity: false,
                 method: HttpMethod.Get,
                 requestUri: $"api/Accelerate/All/{(int)reverseProxyEngine}",
-                cancellationToken: default);
+                cancellationToken: default,
+                isShowResponseErrorMessage: false);
     }
 }

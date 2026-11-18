@@ -20,7 +20,8 @@ namespace System.Application.Services.CloudService.Clients
                 requestUri: "api/script/basics",
                 cancellationToken: default,
                 responseContentMaybeNull: true,
-                errorAppendText: errormsg);
+                errorAppendText: errormsg,
+                isShowResponseErrorMessage: false);
         }
 
         public Task<IApiResponse<PagedModel<ScriptDTO>>> ScriptTable(string? name = null, int pageIndex = 1, int pageSize = 15, string? errormsg = null)

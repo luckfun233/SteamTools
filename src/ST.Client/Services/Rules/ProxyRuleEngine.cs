@@ -52,6 +52,29 @@ namespace System.Application.ProxyRules
         public static IReadOnlyList<string> MatchServices(string host)
             => ProxyRuleSet.Combine(Custom, Remote).MatchServices(host);
 
+        /// <summary>
+        /// 判断某个域名对应的服务是否被用户关闭。用于 DNS 预置 IP/兜底 IP 覆盖。
+        /// </summary>
+        public static bool IsServiceEnabled(string host)
+        {
+            if (string.IsNullOrWhiteSpace(host)) return true;
+
+            var disabledGroups = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledGroups.Value);
+            var disabledServices = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledServices.Value);
+
+            foreach (var pattern in disabledServices)
+            {
+                if (DomainPatternMatcher.IsMatch(host, pattern)) return false;
+            }
+
+            foreach (var service in Remote.Services)
+            {
+                if (!DomainPatternMatcher.IsMatch(host, service.DomainPattern)) continue;
+                if (!string.IsNullOrEmpty(service.Group) && disabledGroups.Contains(service.Group!)) return false;
+            }
+            return true;
+        }
+
         public static int GetRuleCount(string groupId)
             => Remote.Rules.Count(x => string.Equals(x.Group, groupId, StringComparison.OrdinalIgnoreCase));
 
@@ -110,7 +133,12 @@ namespace System.Application.ProxyRules
         public static void Apply(ProxyRuleSet rules)
         {
             Volatile.Write(ref remote, rules);
-            LastError = rules.Rules.Count == 0 ? "配置解析结果为空" : null;
+            LastError = rules.Rules.Count == 0 &&
+                        rules.PresetIps.Count == 0 &&
+                        rules.DnsMappings.Count == 0 &&
+                        rules.Services.Count == 0
+                ? "配置解析结果为空"
+                : null;
             Rebuild();
         }
 
@@ -157,7 +185,11 @@ namespace System.Application.ProxyRules
         public static void Rebuild()
         {
             var remoteFiltered = ProxyRuleSet.Empty;
-            if (ProxySettings.EnableDevSidecarRules.Value && Remote.Rules.Count > 0)
+            if (ProxySettings.EnableDevSidecarRules.Value &&
+                (Remote.Rules.Count > 0 ||
+                 Remote.PresetIps.Count > 0 ||
+                 Remote.DnsMappings.Count > 0 ||
+                 Remote.Services.Count > 0))
             {
                 // 默认全部开启；关闭列表为空表示不过滤。新增的分组会自动生效。
                 var disabledGroups = ProxyRuleGroups.ParseList(ProxySettings.DevSidecarDisabledGroups.Value);

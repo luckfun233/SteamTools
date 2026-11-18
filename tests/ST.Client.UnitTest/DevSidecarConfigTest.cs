@@ -172,7 +172,10 @@ public class DevSidecarConfigTest
         }
 
         var rules = DevSidecarConfigLoader.Parse(System.IO.File.ReadAllText(path!));
+        TestContext.Progress.WriteLine($"rules={rules.Rules.Count}, services={rules.Services.Count}, groups={rules.GetGroups().Count}, preset={rules.PresetIps.Count}, dns={rules.DnsMappings.Count}");
         Assert.That(rules.Rules.Count, Is.GreaterThan(30));
+        Assert.That(rules.Services.Count, Is.GreaterThan(80));
+        Assert.That(rules.GetGroups().Count, Is.GreaterThan(25));
         Assert.That(rules.PresetIps.Count, Is.GreaterThan(0));
 
         var groups = rules.GetGroups();
