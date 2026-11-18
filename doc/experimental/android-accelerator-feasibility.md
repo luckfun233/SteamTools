@@ -563,8 +563,45 @@ ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 > 说明：以上是 Linux 环境下的自动化/本地回环实测，不等价于在所有运营商网络上的真机验证；真机仍需在“会阻断 SNI”的网络下对比直连、分片和中继三种路径。
 
 
-## 12. 参考资料
+## 12. 第二轮真机反馈修正（2026-11-18）
 
+真机实验室报告暴露的问题与处理：
+
+1. **Hugging Face 仍然打不开**
+   - 官方远程配置里 `*.huggingface.co` 的规则是 `sni: huggingface.cn` + `verifyHost: huggingface.cn`，这需要 MITM/根证书；免证书模式无法改写 SNI 后通过证书校验。
+   - 官方 `preSetIpList` 里有 `3.167.200.113`，但原来的 VPN 只把 IP 交给 sidecar，预置 IP 没有被 DNS 使用。
+   - 修复：本地 DNS 代理现在会把 `preSetIpList` 直接写进 A/AAAA 响应；Hugging Face 额外提供 CloudFront 兜底 IP。这样应用会主动连接预置 IP，再由 sidecar 做 TLS record 分片。
+   - 仍不承诺所有网络可用：如果该 IP 也被封，或 DPI 会完整重组 TLS handshake，只能走中继。HTTP/3（UDP 443）现在通过 UDP ASSOCIATE 直连转发，是另一条免证书路径。
+
+2. **远端规则“看起来太少”**
+   - 旧实现只把带 `sni`/`proxy`/`redirect`/头替换/abort 的规则计入分组，所以只有 69 条、25 组。
+   - 现在额外收集 `intercepts` 里所有域名、`preSetIpList`、`dns.mapping`、`whiteList`、`dns.ech.domains`、`dns.nat64.domains`、`familyMapping`、`overwall.targets`，形成完整服务目录；服务分组页面会展示所有组和服务，即使该服务当前没有可执行的 MITM 规则。
+
+3. **客户端错误 1006 / 加速页空白**
+   - `api/Accelerate/All` 需要登录，未登录或返回非 MessagePack 时会反复抛 `ClientException`（1006），加速页图标和列表都加载失败。
+   - 修复：Android 端不再请求该接口，加速页改为显示 DevSidecar 规则摘要和“管理/搜索规则组”入口；脚本基础接口也关闭了错误弹窗。
+
+4. **设置项过多**
+   - 主界面只保留总开关、策略、域名和自动回退；分片参数、SNI 改写、DoH 细节、中继、日志细节收进“高级”折叠区。
+   - DoH 与本地 DNS 代理合并成一个“安全 DNS”开关。
+
+5. **日志不好导出**
+   - 实验设置页新增“导出日志”（系统文件选择器，可保存到下载/网盘）和“分享日志”（分享文本）。
+
+### 其他 SNI/DPI 绕过路线筛选
+
+| 路线 | 免证书 | 可行性 | 结论 |
+|---|---|---|---|
+| TCP 分段 / SNI 边界拆分 | 是 | 只对不重组 TCP 的 DPI 有效 | 保留为兼容策略 |
+| TLS record 拆分 / 随机 record 拆分 | 是 | 对按 record 解析的 DPI 有效 | 默认策略 |
+| DoH + 预置 IP 覆盖 | 是 | 解决 DNS 污染和 IP 黑洞 | 已实现，GitHub/HF 的关键 |
+| SOCKS5 上游中继 | 是 | 最可靠，但依赖用户有可用代理 | 已实现 |
+| HTTP/3 / QUIC（UDP 443） | 是 | 绕过 TCP SNI DPI，取决于运营商 UDP 策略 | UDP ASSOCIATE 已支持 |
+| SNI 改写 / 镜像 / Host 改写 | 否（需 MITM） | 需要根证书 | 仅证书模式 |
+| ECH | 是 | 需要客户端/服务端支持，Android 13 不可控 | 不实现 |
+| 假包 / TTL / 乱序 / TCP 序列重叠（GoodbyeDPI、Zapret、ByeDPI） | 是 | 需要 raw socket/NFQUEUE/root | 当前 VpnService 用户态不可行 |
+
+## 13. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>

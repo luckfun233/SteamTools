@@ -20,15 +20,48 @@
       android:layout_height="wrap_content"
       xamarin:managedType="AndroidX.SwipeRefreshLayout.Widget.SwipeRefreshLayout">
 
-      <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvAccelerateProjectGroup"
+      <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:overScrollMode="never"
-        tools:itemCount="6"
-        tools:listitem="@layout/layout_card_accelerate_project_group"
-        tools:paddingTop="@dimen/activity_vertical_margin"
-        xamarin:managedType="AndroidX.RecyclerView.Widget.RecyclerView" />
+        android:orientation="vertical"
+        xamarin:managedType="Android.Widget.LinearLayout">
+
+        <LinearLayout
+          android:id="@+id/layoutDevSidecarSummary"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:orientation="vertical"
+          android:padding="@dimen/activity_vertical_margin"
+          xamarin:managedType="Android.Widget.LinearLayout">
+
+          <TextView
+            android:id="@+id/tvDevSidecarSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            tools:text="DevSidecar 远程规则：25 个分组 / 100 个服务"
+            xamarin:managedType="Android.Widget.TextView" />
+
+          <Button
+            android:id="@+id/btnDevSidecarGroups"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:text="管理 / 搜索规则组"
+            android:textAllCaps="false"
+            xamarin:managedType="Android.Widget.Button" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+          android:id="@+id/rvAccelerateProjectGroup"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:overScrollMode="never"
+          tools:itemCount="6"
+          tools:listitem="@layout/layout_card_accelerate_project_group"
+          tools:paddingTop="@dimen/activity_vertical_margin"
+          xamarin:managedType="AndroidX.RecyclerView.Widget.RecyclerView" />
+      </LinearLayout>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 

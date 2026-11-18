@@ -89,6 +89,12 @@ namespace System.Application.UI.Activities
             searchBar.AddView(sync, new LinearLayout.LayoutParams(Dp(64), Dp(40)));
             root.AddView(searchBar);
 
+            var quickBar = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            quickBar.SetPadding(Dp(12), 0, Dp(12), Dp(4));
+            quickBar.AddView(CreateButton("全部开启", EnableAll, false), new LinearLayout.LayoutParams(0, Dp(40), 1f));
+            quickBar.AddView(CreateButton("刷新", RefreshList, false), new LinearLayout.LayoutParams(0, Dp(40), 1f));
+            root.AddView(quickBar);
+
             var statusLayout = new LinearLayout(this) { Orientation = Orientation.Vertical };
             statusLayout.SetPadding(Dp(14), 0, Dp(14), Dp(4));
             summaryView = new TextView(this) { TextSize = 12 };
@@ -180,6 +186,16 @@ namespace System.Application.UI.Activities
             {
                 ShowToast("同步失败: " + ex.Message);
             }
+        }
+
+        void EnableAll()
+        {
+            ProxySettings.DevSidecarDisabledGroups.Value = string.Empty;
+            ProxySettings.DevSidecarDisabledServices.Value = string.Empty;
+            SettingsHost.Save();
+            ProxyRuleEngine.Rebuild();
+            RefreshList();
+            ShowToast("已开启全部规则组和服务");
         }
 
         void RefreshList()
@@ -314,9 +330,20 @@ namespace System.Application.UI.Activities
                     name.SetTextColor(ResColor(Resource.Color.text_primary));
                     text.AddView(name);
 
+                    var serviceInfo = ProxyRuleEngine.Remote.Services.FirstOrDefault(x =>
+                        string.Equals(x.DomainPattern, service, StringComparison.OrdinalIgnoreCase));
+                    var detailParts = new List<string> { group.Name };
+                    var ruleCount = CountRules(group.Id, service);
+                    if (ruleCount > 0) detailParts.Add($"{ruleCount} 条规则");
+                    if (serviceInfo?.PresetIpCount > 0) detailParts.Add($"{serviceInfo.PresetIpCount} 个预置 IP");
+                    if (!string.IsNullOrEmpty(serviceInfo?.DnsProvider)) detailParts.Add($"DNS {serviceInfo.DnsProvider}");
+                    if (serviceInfo?.InWhiteList == true) detailParts.Add("白名单");
+                    if (serviceInfo?.InEch == true) detailParts.Add("ECH");
+                    if (serviceInfo?.InNat64 == true) detailParts.Add("NAT64");
+
                     var detail = new TextView(this)
                     {
-                        Text = $"{group.Name} · {CountRules(group.Id, service)} 条规则",
+                        Text = string.Join(" · ", detailParts),
                         TextSize = 11,
                     };
                     detail.SetTextColor(ResColor(Resource.Color.text_secondary));

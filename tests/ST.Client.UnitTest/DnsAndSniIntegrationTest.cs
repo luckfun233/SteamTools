@@ -9,6 +9,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Application.ProxyRules;
 using System.Application.Services.Implementation;
 using System.Application.Settings;
 
@@ -79,6 +80,106 @@ public class DnsAndSniIntegrationTest
             ProxySettings.EnableSniFragment.Value = originalFragment;
             ProxySettings.SniFragmentPortId.Value = originalPort;
             ProxySettings.EnableDoh.Value = originalDoh;
+        }
+    }
+
+    [Test]
+    public async Task DnsProxy_PresetIp_Overrides_Answer()
+    {
+        var originalDoh = ProxySettings.EnableDoh.Value;
+        var originalFallback = ProxySettings.DnsFallbackServers.Value;
+        var originalPort = ProxySettings.DnsProxyPortId.Value;
+        var originalPreset = ProxySettings.EnableDnsPresetIp.Value;
+        var fakeDnsPort = GetFreeUdpPort();
+        var proxyPort = GetFreeUdpPort();
+
+        using var fakeDns = new FakeDnsServer(fakeDnsPort, IPAddress.Parse("9.9.9.9"));
+        fakeDns.Start();
+
+        var rules = DevSidecarConfigLoader.Parse(@"{
+  preSetIpList: {
+    ""*.preset.test"": [""1.2.3.4"", ""1.2.3.5""],
+  },
+}");
+        ProxyRuleEngine.Apply(rules);
+
+        try
+        {
+            ProxySettings.EnableDoh.Value = false;
+            ProxySettings.EnableDnsPresetIp.Value = true;
+            ProxySettings.DnsFallbackServers.Value = "127.0.0.1:" + fakeDnsPort;
+            ProxySettings.DnsProxyPortId.Value = proxyPort;
+            DnsProxyService.Start(force: true);
+
+            var query = BuildDnsQuery("a.preset.test");
+            using var udp = new UdpClient();
+            await udp.SendAsync(query, query.Length, new IPEndPoint(IPAddress.Loopback, DnsProxyService.ActivePort));
+            var receive = udp.ReceiveAsync();
+            var completed = await Task.WhenAny(receive, Task.Delay(5000));
+            Assert.That(completed, Is.SameAs(receive), "DNS 查询超时");
+
+            var response = receive.Result.Buffer;
+            Assert.That((response[7]), Is.EqualTo(2), "应返回 2 条预置 IP");
+            var lastFour = new byte[4];
+            Buffer.BlockCopy(response, response.Length - 4, lastFour, 0, 4);
+            Assert.That(new IPAddress(lastFour).ToString(), Is.EqualTo("1.2.3.5"));
+        }
+        finally
+        {
+            DnsProxyService.Stop();
+            ProxyRuleEngine.Apply(ProxyRuleSet.Empty);
+            ProxySettings.EnableDoh.Value = originalDoh;
+            ProxySettings.EnableDnsPresetIp.Value = originalPreset;
+            ProxySettings.DnsFallbackServers.Value = originalFallback;
+            ProxySettings.DnsProxyPortId.Value = originalPort;
+        }
+    }
+
+    [Test]
+    public async Task DnsProxy_HuggingFace_Fallback_Ip()
+    {
+        var originalDoh = ProxySettings.EnableDoh.Value;
+        var originalFallback = ProxySettings.DnsFallbackServers.Value;
+        var originalPort = ProxySettings.DnsProxyPortId.Value;
+        var originalPreset = ProxySettings.EnableDnsPresetIp.Value;
+        var originalHf = ProxySettings.EnableHuggingFaceFallback.Value;
+        var fakeDnsPort = GetFreeUdpPort();
+        var proxyPort = GetFreeUdpPort();
+
+        using var fakeDns = new FakeDnsServer(fakeDnsPort, IPAddress.Parse("9.9.9.9"));
+        fakeDns.Start();
+        ProxyRuleEngine.Apply(ProxyRuleSet.Empty);
+
+        try
+        {
+            ProxySettings.EnableDoh.Value = false;
+            ProxySettings.EnableDnsPresetIp.Value = true;
+            ProxySettings.EnableHuggingFaceFallback.Value = true;
+            ProxySettings.DnsFallbackServers.Value = "127.0.0.1:" + fakeDnsPort;
+            ProxySettings.DnsProxyPortId.Value = proxyPort;
+            DnsProxyService.Start(force: true);
+
+            var query = BuildDnsQuery("huggingface.co");
+            using var udp = new UdpClient();
+            await udp.SendAsync(query, query.Length, new IPEndPoint(IPAddress.Loopback, DnsProxyService.ActivePort));
+            var receive = udp.ReceiveAsync();
+            var completed = await Task.WhenAny(receive, Task.Delay(5000));
+            Assert.That(completed, Is.SameAs(receive), "DNS 查询超时");
+
+            var response = receive.Result.Buffer;
+            Assert.That((response[6] << 8) | response[7], Is.GreaterThan(0));
+            var firstIp = new byte[4];
+            Buffer.BlockCopy(response, response.Length - 4 - 16 * Math.Max(0, ((response[6] << 8) | response[7]) - 1), firstIp, 0, 4);
+            Assert.That(new IPAddress(firstIp).ToString(), Is.EqualTo("3.167.200.113"));
+        }
+        finally
+        {
+            DnsProxyService.Stop();
+            ProxySettings.EnableDoh.Value = originalDoh;
+            ProxySettings.EnableDnsPresetIp.Value = originalPreset;
+            ProxySettings.EnableHuggingFaceFallback.Value = originalHf;
+            ProxySettings.DnsFallbackServers.Value = originalFallback;
+            ProxySettings.DnsProxyPortId.Value = originalPort;
         }
     }
 

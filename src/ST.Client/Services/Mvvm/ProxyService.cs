@@ -431,7 +431,16 @@ namespace System.Application.Services
             {
                 Log.Error(nameof(ProxyService), ex, "初始化加速项目失败");
             }
-            await InitializeScript();
+
+            try
+            {
+                await InitializeScript();
+            }
+            catch (Exception ex)
+            {
+                // 脚本服务依赖云端接口，未登录/离线时不能影响加速页和本地规则。
+                Log.Warn(nameof(ProxyService), "初始化脚本数据失败", ex);
+            }
 
             if (IsProgramStartupRunProxy())
             {
@@ -459,54 +468,17 @@ namespace System.Application.Services
             }
         }
 
-        public async Task InitializeAccelerate()
+        public Task InitializeAccelerate()
         {
             // 旧版本的 SNI 默认策略是“SNI 边界”，对能重组 TCP 的 DPI 无效。
             // 这里只做一次迁移，之后用户在设置页的选择会被保留。
             ProxySettings.MigrateExperimentalDefaults();
 
-            #region 加载代理服务数据
-            var client = ICloudServiceClient.Instance.Accelerate;
-#if DEBUG
-            var stopwatch = Stopwatch.StartNew();
-#endif
-            //var result = await client.All(reverseProxyService.ReverseProxyEngine);
-            try
-            {
-                var result = await client.All(reverseProxyService.ReverseProxyEngine);
-#if DEBUG
-                stopwatch.Stop();
-                Toast.Show($"加载代理服务数据耗时：{stopwatch.ElapsedMilliseconds}ms，IsSuccess：{result.IsSuccess}，Count：{result.Content?.Count}");
-#endif
-                if (result.IsSuccess)
-                {
-                    if (ProxySettings.SupportProxyServicesStatus.Value.Any_Nullable() && result.Content.Any_Nullable())
-                    {
-                        var items = result.Content!.SelectMany(s => s.Items);
-                        foreach (var item in items)
-                        {
-                            if (ProxySettings.SupportProxyServicesStatus.Value.Contains(item.Id.ToString()))
-                            {
-                                item.Enable = true;
-                            }
-                        }
-                    }
-
-                    ProxyDomains.Clear();
-                    ProxyDomains.AddRange(result.Content!);
-                }
-            }
-            catch (Exception ex)
-            {
-                // 服务端接口失败（网络不可达、非官方渠道拒绝、服务端异常）不能中断初始化，
-                // 否则后面的内置规则不会合并，加速页会一个组都没有。
-                Log.Error(nameof(ProxyService), ex, "加载服务端加速项目失败，使用本地内置规则");
-            }
-
-            LoadOrSaveLocalAccelerate();
+            // 加速规则统一来自 DevSidecar 远程配置 / 本地缓存。
+            // 不再请求 Steam++ 云端的 Accelerate 接口：未登录或服务端返回异常格式时，
+            // 会反复弹出 “客户端错误 1006 - Failed to deserialize ...”，加速页也会空白。
             if (ProxySettings.EnableDevSidecarRules.Value)
             {
-                // 先用本地缓存让加速尽快可用，再在后台同步最新配置。
                 ProxyRuleEngine.LoadFromCache();
                 if (ProxySettings.SyncDevSidecarConfigOnStartup.Value)
                 {
@@ -525,63 +497,10 @@ namespace System.Application.Services
             SniSidecarService.Start();
             DnsProxyService.Start();
             StartDevSidecarAutoSync();
-
-            if (IsLoadImage && ProxyDomains.Items.Any_Nullable())
-            {
-                foreach (var item in ProxyDomains.Items)
-                {
-                    item.ImageStream = IHttpService.Instance.GetImageAsync(ImageUrlHelper.GetImageApiUrlById(item.ImageId), ImageChannelType.AccelerateGroup);
-                }
-            }
-
-            this.WhenAnyValue(v => v.ProxyDomainsList)
-                  .Subscribe(domain => domain?
-                  .ToObservableChangeSet()
-                  .AutoRefresh(x => x.ObservableItems)
-                  .TransformMany(t => t.ObservableItems ?? new ObservableCollection<AccelerateProjectDTO>())
-                  .AutoRefresh(x => x.Enable)
-                  .WhenPropertyChanged(x => x.Enable, false)
-                  .Subscribe(_ =>
-                  {
-                      IsChangeSupportProxyServicesStatus = true;
-                      ProxySettings.SupportProxyServicesStatus.Value = EnableProxyDomains?.Select(k => k.Id.ToString()).ToImmutableHashSet();
-                  }));
-            #endregion
+            return Task.CompletedTask;
         }
 
         public static bool IsChangeSupportProxyServicesStatus { get; set; }
-
-        private void LoadOrSaveLocalAccelerate()
-        {
-            var filepath = Path.Combine(IOPath.AppDataDirectory, "LOCAL_ACCELERATE.json");
-            if (ProxyDomains.Items.Any_Nullable())
-            {
-                if (IOPath.TryOpen(filepath, FileMode.Create, FileAccess.Write, FileShare.Read, out var fileStream, out var _))
-                {
-                    using var stream = fileStream;
-                    MessagePackSerializer.Serialize(stream, ProxyDomains.Items, options: Serializable.lz4Options);
-                }
-            }
-            else
-            {
-                if (File.Exists(filepath) && IOPath.TryOpenRead(filepath, out var fileStream, out var _))
-                {
-                    using var stream = fileStream;
-                    ProxyDomains.Clear();
-                    List<AccelerateProjectGroupDTO>? accelerates = null;
-                    try
-                    {
-                        accelerates = MessagePackSerializer.Deserialize<List<AccelerateProjectGroupDTO>>(stream, options: Serializable.lz4Options);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(nameof(ProxyService), ex, nameof(LoadOrSaveLocalAccelerate));
-                    }
-                    if (accelerates.Any_Nullable())
-                        ProxyDomains.AddRange(accelerates!);
-                }
-            }
-        }
 
         Timer? devSidecarSyncTimer;
 
