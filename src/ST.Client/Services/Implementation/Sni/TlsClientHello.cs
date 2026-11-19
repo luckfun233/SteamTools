@@ -26,6 +26,18 @@ namespace System.Application.Services.Implementation
 
         /// <summary>把 ClientHello 重新封装成多个 TLS record，SNI 处必切，其余切点随机。</summary>
         TlsRecordSplitRandom = 6,
+
+        /// <summary>
+        /// 把 ClientHello 拆成大量很小的 TLS record（SNI 内部强制 1 字节一段）。
+        /// 用于对抗按 record 重组、但缓冲区/超时有限的 DPI。
+        /// </summary>
+        TinyRecords = 7,
+
+        /// <summary>
+        /// 在 SNI 扩展前插入大段 padding，把域名推到 DPI 的检查窗口之外。
+        /// 部分 DPI 只解析 ClientHello 前 N 个字节，这种策略对它们有效。
+        /// </summary>
+        Padding = 8,
     }
 
     /// <summary>
@@ -293,6 +305,85 @@ namespace System.Application.Services.Implementation
             return BuildTlsRecords(data, segments);
         }
 
+        /// <summary>
+        /// 把 ClientHello 拆成很多小 TLS record。SNI 内每个字节单独一个 record，
+        /// 其余部分按 1~32 字节随机切分，逼 DPI 做大量重组；服务端仍会按 TLS 规范重组。
+        /// </summary>
+        public static IReadOnlyList<byte[]> FragmentToTinyRecords(
+            ReadOnlySpan<byte> data,
+            int maxRecordSize = 32,
+            Random? random = null)
+        {
+            if (data.Length < 5 || data[0] != HandshakeContentType) return new[] { data.ToArray() };
+
+            var recordLength = ReadUInt16(data, 3);
+            var recordEnd = 5 + recordLength;
+            if (recordEnd > data.Length || recordLength < 8) return new[] { data.ToArray() };
+
+            maxRecordSize = Math.Max(2, Math.Min(256, maxRecordSize));
+            random ??= new Random(Guid.NewGuid().GetHashCode());
+
+            var sniPayloadStart = -1;
+            var sniPayloadEnd = -1;
+            if (TryGetSniRange(data, out var sniOffset, out var sniLength) && sniLength >= 2)
+            {
+                sniPayloadStart = Math.Max(0, sniOffset - 5);
+                sniPayloadEnd = Math.Min(recordLength, sniPayloadStart + sniLength);
+            }
+
+            var segments = new List<(int Start, int Length)>();
+            var position = 0;
+            while (position < recordLength)
+            {
+                var size = position >= sniPayloadStart && position < sniPayloadEnd
+                    ? 1
+                    : random.Next(1, maxRecordSize + 1);
+                var length = Math.Min(size, recordLength - position);
+                AddRecordSegment(segments, position, length);
+                position += length;
+            }
+
+            return BuildTlsRecords(data, segments);
+        }
+
+        /// <summary>
+        /// 在 SNI 扩展之前插入 padding 扩展（RFC 7685），把真实域名推到后面。
+        /// 同时更新 extensions/handshake/record 长度；总长度超过单个 record 时由调用方再拆分。
+        /// </summary>
+        public static bool TryPadClientHello(ReadOnlySpan<byte> data, int paddingBytes, out byte[] padded)
+        {
+            padded = Array.Empty<byte>();
+            if (paddingBytes <= 0) return false;
+            if (!TryParse(data, out var info)) return false;
+
+            var recordLength = ReadUInt16(data, info.RecordLengthOffset);
+            var recordEnd = info.RecordLengthOffset + 2 + recordLength;
+            if (recordEnd > data.Length) return false;
+
+            // 单个 TLS record 最大 16384 字节，超出部分不能塞进 padding。
+            var maxPadding = 16384 - recordLength - 4;
+            if (maxPadding <= 0) return false;
+            paddingBytes = Math.Min(paddingBytes, maxPadding);
+
+            var insertAt = info.ExtensionHeaderOffset;
+            var extensionLength = 4 + paddingBytes;
+            var result = new byte[data.Length + extensionLength];
+
+            data.Slice(0, insertAt).CopyTo(result);
+            result[insertAt] = 0x00;
+            result[insertAt + 1] = 0x15; // padding
+            result[insertAt + 2] = (byte)((paddingBytes >> 8) & 0xFF);
+            result[insertAt + 3] = (byte)(paddingBytes & 0xFF);
+            data.Slice(insertAt).CopyTo(result.AsSpan(insertAt + extensionLength));
+
+            if (!TryAdd(result, info.ExtensionsLengthOffset, extensionLength, out _)) return false;
+            if (!TryAdd(result, info.HandshakeLengthOffset, extensionLength, out _, 3)) return false;
+            if (!TryAdd(result, info.RecordLengthOffset, extensionLength, out _)) return false;
+
+            padded = result;
+            return true;
+        }
+
         public static IReadOnlyList<byte[]> FragmentRandom(ReadOnlySpan<byte> data, int maxChunkSize, Random? random = null)
         {
             maxChunkSize = Math.Max(1, maxChunkSize);
@@ -387,6 +478,8 @@ namespace System.Application.Services.Implementation
                 TlsFragmentStrategy.SniPieces => FragmentBySniPieces(data, pieces),
                 TlsFragmentStrategy.TlsRecordSplit => FragmentToTlsRecords(data),
                 TlsFragmentStrategy.TlsRecordSplitRandom => FragmentToTlsRecordsRandom(data, pieces, random),
+                TlsFragmentStrategy.TinyRecords => FragmentToTinyRecords(data, Math.Max(2, chunkSize), random),
+                TlsFragmentStrategy.Padding => FragmentToTlsRecords(data),
                 TlsFragmentStrategy.Random => FragmentRandom(data, chunkSize, random),
                 _ => Fragment(data, chunkSize),
             };

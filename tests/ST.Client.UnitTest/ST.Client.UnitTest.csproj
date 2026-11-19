@@ -38,6 +38,10 @@
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Moq" />
+    <!-- Linux 上运行 SkiaSharp 测试需要原生库 -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <!-- 覆盖 System.Windows.Extensions 传递引用的 4.7.0（CVE-2021-24112） -->
+    <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 
 </Project>

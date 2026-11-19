@@ -260,6 +260,14 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public const int SniFragmentStrategyTlsRecordSplit = 4;
     public const int SniFragmentStrategyRandom = 5;
     public const int SniFragmentStrategyTlsRecordSplitRandom = 6;
+    public const int SniFragmentStrategyTinyRecords = 7;
+    public const int SniFragmentStrategyPadding = 8;
+
+    /// <summary>
+    /// Padding 策略在 SNI 扩展前插入的填充字节数。把域名推到 DPI 的检查窗口之外。
+    /// </summary>
+    public static SerializableProperty<int> SniPaddingBytes { get; }
+        = GetProperty(defaultValue: 4096, autoSave: false);
 
     /// <summary>
     /// SNI 多段分片时把域名拆成几段。
@@ -392,7 +400,8 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public static SerializableProperty<string> DohEndpoint { get; }
         = GetProperty(defaultValue: DefaultDohEndpoint, autoSave: false);
 
-    public const string DefaultDohEndpoint = "https://dns.alidns.com/resolve";
+    // AliDNS 对 Hugging Face 等域名会返回污染结果；doh.pub 实测返回真实 CloudFront 地址。
+    public const string DefaultDohEndpoint = "https://doh.pub/dns-query";
 
     /// <summary>
     /// DoH wire format 接口地址（用于本地 DNS 代理转发完整 DNS 报文）。
@@ -400,7 +409,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public static SerializableProperty<string> DohWireEndpoint { get; }
         = GetProperty(defaultValue: DefaultDohWireEndpoint, autoSave: false);
 
-    public const string DefaultDohWireEndpoint = "https://dns.alidns.com/dns-query";
+    public const string DefaultDohWireEndpoint = "https://doh.pub/dns-query";
 
     /// <summary>
     /// DoH 失败时是否回退到系统 DNS。
@@ -451,6 +460,13 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
 
     public const string HfCdnIpList =
         "99.86.109.7;99.86.109.19;99.86.109.21;99.86.109.57;52.84.174.69;52.84.174.83;52.84.174.92;52.84.174.98";
+
+    /// <summary>
+    /// Hugging Face 的 CloudFront IPv6 边缘地址。部分网络只对 IPv4 做 SNI 阻断，
+    /// 或者 IPv4 路由被黑洞，这时可以靠 IPv6 直接连到 CloudFront。
+    /// </summary>
+    public const string HuggingFaceIpv6List =
+        "2600:9000:2751:0:17:b174:6d00:93a1;2600:9000:2751:a800:17:b174:6d00:93a1;2600:9000:2751:dc00:17:b174:6d00:93a1;2600:9000:2751:a000:17:b174:6d00:93a1";
 
     /// <summary>
     /// DoH 不可用时回退使用的 DNS 服务器，分号分隔，可写 ip 或 ip:port。
@@ -545,20 +561,41 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     /// </summary>
     public static void MigrateExperimentalDefaults()
     {
-        if (ExperimentalSettingsVersion.Value >= 2) return;
+        var changed = false;
 
-        EnableDevSidecarRules.Value = true;
-        SyncDevSidecarConfigOnStartup.Value = true;
-        EnableDoh.Value = true;
-        EnableDnsProxy.Value = true;
-        EnableDnsPresetIp.Value = true;
-        EnableHuggingFaceFallback.Value = true;
-        EnableUdpRelay.Value = true;
-        EnableSniFragment.Value = true;
-        SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;
-        SniFragmentMaxBufferBytes.Value = 65536;
-        ExperimentalSettingsVersion.Value = 2;
-        SettingsHost.Save();
+        if (ExperimentalSettingsVersion.Value < 2)
+        {
+            EnableDevSidecarRules.Value = true;
+            SyncDevSidecarConfigOnStartup.Value = true;
+            EnableDoh.Value = true;
+            EnableDnsProxy.Value = true;
+            EnableDnsPresetIp.Value = true;
+            EnableHuggingFaceFallback.Value = true;
+            EnableUdpRelay.Value = true;
+            EnableSniFragment.Value = true;
+            SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;
+            SniFragmentMaxBufferBytes.Value = 65536;
+            ExperimentalSettingsVersion.Value = 2;
+            changed = true;
+        }
+
+        if (ExperimentalSettingsVersion.Value < 3)
+        {
+            // AliDNS 的响应在部分网络下会被污染（HF 返回 Facebook IPv6）。
+            // 只替换仍是旧默认值的地址，保留用户手动配置的 DoH。
+            if (string.Equals(DohEndpoint.Value, "https://dns.alidns.com/resolve", StringComparison.OrdinalIgnoreCase))
+            {
+                DohEndpoint.Value = DefaultDohEndpoint;
+            }
+            if (string.Equals(DohWireEndpoint.Value, "https://dns.alidns.com/dns-query", StringComparison.OrdinalIgnoreCase))
+            {
+                DohWireEndpoint.Value = DefaultDohWireEndpoint;
+            }
+            ExperimentalSettingsVersion.Value = 3;
+            changed = true;
+        }
+
+        if (changed) SettingsHost.Save();
     }
 
     /// <summary>
@@ -582,6 +619,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         SniFragmentDelayMilliseconds.Value = 10;
         SniSplitPieces.Value = 3;
         SniFragmentJitterMilliseconds.Value = 0;
+        SniPaddingBytes.Value = 4096;
         EnableSniFragmentFallback.Value = true;
         SniFragmentFallbackProbeMilliseconds.Value = 1200;
         SniFragmentFallbackCacheMinutes.Value = 10;

@@ -62,7 +62,10 @@ namespace System.Application.ProxyRules
             {
                 return ProxySettings.HfCdnIpList.Split(';');
             }
-            return ProxySettings.HuggingFaceApexIpList.Split(';');
+            return ProxySettings.HuggingFaceApexIpList
+                .Split(';')
+                .Concat(ProxySettings.HuggingFaceIpv6List.Split(';'))
+                .ToArray();
         }
 
         static void Add(List<string> list, string value)

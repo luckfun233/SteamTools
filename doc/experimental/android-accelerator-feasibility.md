@@ -605,7 +605,77 @@ ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 | ECH | 是 | 需要客户端/服务端支持，Android 13 不可控 | 不实现 |
 | 假包 / TTL / 乱序 / TCP 序列重叠（GoodbyeDPI、Zapret、ByeDPI） | 是 | 需要 raw socket/NFQUEUE/root | 当前 VpnService 用户态不可行 |
 
-## 13. 参考资料
+## 13. 第三轮真机日志分析（2026-11-19）
+
+用户网络下 GitHub 已基本可用，但 Hugging Face 仍然失败。新日志（`1watt-lab-20261119-220640/220727`、`1watt-logs-20261119-221252/221627`）显示：
+
+- 预置 IP 已生效：sidecar 实际连接 `3.167.200.113 / 18.155.129.x`，TCP 可连通。
+- TLS record 分片已生效：`分片: huggingface.co:443 策略=TlsRecordSplit 段数=3`，但约 44ms 后立即 `分片握手被重置`。
+- 结论：该网络的 DPI 能重组 TCP 流和普通 TLS record，单纯 record 拆分不足以绕过 Hugging Face 的 SNI 黑名单。
+- `DoH` 走 AliDNS 时返回 `210.56.51.193`，系统 DNS 返回 `128.242.245.29` 和 Facebook IPv6 `2a03:2880:...`，均是被污染结果；而 `doh.pub` 实测返回真实 CloudFront 地址（`3.168.178.x` / `2600:9000:2751:...`）。
+- 证书模式启动时报 `Failed to make system trust root certificate ... Access is denied.`：Titanium 尝试写 Windows 证书存储，Android 上必然失败。
+
+### 本轮新增
+
+1. **Tiny record 脉冲（策略 7）**
+   把 ClientHello 拆成几十到上百个 1~64 字节的小 TLS record，SNI 内部逐字节一条 record，并在发送之间加入少量延迟。服务端会按 TLS 规范重组；只按 record 或固定窗口解析的 DPI 看不到完整域名。
+
+2. **ClientHello 填充（策略 8，RFC 7685）**
+   在 SNI 扩展之前插入 4KB（可调）padding，把域名推到 DPI 的检查窗口之外。部分 DPI 只解析 ClientHello 前 N 字节，这种策略对它们有效，且完全合法。
+
+3. **失败自动升级 + 策略记忆**
+   当前策略被重置时，自动依次尝试 TinyRecords、Padding；成功后按域名记住，后续连接直接用。全部失败才回退到不分片，并写入 10 分钟跳过缓存。
+
+4. **Hugging Face IPv6 兜底**
+   增加 CloudFront IPv6 预置地址（`2600:9000:2751:...`），同时写入 AAAA 响应，避免继续使用被污染的 Facebook IPv6。若 IPv6 也不可达，连接竞速会自动退回 IPv4。
+
+5. **DoH 默认改为 doh.pub**
+   AliDNS 在用户网络下对 HF 返回污染结果；doh.pub 的 JSON/wire 接口都返回真实 CloudFront 地址。迁移版本 3 只替换仍是旧默认值的 DoH 地址，不覆盖用户自定义。
+
+6. **持久 UDP flow（QUIC/HTTP3）**
+   UDP ASSOCIATE 从“每个数据报新建 socket、等 3 秒”改为按目标端点维护长连接和接收循环，空闲 90 秒回收，最多 128 条 flow。这样 QUIC 握手和后续流才可能完成。QUIC 的 SNI 在 TLS 1.3 握手中加密，绕过的是只看 TCP ClientHello 的 DPI；前提是运营商不阻断 UDP/443。
+
+7. **证书模式完善**
+   - Android 不再调用 Titanium 的 Windows 证书存储 API，避免 `Access is denied`。
+   - 新增 Android `TrustRootCertificate` 实现，打开内置 `GuideCACertActivity`（导出 .cer + 系统安全设置）。
+   - 实验设置页增加“证书模式（MITM）”卡片和安装引导。
+   - 说明限制：Chrome/Firefox 一般信任用户 CA；Android 7+ 普通应用默认不信任用户 CA。
+   - 这是复刻 DevSidecar `sni: huggingface.cn + verifyHost` 的唯一可靠方式。
+
+8. **实验室增加 HF 专项**
+   - 同一 IP 分别用 `cloudfront.net` 和 `huggingface.co` 做 SNI，判断阻断依据是 SNI 还是 IP/路由。
+   - 直接测试 CloudFront IPv6。
+   - 分片策略矩阵加入 TinyRecords / Padding，可一键比较成功率。
+
+### 仍未解决
+
+- 如果 DPI 完整重组 TCP + TLS record，并且对 ClientHello 做全文匹配，免证书模式下任何分片/填充都无效；只能靠证书模式 MITM、上游中继或 IPv6/QUIC 绕路。
+- Android 13 的普通应用不信任用户 CA，证书模式主要对浏览器生效。
+- raw socket 级方案（伪造包、TTL、TCP 序列重叠、OOB）需要 root/VpnService 之外的底层能力，当前用户态实现无法使用。
+
+## 14. 依赖漏洞扫描（2026-11-19）
+
+使用 `dotnet list tests/ST.Client.UnitTest/ST.Client.UnitTest.csproj package --vulnerable --include-transitive` 扫描 net6.0 依赖图。
+
+已升级：
+
+| 包 | 原版本 | 新版本 | 说明 |
+|---|---|---|---|
+| System.Text.Json | 6.0.2 | 6.0.10 | 修复反序列化 DoS 等公告 |
+| Microsoft.Extensions.Caching.Memory | 6.0.1 | 6.0.2 | 修复 DoS 公告 |
+| System.Drawing.Common | 4.7.0（传递） | 6.0.1 | CVE-2021-24112（Critical，GDI+ RCE）；测试项目显式覆盖 |
+| MessagePack | 2.4.59 | 2.5.303 | 修复 13 条 DoS/递归公告 |
+| SkiaSharp / NativeAssets.Linux | 2.88.3 | 2.88.9 | 修复 libwebp CVE-2023-4863 对应公告 |
+| SharpZipLib | 1.4.1 | 1.4.2 | 最新稳定版 |
+| SQLitePCLRaw.bundle_green | 2.1.3 | 2.1.11 | 当前最新；GHSA-2m69-gcr7-jv3q 尚无修复版本 |
+
+仍存在、已评估：
+
+- **SQLitePCLRaw.lib.e_sqlite3 2.1.11（High）**：上游 SQLite 漏洞，2.1.11 已是当前最新，暂无修复版本。仅影响本地 SQLite 数据库文件解析，不处理网络输入。
+- **AutoMapper 12.0.0（High）**：公告为不受控递归 DoS，仅在映射恶意构造的对象图时触发；升级到 15.x 需要同时迁移 `AutoMapper.Extensions.Microsoft.DependencyInjection`，风险高于收益，暂缓。
+- **AngleSharp 0.17.1（Moderate）**：来自 ArchiSteamFarm（`EXCLUDE_ASF`，Android 包不包含），仅桌面 ASF 使用；升级到 1.5.0 会破坏 `AngleSharp.XPath 2.0.1`。
+
+## 15. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>

@@ -123,6 +123,49 @@ public class TlsClientHelloTest
         Assert.That(Join(chunks), Is.EqualTo(hello));
     }
 
+    [Test]
+    public void TinyRecords_Split_Sni_Into_Single_Byte_Records()
+    {
+        var hello = CreateClientHello("huggingface.co", 200);
+        var records = TlsClientHello.FragmentToTinyRecords(hello, 32, new Random(7));
+
+        Assert.That(records.Count, Is.GreaterThan(10));
+        foreach (var record in records)
+        {
+            Assert.That(record[0], Is.EqualTo(0x16));
+            var length = (record[3] << 8) | record[4];
+            Assert.That(length, Is.EqualTo(record.Length - 5));
+            Assert.That(Encoding.ASCII.GetString(record).Contains("huggingface.co", StringComparison.Ordinal), Is.False);
+        }
+
+        var payloads = records.Select(x => x.Skip(5).ToArray()).ToArray();
+        Assert.That(Join(payloads), Is.EqualTo(hello.Skip(5).ToArray()));
+    }
+
+    [Test]
+    public void Padding_Pushes_Sni_Behind_Dpi_Window()
+    {
+        var hello = CreateClientHello("huggingface.co", 100);
+
+        Assert.That(TlsClientHello.TryPadClientHello(hello, 2048, out var padded), Is.True);
+        Assert.That(TlsClientHello.TryGetSni(padded, out var sni), Is.True);
+        Assert.That(sni, Is.EqualTo("huggingface.co"));
+        Assert.That(TlsClientHello.TryGetSniRange(padded, out var offset, out _), Is.True);
+        Assert.That(offset, Is.GreaterThan(2048));
+        Assert.That(TlsClientHello.TryGetRecordLength(padded, out var total), Is.True);
+        Assert.That(total, Is.EqualTo(padded.Length));
+
+        // 填充后仍然可以继续按 record 拆分。
+        var records = TlsClientHello.FragmentToTlsRecords(padded);
+        Assert.That(records.Count, Is.GreaterThan(1));
+        foreach (var record in records)
+        {
+            Assert.That(record[0], Is.EqualTo(0x16));
+            var length = (record[3] << 8) | record[4];
+            Assert.That(length, Is.EqualTo(record.Length - 5));
+        }
+    }
+
     static byte[] Join(System.Collections.Generic.IReadOnlyList<byte[]> chunks)
     {
         var length = 0;

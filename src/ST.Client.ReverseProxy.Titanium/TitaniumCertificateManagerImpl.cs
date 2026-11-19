@@ -70,8 +70,18 @@ sealed partial class TitaniumCertificateManagerImpl : CertificateManagerImpl, IC
         => manager.CreateRootCertificate(true);
 
     protected override void SharedRemoveTrustedRootCertificate()
-        => manager.RemoveTrustedRootCertificate(true);
+    {
+        if (OperatingSystem2.IsAndroid()) return;
+
+        manager.RemoveTrustedRootCertificate(true);
+    }
 
     protected override void SharedTrustRootCertificate()
-        => manager.TrustRootCertificate(true);
+    {
+        // Android 没有 Windows 证书存储，Titanium 的 TrustRootCertificate 会抛
+        // “Access is denied”。证书必须通过系统设置/KeyChain 安装。
+        if (OperatingSystem2.IsAndroid()) return;
+
+        manager.TrustRootCertificate(true);
+    }
 }

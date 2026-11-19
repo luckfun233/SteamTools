@@ -117,6 +117,7 @@ namespace System.Application.Services.Implementation
             }
 
             results.Add(await CheckUdpAsync(host, cancellationToken).ConfigureAwait(false));
+            results.AddRange(await CheckHuggingFaceAsync(cancellationToken).ConfigureAwait(false));
             results.Add(CheckCertificate());
             results.Add(CheckDevice(deviceInfo));
 
@@ -470,6 +471,75 @@ namespace System.Application.Services.Implementation
             }
         }
 
+        /// <summary>
+        /// Hugging Face 专项目检：用白名单 SNI 做对照，并测试 CloudFront IPv6。
+        /// 结果能区分“SNI 黑名单”和“IP/路由被阻断”，比单纯看握手失败更有用。
+        /// </summary>
+        static async Task<IReadOnlyList<LabTestResult>> CheckHuggingFaceAsync(CancellationToken cancellationToken)
+        {
+            const string host = "huggingface.co";
+            var results = new List<LabTestResult>();
+            var sw = Stopwatch.StartNew();
+
+            try
+            {
+                var candidates = ProxyPresetIpProvider.GetCandidates(host)
+                    .Select(x => IPAddress.TryParse(x, out var ip) ? ip : null)
+                    .Where(x => x != null)
+                    .Select(x => x!)
+                    .ToList();
+
+                var v4 = candidates.Where(x => x.AddressFamily == AddressFamily.InterNetwork).ToList();
+                var v6 = candidates.Where(x => x.AddressFamily == AddressFamily.InterNetworkV6).ToList();
+
+                if (v4.Count == 0 && v6.Count == 0)
+                {
+                    results.Add(new LabTestResult("HF 预置 IP", false, 0, "没有可用预置 IP"));
+                    return results;
+                }
+
+                if (v4.Count > 0)
+                {
+                    var ip = v4[0].ToString();
+                    var control = await SniConnectivityTester.ProbeIpWithSniAsync(
+                        ip, "cloudfront.net", 443, 5, cancellationToken).ConfigureAwait(false);
+                    var real = await SniConnectivityTester.ProbeIpWithSniAsync(
+                        ip, host, 443, 5, cancellationToken).ConfigureAwait(false);
+
+                    var conclusion = control.Success
+                        ? (real.Success
+                            ? "白名单 SNI 与真实 SNI 都能握手，当前网络可能未阻断 HF"
+                            : "白名单 SNI 可握手、真实 SNI 被重置 => 阻断依据是 SNI")
+                        : "白名单 SNI 也失败 => IP/路由被阻断，换 SNI 也无法绕过";
+
+                    results.Add(new LabTestResult(
+                        "HF SNI 对照",
+                        real.Success,
+                        sw.ElapsedMilliseconds,
+                        $"{ip}；对照(cloudfront.net)={(control.Success ? "成功" : control.Error)}；" +
+                        $"真实(huggingface.co)={(real.Success ? "成功" : real.Error)}；{conclusion}",
+                        informational: true));
+                }
+
+                foreach (var address in v6.Take(2))
+                {
+                    var probe = await SniConnectivityTester.ProbeIpWithSniAsync(
+                        address.ToString(), host, 443, 5, cancellationToken).ConfigureAwait(false);
+                    results.Add(new LabTestResult(
+                        $"HF IPv6 TLS ({address})",
+                        probe.Success,
+                        probe.ElapsedMs,
+                        probe.Success ? "IPv6 可直连 CloudFront" : probe.Error ?? "失败"));
+                }
+            }
+            catch (Exception ex)
+            {
+                results.Add(new LabTestResult("HF 探测", false, sw.ElapsedMilliseconds, ex.Message));
+            }
+
+            return results;
+        }
+
         static LabTestResult CheckCertificate()
         {
             try
@@ -500,7 +570,7 @@ namespace System.Application.Services.Implementation
             sb.AppendLine($"远程规则: {ProxyRuleEngine.Remote.Rules.Count} 条，实际启用 {ProxyRuleEngine.Current.Rules.Count} 条，预置 IP {ProxyRuleEngine.Remote.PresetIps.Count} 组");
             sb.AppendLine($"自定义规则: {ProxySettings.EnableCustomRules.Value}，{ProxyRuleEngine.CustomRuleCount} 条");
             sb.AppendLine($"SNI 分片: {ProxySettings.EnableSniFragment.Value}，策略: {SniConnectivityTester.GetStrategyName(ProxySettings.SniFragmentStrategy.Value)}");
-            sb.AppendLine($"分片参数: 大小 {ProxySettings.SniFragmentChunkSize.Value}B，段数 {ProxySettings.SniSplitPieces.Value}，延迟 {ProxySettings.SniFragmentDelayMilliseconds.Value}ms，抖动 {ProxySettings.SniFragmentJitterMilliseconds.Value}ms");
+            sb.AppendLine($"分片参数: 大小 {ProxySettings.SniFragmentChunkSize.Value}B，段数 {ProxySettings.SniSplitPieces.Value}，延迟 {ProxySettings.SniFragmentDelayMilliseconds.Value}ms，抖动 {ProxySettings.SniFragmentJitterMilliseconds.Value}ms，填充 {ProxySettings.SniPaddingBytes.Value}B");
             sb.AppendLine($"分片域名: {ProxySettings.SniFragmentDomains.Value}");
             sb.AppendLine($"分片回退: {ProxySettings.EnableSniFragmentFallback.Value}，探测 {ProxySettings.SniFragmentFallbackProbeMilliseconds.Value}ms，缓存 {ProxySettings.SniFragmentFallbackCacheMinutes.Value} 分钟");
             sb.AppendLine($"SNI 改写: {ProxySettings.EnableSniRewrite.Value}，目标: {ProxySettings.SniRewriteHost.Value}");

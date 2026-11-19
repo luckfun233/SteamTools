@@ -1,6 +1,7 @@
 using System;
 using System.Application.ProxyRules;
 using System.Application.Settings;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -203,48 +204,112 @@ namespace System.Application.Services.Implementation
                     var fragment = ShouldFragment(effectiveHost, payload!, excludedBySni) &&
                                    !FragmentFallbackCache.ShouldSkip(effectiveHost);
 
+                    // 记住上次在这个域名上成功的分片策略，后续连接直接使用。
+                    // key 里带上用户当前选择的策略，用户改设置后旧缓存自动失效。
+                    var configuredStrategy = (TlsFragmentStrategy)ProxySettings.SniFragmentStrategy.Value;
+                    var learnedKey = GetLearnedKey(effectiveHost, configuredStrategy);
+                    TlsFragmentStrategy? learnedStrategy = null;
+                    if (fragment && learnedStrategies.TryGetValue(learnedKey, out var cachedStrategy))
+                    {
+                        learnedStrategy = cachedStrategy;
+                    }
+
                     var probe = await SendFirstPayloadAsync(
                         targetStream,
                         payload!,
                         fragment,
                         effectiveHost,
                         req.Port,
-                        connectionCts.Token).ConfigureAwait(false);
+                        connectionCts.Token,
+                        learnedStrategy).ConfigureAwait(false);
 
                     if (probe.Closed && fragment && ProxySettings.EnableSniFragmentFallback.Value)
                     {
-                        // 分片被重置：记住该域名，换一条连接用不分片方式重试一次。
-                        FragmentFallbackCache.Duration = TimeSpan.FromMinutes(
-                            Math.Max(1, ProxySettings.SniFragmentFallbackCacheMinutes.Value));
-                        FragmentFallbackCache.MarkFailure(effectiveHost);
-                        SniSidecarStats.OnFallback();
-                        ProxyDiagnostics.Warn("SniSidecar", $"分片握手被重置，回退直连重试: {effectiveHost}");
-
-                        target.Dispose();
-                        try
+                        // 分片被重置：先尝试更强的策略，再回退到不分片。
+                        // 很多 DPI 能重组普通 TLS record，但对 Tiny record 脉冲/ClientHello 填充无效。
+                        var currentStrategy = learnedStrategy ?? configuredStrategy;
+                        if (learnedStrategy != null)
                         {
-                            target = await ConnectWithFallbackAsync(
-                                host,
-                                effectiveHost,
-                                req.Port,
-                                excludedBySni,
-                                connectionCts.Token).ConfigureAwait(false);
-                            target.NoDelay = true;
-                            targetStream = target.GetStream();
-                            probe = await SendFirstPayloadAsync(
-                                targetStream,
-                                payload!,
-                                fragment: false,
-                                effectiveHost,
-                                req.Port,
-                                connectionCts.Token).ConfigureAwait(false);
-                            SniSidecarStats.OnReconnect();
+                            learnedStrategies.TryRemove(learnedKey, out _);
                         }
-                        catch (Exception ex)
+                        var recovered = false;
+                        foreach (var strategy in GetEscalationStrategies(currentStrategy))
                         {
-                            SniSidecarStats.OnFailure();
-                            ProxyDiagnostics.Warn("SniSidecar", $"回退重试失败: {effectiveHost}: {ex.Message}");
-                            return;
+                            target.Dispose();
+                            try
+                            {
+                                target = await ConnectWithFallbackAsync(
+                                    host,
+                                    effectiveHost,
+                                    req.Port,
+                                    excludedBySni,
+                                    connectionCts.Token).ConfigureAwait(false);
+                                target.NoDelay = true;
+                                targetStream = target.GetStream();
+                                probe = await SendFirstPayloadAsync(
+                                    targetStream,
+                                    payload!,
+                                    fragment: true,
+                                    effectiveHost,
+                                    req.Port,
+                                    connectionCts.Token,
+                                    strategy).ConfigureAwait(false);
+                                SniSidecarStats.OnReconnect();
+
+                                if (!probe.Closed)
+                                {
+                                    recovered = true;
+                                    learnedStrategies[learnedKey] = strategy;
+                                    ProxyDiagnostics.Info("SniSidecar",
+                                        $"分片策略升级成功: {effectiveHost} -> {strategy}");
+                                    break;
+                                }
+
+                                ProxyDiagnostics.Warn("SniSidecar",
+                                    $"分片策略升级仍被重置: {effectiveHost} -> {strategy}");
+                            }
+                            catch (Exception ex)
+                            {
+                                ProxyDiagnostics.Warn("SniSidecar",
+                                    $"分片策略升级失败: {effectiveHost} -> {strategy}: {ex.Message}");
+                            }
+                        }
+
+                        if (!recovered)
+                        {
+                            // 所有分片都失败：记住该域名，换一条连接用不分片方式重试一次。
+                            FragmentFallbackCache.Duration = TimeSpan.FromMinutes(
+                                Math.Max(1, ProxySettings.SniFragmentFallbackCacheMinutes.Value));
+                            FragmentFallbackCache.MarkFailure(effectiveHost);
+                            SniSidecarStats.OnFallback();
+                            ProxyDiagnostics.Warn("SniSidecar", $"分片握手被重置，回退直连重试: {effectiveHost}");
+
+                            target.Dispose();
+                            try
+                            {
+                                target = await ConnectWithFallbackAsync(
+                                    host,
+                                    effectiveHost,
+                                    req.Port,
+                                    excludedBySni,
+                                    connectionCts.Token).ConfigureAwait(false);
+                                target.NoDelay = true;
+                                targetStream = target.GetStream();
+                                probe = await SendFirstPayloadAsync(
+                                    targetStream,
+                                    payload!,
+                                    fragment: false,
+                                    effectiveHost,
+                                    req.Port,
+                                    connectionCts.Token).ConfigureAwait(false);
+                                SniSidecarStats.OnReconnect();
+                            }
+                            catch (Exception ex)
+                            {
+                                SniSidecarStats.OnFailure();
+                                ProxyDiagnostics.Warn("SniSidecar", $"回退重试失败: {effectiveHost}: {ex.Message}");
+                                return;
+                            }
                         }
                     }
 
@@ -281,20 +346,33 @@ namespace System.Application.Services.Implementation
             await WriteReplyAsync(control, SocksReply.Succeeded, bound).ConfigureAwait(false);
             ProxyDiagnostics.Info("SniSidecar", $"UDP ASSOCIATE 已建立 127.0.0.1:{bound.Port}");
 
-            var concurrency = new SemaphoreSlim(32, 32);
+            // QUIC/HTTP3 是长连接：必须按目标端点维护持久 UDP socket 和接收循环，
+            // 每个数据报新建 socket 再等 3 秒会导致 QUIC 握手根本走不完。
+            var flows = new Dictionary<string, UdpFlow>(StringComparer.OrdinalIgnoreCase);
+            var client = new UdpClientState { EndPoint = null };
             var controlMonitor = MonitorControlConnectionAsync(control, cancellationToken);
-            var lifetime = Task.Delay(TimeSpan.FromMinutes(10), cancellationToken);
 
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var receiveTask = udp.ReceiveAsync();
-                    var completed = await Task.WhenAny(receiveTask, controlMonitor, lifetime).ConfigureAwait(false);
-                    if (completed != receiveTask) break;
+                    var completed = await Task.WhenAny(
+                        receiveTask,
+                        controlMonitor,
+                        Task.Delay(TimeSpan.FromSeconds(30), cancellationToken)).ConfigureAwait(false);
+
+                    if (completed == controlMonitor) break;
+                    if (completed != receiveTask)
+                    {
+                        CleanupUdpFlows(flows);
+                        continue;
+                    }
 
                     var result = receiveTask.Result;
-                    _ = HandleUdpDatagramAsync(udp, result, concurrency, cancellationToken);
+                    client.EndPoint = result.RemoteEndPoint;
+                    // 不阻塞后续数据报：QUIC 的握手包可能连续到达。
+                    _ = HandleUdpDatagramAsync(udp, client, result.Buffer, flows, cancellationToken);
                 }
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
@@ -303,8 +381,83 @@ namespace System.Application.Services.Implementation
             }
             finally
             {
-                // 不 Dispose：fire-and-forget 的 UDP 处理可能仍在释放信号量。
-                // 每个 UDP ASSOCIATE 只创建一次，连接结束后由 GC 回收。
+                lock (flows)
+                {
+                    foreach (var flow in flows.Values)
+                    {
+                        flow.Dispose();
+                    }
+                    flows.Clear();
+                }
+            }
+        }
+
+        const int MaxUdpFlows = 128;
+        static readonly TimeSpan UdpFlowIdleTimeout = TimeSpan.FromSeconds(90);
+
+        sealed class UdpClientState
+        {
+            public volatile IPEndPoint? EndPoint;
+        }
+
+        sealed class UdpFlow : IDisposable
+        {
+            public UdpFlow(IPAddress address, string? host, int port, UdpClient socket)
+            {
+                Address = address;
+                Host = host;
+                Port = port;
+                Socket = socket;
+                Touch();
+            }
+
+            public IPAddress Address { get; }
+
+            public string? Host { get; }
+
+            public int Port { get; }
+
+            public UdpClient Socket { get; }
+
+            long lastActiveTicks;
+
+            public void Touch() => Interlocked.Exchange(ref lastActiveTicks, DateTime.UtcNow.Ticks);
+
+            public long IdleMilliseconds
+                => (long)(DateTime.UtcNow - new DateTime(Interlocked.Read(ref lastActiveTicks))).TotalMilliseconds;
+
+            public bool IsIdle(TimeSpan timeout)
+                => IdleMilliseconds > (long)timeout.TotalMilliseconds;
+
+            public void Dispose()
+            {
+                try
+                {
+                    Socket.Dispose();
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+        }
+
+        static void CleanupUdpFlows(Dictionary<string, UdpFlow> flows)
+        {
+            lock (flows)
+            {
+                var expired = flows
+                    .Where(x => x.Value.IsIdle(UdpFlowIdleTimeout))
+                    .Select(x => x.Key)
+                    .ToList();
+                foreach (var key in expired)
+                {
+                    if (flows.TryGetValue(key, out var flow))
+                    {
+                        flows.Remove(key);
+                        flow.Dispose();
+                    }
+                }
             }
         }
 
@@ -327,20 +480,16 @@ namespace System.Application.Services.Implementation
 
         async Task HandleUdpDatagramAsync(
             UdpClient udp,
-            UdpReceiveResult result,
-            SemaphoreSlim concurrency,
+            UdpClientState client,
+            byte[]? datagram,
+            Dictionary<string, UdpFlow> flows,
             CancellationToken cancellationToken)
         {
-            var datagram = result.Buffer;
             if (datagram == null || datagram.Length < 4 || datagram.Length > MaxUdpDatagram) return;
             if (datagram[2] != 0) return; // 不支持 SOCKS5 UDP 分片
 
-            var acquired = false;
             try
             {
-                await concurrency.WaitAsync(cancellationToken).ConfigureAwait(false);
-                acquired = true;
-
                 var offset = 4;
                 IPAddress? address = null;
                 string? host = null;
@@ -384,57 +533,120 @@ namespace System.Application.Services.Implementation
                     response = await DohWireResolver.QueryAsync(payload, cancellationToken).ConfigureAwait(false);
                 }
 
-                if (response == null)
+                if (response != null)
                 {
-                    response = await ForwardUdpAsync(address, host, targetPort, payload, cancellationToken).ConfigureAwait(false);
+                    var responsePacket = BuildUdpResponse(address, host, targetPort, response);
+                    if (client.EndPoint != null)
+                    {
+                        await udp.SendAsync(responsePacket, responsePacket.Length, client.EndPoint).ConfigureAwait(false);
+                    }
+                    return;
                 }
-                if (response == null) return;
 
-                var responsePacket = BuildUdpResponse(address, host, targetPort, response);
-                await udp.SendAsync(responsePacket, responsePacket.Length, result.RemoteEndPoint).ConfigureAwait(false);
+                // 非 DNS 或 DoH 失败：交给持久 flow 转发。
+                var flow = await GetOrCreateUdpFlowAsync(
+                    udp, client, address, host, targetPort, flows).ConfigureAwait(false);
+                if (flow == null) return;
+
+                await flow.Socket.SendAsync(payload, payload.Length).ConfigureAwait(false);
+                flow.Touch();
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 ProxyDiagnostics.Warn("SniSidecar", $"UDP 转发失败: {ex.Message}");
             }
-            finally
-            {
-                if (acquired) concurrency.Release();
-            }
         }
 
-        static async Task<byte[]?> ForwardUdpAsync(
+        static async Task<UdpFlow?> GetOrCreateUdpFlowAsync(
+            UdpClient udp,
+            UdpClientState client,
             IPAddress? address,
             string? host,
             int port,
-            byte[] payload,
-            CancellationToken cancellationToken)
+            Dictionary<string, UdpFlow> flows)
         {
-            try
+            if (address == null && !string.IsNullOrEmpty(host))
             {
-                if (address == null && !string.IsNullOrEmpty(host))
+                var preset = ProxyPresetIpProvider.GetCandidates(host)
+                    .Select(x => IPAddress.TryParse(x, out var ip) ? ip : null)
+                    .FirstOrDefault(x => x != null);
+                if (preset != null)
+                {
+                    address = preset;
+                }
+                else
                 {
                     var addresses = await Dns.GetHostAddressesAsync(host).ConfigureAwait(false);
                     address = addresses.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork) ??
                               addresses.FirstOrDefault();
                 }
-                if (address == null) return null;
-
-                using var client = new UdpClient(address.AddressFamily);
-                client.Connect(new IPEndPoint(address, port));
-                await client.SendAsync(payload, payload.Length).ConfigureAwait(false);
-
-                var receiveTask = client.ReceiveAsync();
-                var completed = await Task.WhenAny(
-                    receiveTask,
-                    Task.Delay(TimeSpan.FromSeconds(3), cancellationToken)).ConfigureAwait(false);
-                if (completed != receiveTask) return null;
-                return receiveTask.Result.Buffer;
             }
-            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            if (address == null) return null;
+
+            var key = $"{address}:{port}";
+            lock (flows)
             {
-                ProxyDiagnostics.Warn("SniSidecar", $"UDP 目标 {host ?? address?.ToString()}:{port} 不可达: {ex.Message}");
-                return null;
+                if (flows.TryGetValue(key, out var existing))
+                {
+                    existing.Touch();
+                    return existing;
+                }
+
+                if (flows.Count >= MaxUdpFlows)
+                {
+                    var oldest = flows.OrderByDescending(x => x.Value.IdleMilliseconds)
+                        .Select(x => x.Key)
+                        .FirstOrDefault();
+                    if (oldest != null && flows.TryGetValue(oldest, out var removed))
+                    {
+                        flows.Remove(oldest);
+                        removed.Dispose();
+                    }
+                }
+
+                var socket = new UdpClient(address.AddressFamily);
+                try
+                {
+                    socket.Connect(new IPEndPoint(address, port));
+                }
+                catch
+                {
+                    socket.Dispose();
+                    return null;
+                }
+
+                var flow = new UdpFlow(address, host, port, socket);
+                flows[key] = flow;
+                _ = ReceiveUdpFlowAsync(udp, client, flow);
+                return flow;
+            }
+        }
+
+        static async Task ReceiveUdpFlowAsync(UdpClient udp, UdpClientState client, UdpFlow flow)
+        {
+            try
+            {
+                while (true)
+                {
+                    var result = await flow.Socket.ReceiveAsync().ConfigureAwait(false);
+                    if (result.Buffer == null || result.Buffer.Length == 0) continue;
+                    flow.Touch();
+
+                    var endPoint = client.EndPoint;
+                    if (endPoint == null) continue;
+
+                    var packet = BuildUdpResponse(flow.Address, flow.Host, flow.Port, result.Buffer);
+                    await udp.SendAsync(packet, packet.Length, endPoint).ConfigureAwait(false);
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // flow 被回收
+            }
+            catch (Exception ex)
+            {
+                ProxyDiagnostics.Warn("SniSidecar",
+                    $"UDP flow 接收结束 {flow.Address}:{flow.Port}: {ex.Message}");
             }
         }
 
@@ -1089,13 +1301,27 @@ namespace System.Application.Services.Implementation
             return IsDomainAllowed(host, ProxySettings.SniFragmentDomains.Value);
         }
 
+        /// <summary>按域名记住当前网络下真正可用的分片策略。</summary>
+        static readonly ConcurrentDictionary<string, TlsFragmentStrategy> learnedStrategies =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        static string GetLearnedKey(string host, TlsFragmentStrategy configured)
+            => host + "|" + (int)configured;
+
+        static IEnumerable<TlsFragmentStrategy> GetEscalationStrategies(TlsFragmentStrategy current)
+        {
+            if (current != TlsFragmentStrategy.TinyRecords) yield return TlsFragmentStrategy.TinyRecords;
+            if (current != TlsFragmentStrategy.Padding) yield return TlsFragmentStrategy.Padding;
+        }
+
         async Task<ProbeResult> SendFirstPayloadAsync(
             NetworkStream target,
             byte[] payload,
             bool fragment,
             string host,
             int port,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            TlsFragmentStrategy? strategyOverride = null)
         {
             bool fragmented;
             try
@@ -1106,7 +1332,8 @@ namespace System.Application.Services.Implementation
                     fragment,
                     host,
                     port,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    strategyOverride).ConfigureAwait(false);
             }
             catch (Exception ex) when (fragment && IsConnectionReset(ex))
             {
@@ -1172,7 +1399,8 @@ namespace System.Application.Services.Implementation
             bool fragment,
             string host,
             int port,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            TlsFragmentStrategy? strategyOverride = null)
         {
             if (!fragment || payload.Length == 0)
             {
@@ -1180,11 +1408,25 @@ namespace System.Application.Services.Implementation
                 return false;
             }
 
-            var strategy = (TlsFragmentStrategy)ProxySettings.SniFragmentStrategy.Value;
+            var strategy = strategyOverride ?? (TlsFragmentStrategy)ProxySettings.SniFragmentStrategy.Value;
             var chunkSize = Math.Max(1, ProxySettings.SniFragmentChunkSize.Value);
             var delay = Math.Max(0, ProxySettings.SniFragmentDelayMilliseconds.Value);
             var jitter = Math.Max(0, ProxySettings.SniFragmentJitterMilliseconds.Value);
             var pieces = Math.Max(2, ProxySettings.SniSplitPieces.Value);
+
+            if (strategy == TlsFragmentStrategy.Padding &&
+                TlsClientHello.TryPadClientHello(payload, ProxySettings.SniPaddingBytes.Value, out var padded))
+            {
+                payload = padded;
+            }
+
+            // TinyRecords 会产生几十到上百个 record。保留少量间隔，既避免 TCP 合并，
+            // 又能在 1 秒左右发完，不至于触发浏览器握手超时。
+            if (strategy == TlsFragmentStrategy.TinyRecords)
+            {
+                delay = delay <= 0 ? 1 : Math.Min(delay, 10);
+            }
+
             var chunks = TlsClientHello.Fragment(payload, strategy, chunkSize, pieces);
 
             if (chunks.Count <= 1)

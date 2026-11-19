@@ -259,10 +259,12 @@ namespace System.Application.Services.Implementation
 
             var candidates = ProxyPresetIpProvider.GetCandidates(host);
 
+            var parsed = new List<IPAddress>();
             var addresses = new List<IPAddress>();
             foreach (var candidate in candidates)
             {
                 if (!IPAddress.TryParse(candidate.Trim(), out var address)) continue;
+                if (!parsed.Contains(address)) parsed.Add(address);
                 var isV6 = address.AddressFamily == AddressFamily.InterNetworkV6;
                 if (qtype == 1 && isV6) continue;
                 if (qtype == 28 && !isV6) continue;
@@ -270,7 +272,12 @@ namespace System.Application.Services.Implementation
                 addresses.Add(address);
             }
 
-            if (addresses.Count == 0) return null;
+            if (addresses.Count == 0)
+            {
+                // 有预置 IP，但没有当前查询类型对应的地址：
+                // 返回空答案（NOERROR/0），避免把被污染的 AAAA 继续交给客户端。
+                return parsed.Count > 0 ? BuildPresetEmptyResponse(query) : null;
+            }
 
             if (TryGetQuestionEnd(query, out var questionEnd))
             {
@@ -339,6 +346,24 @@ namespace System.Application.Services.Implementation
                 if (cache.Count >= MaxCacheEntries) cache.Clear();
             }
             cache[key] = new CacheItem((byte[])response.Clone(), DateTime.UtcNow.AddSeconds(60));
+        }
+
+        /// <summary>
+        /// 构造 NOERROR、0 条答案的响应，用于压掉被污染的 AAAA。
+        /// </summary>
+        static byte[] BuildPresetEmptyResponse(byte[] query)
+        {
+            var hasQuestion = TryGetQuestionEnd(query, out var end);
+            var questionEnd = hasQuestion ? end : Math.Min(12, query.Length);
+            var response = new byte[questionEnd];
+            Buffer.BlockCopy(query, 0, response, 0, questionEnd);
+            response[2] = 0x81; // QR + RD
+            response[3] = 0x80; // RA, RCODE=0
+            response[4] = 0x00; response[5] = 0x01;
+            response[6] = 0; response[7] = 0;
+            response[8] = 0; response[9] = 0;
+            response[10] = 0; response[11] = 0;
+            return response;
         }
 
         /// <summary>

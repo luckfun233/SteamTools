@@ -125,6 +125,8 @@ namespace System.Application.Services.Implementation
                     TlsFragmentStrategy.SniPieces,
                     TlsFragmentStrategy.TlsRecordSplit,
                     TlsFragmentStrategy.TlsRecordSplitRandom,
+                    TlsFragmentStrategy.TinyRecords,
+                    TlsFragmentStrategy.Padding,
                     TlsFragmentStrategy.Fixed,
                     TlsFragmentStrategy.Record,
                     TlsFragmentStrategy.Random,
@@ -182,6 +184,8 @@ namespace System.Application.Services.Implementation
             ProxySettings.SniFragmentStrategySniPieces => "SNI 多段",
             ProxySettings.SniFragmentStrategyTlsRecordSplit => "TLS record 拆分",
             ProxySettings.SniFragmentStrategyTlsRecordSplitRandom => "TLS record 随机拆分",
+            ProxySettings.SniFragmentStrategyTinyRecords => "Tiny record 脉冲",
+            ProxySettings.SniFragmentStrategyPadding => "ClientHello 填充",
             ProxySettings.SniFragmentStrategyRandom => "随机分片",
             _ => "SNI 边界",
         };
@@ -199,6 +203,35 @@ namespace System.Application.Services.Implementation
                 using var timeout = CreateTimeout(cancellationToken, timeoutSeconds);
                 await ConnectWithTimeoutAsync(client, host, port, timeout.Token).ConfigureAwait(false);
                 if (!await HandshakeAsync(client.GetStream(), host, timeoutSeconds, cancellationToken).ConfigureAwait(false))
+                {
+                    return SniProbeResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
+                }
+                return SniProbeResult.Ok(sw.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                return SniProbeResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
+            }
+        }
+
+        /// <summary>
+        /// 连接到指定 IP，但用指定域名做 SNI。用于判断阻断是否针对 SNI：
+        /// 同一个 IP 换成白名单 SNI 能握手，说明是 SNI 黑名单而不是 IP 阻断。
+        /// </summary>
+        public static async Task<SniProbeResult> ProbeIpWithSniAsync(
+            string address,
+            string sni,
+            int port,
+            int timeoutSeconds,
+            CancellationToken cancellationToken)
+        {
+            using var client = new TcpClient();
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                using var timeout = CreateTimeout(cancellationToken, timeoutSeconds);
+                await ConnectWithTimeoutAsync(client, address, port, timeout.Token).ConfigureAwait(false);
+                if (!await HandshakeAsync(client.GetStream(), sni, timeoutSeconds, cancellationToken).ConfigureAwait(false))
                 {
                     return SniProbeResult.Fail(sw.ElapsedMilliseconds, "TLS 握手失败");
                 }

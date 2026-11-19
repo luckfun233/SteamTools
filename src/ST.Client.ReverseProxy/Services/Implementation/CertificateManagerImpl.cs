@@ -114,7 +114,21 @@ abstract partial class CertificateManagerImpl
             {
                 await TrustRootCertificateMacOS();
             }
-            else if (OperatingSystem2.IsLinux() && !OperatingSystem2.IsAndroid())
+            else if (OperatingSystem2.IsAndroid())
+            {
+                // Android 无法由应用直接写入系统信任区，只能导出 .cer 后交给系统安装器。
+                // 未安装根证书时，VPN 会自动退回免证书 sidecar。
+                var filePath = GetCerFilePathGeneratedWhenNoFileExists();
+                if (filePath != null)
+                {
+                    var state = await platformService.TrustRootCertificate(filePath);
+                    if (state == true)
+                    {
+                        Log.Info(TAG, "已打开 Android 证书安装器，需要用户在系统设置中确认。");
+                    }
+                }
+            }
+            else if (OperatingSystem2.IsLinux())
             {
                 TrustRootCertificateLinux();
             }

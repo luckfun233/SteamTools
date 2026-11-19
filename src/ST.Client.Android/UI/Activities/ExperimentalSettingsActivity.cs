@@ -124,6 +124,7 @@ namespace System.Application.UI.Activities
             BuildStatusSection();
             BuildDevSidecarSection();
             BuildCertificateLessSection();
+            BuildCertificateSection();
             BuildRelaySection();
             BuildVpnAndLogSection();
             BuildBottomActions();
@@ -206,8 +207,8 @@ namespace System.Application.UI.Activities
 
             AddSwitch(card, "免证书模式", "开启后 VPN 出口切换到本地 SNI sidecar，不做 MITM/证书安装。", ProxySettings.IsCertificateLessMode);
             AddSwitch(card, "启用 SNI 分片", "对下方域名拆分 ClientHello，绕过 SNI 阻断。", ProxySettings.EnableSniFragment);
-            AddChoice(card, "分片策略", "推荐 TLS record 拆分；TLS record 随机拆分更难被指纹。SNI 边界/多段只拆 TCP 段，对能重组 TCP 的 DPI 无效。",
-                new[] { "固定大小", "SNI 边界", "TLS 记录头", "SNI 多段", "TLS record 拆分（推荐）", "随机分片", "TLS record 随机拆分" },
+            AddChoice(card, "分片策略", "推荐 TLS record 拆分；TLS record 随机拆分更难被指纹。若仍被重置，可试 Tiny record 脉冲或 ClientHello 填充。SNI 边界/多段只拆 TCP 段，对能重组 TCP 的 DPI 无效。",
+                new[] { "固定大小", "SNI 边界", "TLS 记录头", "SNI 多段", "TLS record 拆分（推荐）", "随机分片", "TLS record 随机拆分", "Tiny record 脉冲", "ClientHello 填充" },
                 ProxySettings.SniFragmentStrategy.Value,
                 value => ProxySettings.SniFragmentStrategy.Value = value);
             AddText(card, "分片生效域名", "分号分隔，支持 * 通配符。默认包含 GitHub/Hugging Face/Pixiv。", ProxySettings.SniFragmentDomains, false);
@@ -218,6 +219,7 @@ namespace System.Application.UI.Activities
             AddNumber(advanced, "固定分片大小（字节）", "固定大小和随机分片策略使用。", ProxySettings.SniFragmentChunkSize, 1, 4096);
             AddNumber(advanced, "分片间隔（毫秒）", "每段之间的延迟，10~30ms 通常足够。", ProxySettings.SniFragmentDelayMilliseconds, 0, 1000);
             AddNumber(advanced, "随机抖动（毫秒）", "在固定间隔上增加随机等待。", ProxySettings.SniFragmentJitterMilliseconds, 0, 500);
+            AddNumber(advanced, "ClientHello 填充字节", "仅“ClientHello 填充”策略生效，默认 4096；上限受单 record 16384 字节限制。", ProxySettings.SniPaddingBytes, 0, 16384);
             AddNumber(advanced, "ClientHello 最大缓冲（字节）", "新版浏览器 ClientHello 可能接近 16KB。", ProxySettings.SniFragmentMaxBufferBytes, 1024, 65536);
             AddNumber(advanced, "首字节探测超时（毫秒）", "分片后等待上游响应的最长时间。", ProxySettings.SniFragmentFallbackProbeMilliseconds, 100, 5000);
             AddNumber(advanced, "跳过分片缓存（分钟）", "失败后对该域名暂停分片的时间。", ProxySettings.SniFragmentFallbackCacheMinutes, 1, 1440);
@@ -228,6 +230,48 @@ namespace System.Application.UI.Activities
             AddSwitch(rewrite, "启用 SNI 改写", "仅用于明确知道源站行为的域名。", ProxySettings.EnableSniRewrite);
             AddText(rewrite, "改写目标", "例如 baidu.com 或 none（删除 SNI 扩展）。", ProxySettings.SniRewriteHost, false);
             AddText(rewrite, "允许改写的域名", "分号分隔，支持 * 通配符。", ProxySettings.SniRewriteDomains, false);
+        }
+
+        void BuildCertificateSection()
+        {
+            var card = AddSection(
+                "证书模式（MITM）",
+                "安装根证书后可以做 SNI 伪装/镜像/请求头改写，是 DevSidecar 访问 Hugging Face 的方式。Android 必须手动把证书装到“用户 CA”里。");
+
+            AddInfoText(card,
+                "限制：Chrome/Firefox 一般信任用户 CA，但 Android 7+ 的普通应用默认不信任用户 CA。\n" +
+                "因此证书模式主要影响浏览器；其它应用仍建议保持免证书模式。\n" +
+                "未安装证书时，VPN 会自动退回免证书 sidecar，不会断网。");
+
+            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row.AddView(CreateButton("安装根证书（打开引导）", InstallRootCertificateAsync, true), WeightedButtonParams());
+            row.AddView(CreateButton("系统安全设置", () =>
+            {
+                GoToPlatformPages.SystemSettingsSecurity(this);
+            }, false), WeightedButtonParams());
+            card.AddView(row);
+        }
+
+        async void InstallRootCertificateAsync()
+        {
+            try
+            {
+                var manager = IReverseProxyService.Instance.CertificateManager;
+                if (manager.GetCerFilePathGeneratedWhenNoFileExists() == null)
+                {
+                    ShowToast("证书生成失败，请查看诊断日志");
+                    return;
+                }
+
+                // Android 上 SetupRootCertificate 的返回值只代表“是否已信任”，
+                // 而用户此时还没在系统设置里确认，所以这里直接打开安装引导。
+                await manager.PlatformTrustRootCertificateGuide();
+                RefreshStatus();
+            }
+            catch (Exception ex)
+            {
+                ShowToast("安装证书失败: " + ex.Message);
+            }
         }
 
         void BuildRelaySection()
