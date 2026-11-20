@@ -60,8 +60,13 @@ jobs:
       - name: Install .NET Android workload
         run: dotnet workload install android
 
+      - name: Verify SDK
+        run: |
+          dotnet --version
+          dotnet --list-sdks
+
       - name: Run tests
-        run: dotnet test tests/ST.Client.UnitTest/ST.Client.UnitTest.csproj -p:RunAnalyzers=false --nologo
+        run: dotnet test tests/ST.Client.UnitTest/ST.Client.UnitTest.csproj -f net6.0 -p:RunAnalyzers=false --nologo
 
       - name: Generate signing key
         run: |

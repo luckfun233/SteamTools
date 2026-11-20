@@ -675,7 +675,60 @@ ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 - **AutoMapper 12.0.0（High）**：公告为不受控递归 DoS，仅在映射恶意构造的对象图时触发；升级到 15.x 需要同时迁移 `AutoMapper.Extensions.Microsoft.DependencyInjection`，风险高于收益，暂缓。
 - **AngleSharp 0.17.1（Moderate）**：来自 ArchiSteamFarm（`EXCLUDE_ASF`，Android 包不包含），仅桌面 ASF 使用；升级到 1.5.0 会破坏 `AngleSharp.XPath 2.0.1`。
 
-## 15. 参考资料
+## 15. 启动闪退与 Android 13 证书安装（2026-11-20）
+
+### 启动闪退
+
+上一版 APK 是 `Debug` 构建。.NET Android 在 Debug 下默认启用 Fast Deployment，
+程序集不嵌进 APK，而是由 IDE 通过 `adb` 推送。直接 sideload 时 APK 里没有程序集，
+启动就会立刻闪退。
+
+修复：
+
+- `ST.Client.Android.App.Modern.csproj` 固定 `EmbedAssembliesIntoApk=true` 和
+  `AndroidFastDeploymentType=None`。
+- 新增 `AndroidCrashLogger`，未处理异常写入：
+  `Android/data/net.steampp.app/files/last-crash.txt`，同时写 `logcat` tag `SteamToolsCrash`。
+- 设置页“VPN 与诊断日志”里新增“上次崩溃日志”入口。
+- GitHub Actions 只构建 Release APK，避免再次产出 Debug Fast Deployment 包。
+
+### Android 13 安装证书的可行路径
+
+| 方式 | 权限要求 | 证书位置 | Chrome | 普通 App（targetSdk 24+） |
+|---|---|---|---|---|
+| 系统设置手动导入 | 无 | 用户 CA | 信任 | 默认不信任 |
+| `KeyChain` 安装 Intent | 无（需用户确认） | 用户 CA | 信任 | 默认不信任 |
+| 设备所有者 + `DevicePolicyManager.installCaCert` | Shizuku/ADB 执行 `dpm set-device-owner` | 用户 CA | 信任 | 默认不信任 |
+| 写入 `/system/etc/security/cacerts` | root（remount /system） | 系统 CA | 信任 | 信任 |
+
+关键结论：
+
+- **Shizuku 只有 shell UID，不是 root**。Android 10+ 的 `/system` 是只读 + dm-verity，
+  `mount -o rw,remount /system` 和 `adb remount` 都需要 root 或关闭验证启动，
+  Shizuku 无法完成系统 CA 写入。
+- 设备所有者可以**静默安装用户 CA**，不需要用户点确认，但仍不是系统 CA。
+  设置设备所有者要求设备上没有账号，且取消通常需要恢复出厂设置，风险较高。
+- 应用已内置 `SteamToolsDeviceAdminReceiver` 和“复制 Shizuku 命令”按钮：
+  `rish -c "dpm set-device-owner net.steampp.app/.SteamToolsDeviceAdminReceiver"`。
+  设置成功后，证书页面会显示“设备所有者: 是”，可直接静默安装用户 CA。
+- 如果目标 App 使用 `networkSecurityConfig` 且没有 `<certificates src="user"/>`，
+  用户 CA 不会被信任；这需要改目标 App 或 root 装系统 CA，VPN 层无法绕过。
+
+### 其他开源项目调研
+
+| 项目 | 平台 | 是否需要 root | 可借鉴点 |
+|---|---|---|---|
+| ByeDPI / ByeDPIAndroid | 桌面/Android | 否（Android 走 VPN + 原生 ciadpi） | TCP split、disorder、OOB、fake、TTL；比 C# 分片更底层 |
+| GoodbyeDPI | Windows | 否 | TCP 分片、Host 头混淆、TTL 伪装 |
+| Zapret 2 | Linux | 通常需要 NFQUEUE/root | multisplit、seqovl、fake、TTL |
+| SpoofDPI / GreenTunnel | 桌面 | 否 | 首字节拆分、TLS record 拆分 |
+| hf-mirror | Web | 否 | Hugging Face 镜像，适合下载模型，不是透明代理 |
+
+本项目当前没有直接嵌入 ciadpi：它需要为 Android 交叉编译原生二进制、处理
+Android 10+ 的可执行文件限制，并做进程/端口生命周期管理。若后续 TinyRecords/Padding
+仍无法绕过该网络，建议把 ByeDPIAndroid 的 `ciadpi` 作为可选 sidecar 内核接入。
+
+## 16. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>

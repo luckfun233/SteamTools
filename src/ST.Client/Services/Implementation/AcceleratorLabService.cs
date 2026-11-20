@@ -141,6 +141,12 @@ namespace System.Application.Services.Implementation
                 {
                     detail += $"；自定义规则错误: {ProxyRuleEngine.LastCustomError}";
                 }
+
+                var hfRule = current.Match("huggingface.co", "/");
+                detail += hfRule == null
+                    ? "；HF MITM 规则: 未匹配"
+                    : $"；HF MITM 规则: {hfRule.Description ?? hfRule.DomainPattern}" +
+                      (string.IsNullOrEmpty(hfRule.Sni) ? string.Empty : $"，SNI={hfRule.Sni}");
                 return new LabTestResult(
                     "规则集",
                     current.Rules.Count > 0 || current.PresetIps.Count > 0,
