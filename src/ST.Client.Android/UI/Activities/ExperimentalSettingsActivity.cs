@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Android.App;
@@ -241,7 +242,12 @@ namespace System.Application.UI.Activities
             AddInfoText(card,
                 "限制：Chrome/Firefox 一般信任用户 CA，但 Android 7+ 的普通应用默认不信任用户 CA。\n" +
                 "因此证书模式主要影响浏览器；其它应用仍建议保持免证书模式。\n" +
-                "未安装证书时，VPN 会自动退回免证书 sidecar，不会断网。");
+                "未安装证书时，VPN 会自动退回免证书 sidecar，不会断网。\n\n" +
+                "Android 13 的系统 CA 位于只读 /system 分区，Shizuku 只有 shell 权限，无法写入系统 CA。\n" +
+                "如果已用 Shizuku/ADB 把本应用设为“设备所有者”，可以静默安装用户 CA（Chrome 信任）。");
+
+            var owner = AndroidCertificateInstaller.IsDeviceOwner(this);
+            AddInfoText(card, $"设备所有者: {(owner ? "是，可静默安装用户 CA" : "否")}");
 
             var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             row.AddView(CreateButton("安装根证书（打开引导）", InstallRootCertificateAsync, true), WeightedButtonParams());
@@ -250,6 +256,37 @@ namespace System.Application.UI.Activities
                 GoToPlatformPages.SystemSettingsSecurity(this);
             }, false), WeightedButtonParams());
             card.AddView(row);
+
+            var row2 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row2.AddView(CreateButton(owner ? "静默安装用户 CA" : "复制 Shizuku 命令", () =>
+            {
+                if (!AndroidCertificateInstaller.IsDeviceOwner(this))
+                {
+                    var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
+                    clipboard?.SetText(AndroidCertificateInstaller.ShizukuCommand);
+                    ShowToast("已复制。请在 Shizuku 终端执行，然后回到本页");
+                    return;
+                }
+
+                var manager = IReverseProxyService.Instance.CertificateManager;
+                var cer = manager.GetCerFilePathGeneratedWhenNoFileExists();
+                if (cer == null)
+                {
+                    ShowToast("证书生成失败");
+                    return;
+                }
+
+                ShowToast(AndroidCertificateInstaller.InstallUserCa(this, cer)
+                    ? "用户 CA 已静默安装"
+                    : "安装失败，请改用系统安装引导");
+            }, !owner), WeightedButtonParams());
+            row2.AddView(CreateButton("复制设备所有者命令", () =>
+            {
+                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
+                clipboard?.SetText(AndroidCertificateInstaller.ShizukuCommand);
+                ShowToast("已复制设备所有者命令");
+            }, false), WeightedButtonParams());
+            card.AddView(row2);
         }
 
         async void InstallRootCertificateAsync()
@@ -323,6 +360,16 @@ namespace System.Application.UI.Activities
             card.AddView(row);
 
             var row2 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row2.AddView(CreateButton("上次崩溃日志", () =>
+            {
+                var path = AndroidCrashLogger.CrashFilePath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                {
+                    ShowToast("没有崩溃日志");
+                    return;
+                }
+                GoToPlatformPages.OpenFile(this, new Java.IO.File(path), "text/plain");
+            }, false), WeightedButtonParams());
             row2.AddView(CreateButton("清理日志", () =>
             {
                 ProxyDiagnostics.Clear();

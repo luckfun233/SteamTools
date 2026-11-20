@@ -16,6 +16,9 @@
     <DefineConstants>SHADOWSOCKS;EXCLUDE_ASF;$(DefineConstants)</DefineConstants>
     <!--<DefineConstants>SHADOWSOCKS;V2RAY;$(DefineConstants)</DefineConstants>-->
     <AndroidEnableProguard>false</AndroidEnableProguard>
+    <!-- Debug 包必须把程序集打进 APK，否则直接安装会启动即闪退（Fast Deployment 依赖 IDE 推送） -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <AndroidFastDeploymentType>None</AndroidFastDeploymentType>
     <AotAssemblies>false</AotAssemblies>
     <EnableLLVM>false</EnableLLVM>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>

@@ -311,13 +311,30 @@ namespace System.Application.UI.Activities
                     // 证书不可用时仍然测试明文 HTTP 行为
                 }
 
-                using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-                using var response = await client.GetAsync("https://github.com/robots.txt", cancellationToken);
+                using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+
+                var parts = new List<string>();
+                var ok = true;
+                foreach (var host in new[] { "github.com", "huggingface.co" })
+                {
+                    try
+                    {
+                        using var response = await client.GetAsync($"https://{host}/robots.txt", cancellationToken);
+                        parts.Add($"{host}=HTTP {(int)response.StatusCode}");
+                        ok &= response.IsSuccessStatusCode;
+                    }
+                    catch (Exception ex)
+                    {
+                        parts.Add($"{host}={ex.Message}");
+                        ok = false;
+                    }
+                }
+
                 return new LabTestResult(
                     "Titanium 代理 HTTP",
-                    response.IsSuccessStatusCode,
+                    ok,
                     watch.ElapsedMilliseconds,
-                    $"HTTP {(int)response.StatusCode}");
+                    string.Join("；", parts));
             }
             catch (Exception ex)
             {

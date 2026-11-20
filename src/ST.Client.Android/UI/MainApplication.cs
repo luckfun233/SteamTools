@@ -73,6 +73,10 @@ namespace System.Application.UI
         public override void OnCreate()
         {
             base.OnCreate();
+
+            // 先安装崩溃日志，后续任何启动异常都能在 Android/data/.../files/last-crash.txt 中看到。
+            AndroidCrashLogger.Install(this);
+
 #if SHADOWSOCKS
             Shadowsocks.Core.Instance.Init(this);
 #endif

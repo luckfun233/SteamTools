@@ -1,0 +1,122 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/android-certless-ip
+    paths-ignore:
+      - 'doc/**'
+      - '**.md'
+      - '.uploads/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Init required submodules
+        run: |
+          git submodule update --init --depth 1 \
+            references/ArchiSteamFarm \
+            references/Titanium-Web-Proxy
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.428'
+
+      - name: Setup Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platforms;android-31" "build-tools;32.0.0" "platform-tools"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install .NET Android workload
+        run: dotnet workload install android
+
+      - name: Run tests
+        run: dotnet test tests/ST.Client.UnitTest/ST.Client.UnitTest.csproj -p:RunAnalyzers=false --nologo
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore ci.keystore \
+            -alias steampp \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass steampp-ci -keypass steampp-ci \
+            -dname "CN=SteamTools CI, OU=Android, O=SteamTools, L=CN, ST=CN, C=CN"
+
+      - name: Build Release APK
+        run: |
+          dotnet build src/ST.Client.Android.App.Modern/ST.Client.Android.App.Modern.csproj \
+            -c Release -f net6.0-android \
+            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" \
+            -p:JavaSdkDirectory="$JAVA_HOME" \
+            -p:AndroidPackageFormats=apk \
+            -p:AndroidKeyStore=true \
+            -p:AndroidSigningKeyStore="${{ github.workspace }}/ci.keystore" \
+            -p:AndroidSigningKeyAlias=steampp \
+            -p:AndroidSigningKeyPass=steampp-ci \
+            -p:AndroidSigningStorePass=steampp-ci \
+            -p:RunAnalyzers=false \
+            --nologo
+
+      - name: Collect APK
+        id: apk
+        run: |
+          set -e
+          APK=$(find src/ST.Client.Android.App.Modern/bin/Release/net6.0-android -name "*-Signed.apk" | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find src/ST.Client.Android.App.Modern/bin/Release/net6.0-android -name "*.apk" | head -1)
+          fi
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          ls -lh "$APK"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: steampp-android-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload to gofile
+        if: success()
+        run: |
+          set +e
+          RESP=$(curl -s --max-time 300 -F "file=@${{ steps.apk.outputs.path }}" https://upload.gofile.io/uploadfile)
+          echo "$RESP" > gofile.json
+          LINK=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('data',{}).get('downloadPage',''))" 2>/dev/null)
+          echo "gofile=$LINK" >> "$GITHUB_OUTPUT"
+          echo "### APK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- gofile: $LINK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- artifact: steampp-android-apk" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach APK to release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-${{ github.run_number }}
+          name: Android build ${{ github.run_number }}
+          body: |
+            Automated build from ${{ github.sha }}.
+          files: ${{ steps.apk.outputs.path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
