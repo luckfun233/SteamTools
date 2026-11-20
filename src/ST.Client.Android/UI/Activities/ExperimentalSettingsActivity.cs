@@ -262,8 +262,7 @@ namespace System.Application.UI.Activities
             {
                 if (!AndroidCertificateInstaller.IsDeviceOwner(this))
                 {
-                    var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                    clipboard?.SetText(AndroidCertificateInstaller.ShizukuCommand);
+                    CopyText(AndroidCertificateInstaller.ShizukuCommand);
                     ShowToast("已复制。请在 Shizuku 终端执行，然后回到本页");
                     return;
                 }
@@ -282,11 +281,17 @@ namespace System.Application.UI.Activities
             }, !owner), WeightedButtonParams());
             row2.AddView(CreateButton("复制设备所有者命令", () =>
             {
-                var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-                clipboard?.SetText(AndroidCertificateInstaller.ShizukuCommand);
+                CopyText(AndroidCertificateInstaller.ShizukuCommand);
                 ShowToast("已复制设备所有者命令");
             }, false), WeightedButtonParams());
             card.AddView(row2);
+        }
+
+        void CopyText(string text)
+        {
+            var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
+            if (clipboard == null) return;
+            clipboard.SetPrimaryClip(ClipData.NewPlainText("SteamTools", text));
         }
 
         async void InstallRootCertificateAsync()
