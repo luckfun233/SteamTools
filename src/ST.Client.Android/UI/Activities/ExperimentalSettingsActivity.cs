@@ -289,9 +289,7 @@ namespace System.Application.UI.Activities
 
         void CopyText(string text)
         {
-            var clipboard = (ClipboardManager?)GetSystemService(ClipboardService);
-            if (clipboard == null) return;
-            clipboard.SetPrimaryClip(ClipData.NewPlainText("SteamTools", text));
+            _ = Xamarin.Essentials.Clipboard.SetTextAsync(text);
         }
 
         async void InstallRootCertificateAsync()
