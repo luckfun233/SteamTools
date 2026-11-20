@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Application.ProxyRules;
+using System.Application.Settings;
 using AndroidApplication = Android.App.Application;
 
 namespace System.Application.Services.Implementation

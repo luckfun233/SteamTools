@@ -724,11 +724,37 @@ ClientHello 517 字节，SNI 偏移 127，分片间隔 20ms：
 | SpoofDPI / GreenTunnel | 桌面 | 否 | 首字节拆分、TLS record 拆分 |
 | hf-mirror | Web | 否 | Hugging Face 镜像，适合下载模型，不是透明代理 |
 
-本项目当前没有直接嵌入 ciadpi：它需要为 Android 交叉编译原生二进制、处理
-Android 10+ 的可执行文件限制，并做进程/端口生命周期管理。若后续 TinyRecords/Padding
-仍无法绕过该网络，建议把 ByeDPIAndroid 的 `ciadpi` 作为可选 sidecar 内核接入。
+本轮已把 ByeDPIAndroid 使用的 `libbyedpi.so` 作为可选 sidecar 接入，详见下一节。
+仍未直接使用原版 ciadpi 源码自行交叉编译；当前使用的是 ByeDPIAndroid 官方 release
+内的预编译二进制（MIT），并在启动失败时自动回退。
 
-## 16. 参考资料
+## 16. ByeDPI 原生内核接入（2026-11-21）
+
+C# 的 TLS record/TinyRecords/Padding 都只能改“已经进入 .NET 的字节流”。如果 DPI 完整重组
+TCP + TLS，C# 层没有更多手段。本轮把 ByeDPI（MIT）作为最后一层回退接入：
+
+- 内置 `libbyedpi.so`（arm64-v8a / armeabi-v7a / x86_64，来自 ByeDPIAndroid v1.2.0 官方 release，
+  上游 https://github.com/hufrea/byedpi，MIT）。
+- 通过 `AndroidNativeLibrary` 打包，`android:extractNativeLibs="true"` 确保运行时能从
+  `ApplicationInfo.NativeLibraryDir` 执行。
+- 只在 `huggingface.co / *.huggingface.co / hf.co / *.hf.co` 等配置域名上启用，
+  并且仅在 TinyRecords、Padding 都被重置后才启动，避免影响其它站点。
+- 启动后监听 `127.0.0.1:<8871+>`；C# sidecar 用 SOCKS5 把目标 IP 和 ClientHello 交给它，
+  ByeDPI 负责 disorder/tlsrec/fake/oob/split/TTL 等原生去同步。
+- 预设：
+  - Disorder + TLS record：`--disorder 1 --tlsrec 1+s`
+  - Fake SNI + TTL：`--fake -1 --ttl 8 --tls-sni www.iana.org`
+  - OOB：`--oob 1+s`
+  - Split：`--split 1+s`
+  - Auto：`--auto torst --tlsrec 1+s`
+  - 自定义
+- 启动失败、端口被占用、二进制缺失时返回 false，自动继续原来的“不分片重试”，不会阻断网络。
+- 实验室新增“ByeDPI 内核”检查，显示是否运行、端口和生效域名；日志 tag 为 `ByeDPI`。
+
+安全边界：只监听 127.0.0.1，不接受外部连接；不修改系统设置；不请求 root。
+ByeDPI 的 `--fake`/TTL 等参数在不同运营商效果不同，需要配合实验室逐项尝试。
+
+## 17. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>
