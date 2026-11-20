@@ -35,19 +35,27 @@ jobs:
         with:
           dotnet-version: '6.0.428'
 
-      - name: Setup Java 11
+      - name: Setup Java 17 for sdkmanager
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Android SDK packages
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          SDKMANAGER=$(find "$ANDROID_SDK_ROOT/cmdline-tools" -name sdkmanager | head -1)
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" "platforms;android-31" "platforms;android-32" "build-tools;32.0.0" "platform-tools"
+
+      - name: Setup Java 11 for .NET Android
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager --install "platforms;android-31" "build-tools;32.0.0" "platform-tools"
-          yes | sdkmanager --licenses >/dev/null || true
 
       - name: Install .NET Android workload
         run: dotnet workload install android
@@ -65,6 +73,9 @@ jobs:
             -dname "CN=SteamTools CI, OU=Android, O=SteamTools, L=CN, ST=CN, C=CN"
 
       - name: Build Release APK
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           dotnet build src/ST.Client.Android.App.Modern/ST.Client.Android.App.Modern.csproj \
             -c Release -f net6.0-android \
