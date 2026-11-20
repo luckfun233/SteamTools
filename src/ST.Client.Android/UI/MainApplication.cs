@@ -77,6 +77,9 @@ namespace System.Application.UI
             // 先安装崩溃日志，后续任何启动异常都能在 Android/data/.../files/last-crash.txt 中看到。
             AndroidCrashLogger.Install(this);
 
+            // 注册 ByeDPI 原生内核钩子；未启用/启动失败时共享层会自动退回 C# 分片。
+            ByedpiService.InstallRuntimeHooks();
+
 #if SHADOWSOCKS
             Shadowsocks.Core.Instance.Init(this);
 #endif

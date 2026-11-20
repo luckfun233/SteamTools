@@ -118,6 +118,7 @@ namespace System.Application.Services.Implementation
 
             results.Add(await CheckUdpAsync(host, cancellationToken).ConfigureAwait(false));
             results.AddRange(await CheckHuggingFaceAsync(cancellationToken).ConfigureAwait(false));
+            results.Add(CheckByedpi());
             results.Add(CheckCertificate());
             results.Add(CheckDevice(deviceInfo));
 
@@ -546,6 +547,32 @@ namespace System.Application.Services.Implementation
             return results;
         }
 
+        static LabTestResult CheckByedpi()
+        {
+            if (!ProxySettings.EnableByedpi.Value)
+            {
+                return new LabTestResult("ByeDPI 内核", true, 0, "未启用", informational: true);
+            }
+
+            try
+            {
+                var running = ByedpiRuntime.EnsureStarted?.Invoke() == true;
+                var port = ByedpiRuntime.GetPort?.Invoke() ?? 0;
+                return new LabTestResult(
+                    "ByeDPI 内核",
+                    running,
+                    0,
+                    running
+                        ? $"运行中 127.0.0.1:{port}，域名: {ProxySettings.ByedpiDomains.Value}"
+                        : "未启动（非 Android、缺少 libbyedpi.so 或执行失败）",
+                    informational: !running);
+            }
+            catch (Exception ex)
+            {
+                return new LabTestResult("ByeDPI 内核", false, 0, ex.Message);
+            }
+        }
+
         static LabTestResult CheckCertificate()
         {
             try
@@ -585,6 +612,7 @@ namespace System.Application.Services.Implementation
             sb.AppendLine($"DoH: {ProxySettings.EnableDoh.Value}，JSON: {ProxySettings.DohEndpoint.Value}，wire: {ProxySettings.DohWireEndpoint.Value}，回退: {ProxySettings.DohFallbackToSystem.Value}");
             sb.AppendLine($"DNS 代理: {ProxySettings.EnableDnsProxy.Value}，端口: {ProxySettings.DnsProxyPortId.Value}，实际: {(DnsProxyService.IsRunning ? DnsProxyService.ActivePort : 0)}，回退 DNS: {ProxySettings.DnsFallbackServers.Value}");
             sb.AppendLine($"DNS 预置 IP: {ProxySettings.EnableDnsPresetIp.Value}，HuggingFace 兜底: {ProxySettings.EnableHuggingFaceFallback.Value}，UDP/QUIC: {ProxySettings.EnableUdpRelay.Value}");
+            sb.AppendLine($"ByeDPI: {ProxySettings.EnableByedpi.Value}，域名: {ProxySettings.ByedpiDomains.Value}，预设: {ProxySettings.ByedpiPreset.Value}，端口: {ProxySettings.ByedpiPortId.Value}");
             sb.AppendLine($"诊断日志: {ProxySettings.EnableProxyDiagnostics.Value}，级别 {ProxySettings.ProxyDiagnosticsMinimumLevel.Value}，保留 {ProxySettings.ProxyDiagnosticsRetentionDays.Value} 天");
             sb.AppendLine($"仅浏览器 VPN: {ProxySettings.EnableBrowserOnlyVpn.Value}");
             return sb.ToString();

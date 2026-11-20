@@ -19,6 +19,8 @@
     <!-- Debug 包必须把程序集打进 APK，否则直接安装会启动即闪退（Fast Deployment 依赖 IDE 推送） -->
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
     <AndroidFastDeploymentType>None</AndroidFastDeploymentType>
+    <!-- ByeDPI 需要从磁盘执行 libbyedpi.so，必须把原生库解压到 nativeLibraryDir -->
+    <AndroidExtractNativeLibs>true</AndroidExtractNativeLibs>
     <AotAssemblies>false</AotAssemblies>
     <EnableLLVM>false</EnableLLVM>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
@@ -35,6 +37,19 @@
   <!--<PropertyGroup>
     <DefineConstants>__XAMARIN_FORMS__;$(DefineConstants)</DefineConstants>
   </PropertyGroup>-->
+
+  <ItemGroup>
+    <!-- 可选 ByeDPI 原生内核：打包为 lib/<abi>/libbyedpi.so，运行时从 nativeLibraryDir 执行 -->
+    <AndroidNativeLibrary Include="..\..\third_party\byedpi\arm64-v8a\libbyedpi.so">
+      <Abi>arm64-v8a</Abi>
+    </AndroidNativeLibrary>
+    <AndroidNativeLibrary Include="..\..\third_party\byedpi\armeabi-v7a\libbyedpi.so">
+      <Abi>armeabi-v7a</Abi>
+    </AndroidNativeLibrary>
+    <AndroidNativeLibrary Include="..\..\third_party\byedpi\x86_64\libbyedpi.so">
+      <Abi>x86_64</Abi>
+    </AndroidNativeLibrary>
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\ST.Client.Android\**\*.cs" />

@@ -226,6 +226,19 @@ namespace System.Application.UI.Activities
             AddNumber(advanced, "跳过分片缓存（分钟）", "失败后对该域名暂停分片的时间。", ProxySettings.SniFragmentFallbackCacheMinutes, 1, 1440);
             AddNumber(advanced, "Sidecar 端口", "本地 SOCKS5 监听端口，仅绑定 127.0.0.1。", ProxySettings.SniFragmentPortId, 1024, 65535);
 
+            var byedpi = AddExpander(advanced, "ByeDPI 原生内核（实验，MIT）");
+            AddParagraphTo(byedpi,
+                "使用 APK 内置的 libbyedpi.so，在本机 127.0.0.1 启动 SOCKS5，做 disorder/TLS record/OOB/fake 等原生层去同步。\n" +
+                "只在 C# 的 Tiny record、填充等策略都被重置后，对下方域名尝试；启动失败会自动跳过。");
+            AddSwitch(byedpi, "启用 ByeDPI 内核", "仅对 ByeDPI 域名生效，其它站点仍走原逻辑。", ProxySettings.EnableByedpi);
+            AddText(byedpi, "ByeDPI 生效域名", "分号分隔，默认 Hugging Face。", ProxySettings.ByedpiDomains, false);
+            AddChoice(byedpi, "ByeDPI 预设", "推荐先用 Disorder+TLS record；仍失败再试 Fake/OOB/Split。",
+                new[] { "Disorder + TLS record", "Fake SNI + TTL", "OOB", "Split", "Auto", "自定义" },
+                ProxySettings.ByedpiPreset.Value,
+                value => ProxySettings.ByedpiPreset.Value = value);
+            AddText(byedpi, "ByeDPI 自定义参数", "仅“自定义”预设生效，例如 --disorder 1 --tlsrec 1+s。", ProxySettings.ByedpiCustomArgs, false);
+            AddNumber(byedpi, "ByeDPI 端口", "仅绑定 127.0.0.1；被占用时自动向后寻找。", ProxySettings.ByedpiPortId, 1024, 65535);
+
             var rewrite = AddExpander(advanced, "SNI 改写（高风险，仅特殊站点）");
             AddParagraphTo(rewrite, "客户端仍按原域名校验证书，只有源站忽略 SNI 或返回原域名证书时才成立，不能作为通用方案。");
             AddSwitch(rewrite, "启用 SNI 改写", "仅用于明确知道源站行为的域名。", ProxySettings.EnableSniRewrite);
@@ -583,6 +596,9 @@ namespace System.Application.UI.Activities
                 var cert = IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled
                     ? "已安装"
                     : "未安装";
+                var byedpi = ByedpiRuntime.IsRunning?.Invoke() == true
+                    ? $"运行中 127.0.0.1:{ByedpiRuntime.GetPort?.Invoke()}"
+                    : (ProxySettings.EnableByedpi.Value ? "未运行" : "未启用");
                 var sync = ProxyRuleEngine.LastSyncTime.HasValue
                     ? ProxyRuleEngine.LastSyncTime.Value.ToString("yyyy-MM-dd HH:mm:ss")
                     : "未同步";
@@ -597,6 +613,7 @@ namespace System.Application.UI.Activities
                     $"Sidecar: {sidecar}\n" +
                     $"DNS 代理: {dnsProxy}\n" +
                     $"根证书: {cert}\n" +
+                    $"ByeDPI: {byedpi}\n" +
                     $"远程分组: {ProxyRuleEngine.GroupStats.Count} 个，关闭组: {(string.IsNullOrWhiteSpace(ProxySettings.DevSidecarDisabledGroups.Value) ? "无" : ProxySettings.DevSidecarDisabledGroups.Value)}\n" +
                     $"自定义: {(ProxySettings.EnableCustomRules.Value ? "启用" : "关闭")}，{ProxyRuleEngine.CustomRuleCount} 条\n" +
                     $"规则: 实际启用 {ProxyRuleEngine.Current.Rules.Count} / 远程 {ProxyRuleEngine.Remote.Rules.Count} 条\n" +

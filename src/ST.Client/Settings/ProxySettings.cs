@@ -270,6 +270,37 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         = GetProperty(defaultValue: 4096, autoSave: false);
 
     /// <summary>
+    /// 是否启用 ByeDPI 原生内核（MIT，libbyedpi.so）。启用后仅对 ByeDPI 域名生效，
+    /// C# 分片全部失败时作为更强的一层重试。
+    /// </summary>
+    public static SerializableProperty<bool> EnableByedpi { get; }
+        = GetProperty(defaultValue: true, autoSave: false);
+
+    /// <summary>
+    /// ByeDPI 生效域名，分号分隔。默认只用于 Hugging Face，避免影响其它站点。
+    /// </summary>
+    public static SerializableProperty<string> ByedpiDomains { get; }
+        = GetProperty(defaultValue: "huggingface.co;*.huggingface.co;hf.co;*.hf.co", autoSave: false);
+
+    /// <summary>
+    /// ByeDPI 参数预设：0=disorder+tlsrec，1=fake，2=oob，3=split，4=auto，5=自定义。
+    /// </summary>
+    public static SerializableProperty<int> ByedpiPreset { get; }
+        = GetProperty(defaultValue: 0, autoSave: false);
+
+    /// <summary>
+    /// ByeDPI 自定义参数（仅预设 5 生效），例如 "--disorder 1 --tlsrec 1+s"。
+    /// </summary>
+    public static SerializableProperty<string> ByedpiCustomArgs { get; }
+        = GetProperty(defaultValue: "--disorder 1 --tlsrec 1+s", autoSave: false);
+
+    /// <summary>
+    /// ByeDPI 本地 SOCKS5 端口，仅绑定 127.0.0.1；被占用时自动向后寻找。
+    /// </summary>
+    public static SerializableProperty<int> ByedpiPortId { get; }
+        = GetProperty(defaultValue: 8871, autoSave: false);
+
+    /// <summary>
     /// SNI 多段分片时把域名拆成几段。
     /// </summary>
     public static SerializableProperty<int> SniSplitPieces { get; }
@@ -620,6 +651,11 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         SniSplitPieces.Value = 3;
         SniFragmentJitterMilliseconds.Value = 0;
         SniPaddingBytes.Value = 4096;
+        EnableByedpi.Value = true;
+        ByedpiDomains.Value = "huggingface.co;*.huggingface.co;hf.co;*.hf.co";
+        ByedpiPreset.Value = 0;
+        ByedpiCustomArgs.Value = "--disorder 1 --tlsrec 1+s";
+        ByedpiPortId.Value = 8871;
         EnableSniFragmentFallback.Value = true;
         SniFragmentFallbackProbeMilliseconds.Value = 1200;
         SniFragmentFallbackCacheMinutes.Value = 10;

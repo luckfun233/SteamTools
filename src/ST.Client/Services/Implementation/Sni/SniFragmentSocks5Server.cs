@@ -275,6 +275,47 @@ namespace System.Application.Services.Implementation
                             }
                         }
 
+                        // C# 分片都不行时，尝试 APK 内置的 ByeDPI 原生内核（仅配置的域名）。
+                        if (!recovered &&
+                            ByedpiRuntime.ShouldUse?.Invoke(effectiveHost) == true &&
+                            ByedpiRuntime.EnsureStarted?.Invoke() == true)
+                        {
+                            target.Dispose();
+                            try
+                            {
+                                target = await ConnectViaByedpiAsync(
+                                    effectiveHost,
+                                    host,
+                                    req.Port,
+                                    excludedBySni,
+                                    connectionCts.Token).ConfigureAwait(false);
+                                target.NoDelay = true;
+                                targetStream = target.GetStream();
+                                probe = await SendFirstPayloadAsync(
+                                    targetStream,
+                                    payload!,
+                                    fragment: false,
+                                    effectiveHost,
+                                    req.Port,
+                                    connectionCts.Token).ConfigureAwait(false);
+                                SniSidecarStats.OnReconnect();
+
+                                if (!probe.Closed)
+                                {
+                                    recovered = true;
+                                    ProxyDiagnostics.Info("SniSidecar", $"ByeDPI 内核绕过成功: {effectiveHost}");
+                                }
+                                else
+                                {
+                                    ProxyDiagnostics.Warn("SniSidecar", $"ByeDPI 内核仍被重置: {effectiveHost}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                ProxyDiagnostics.Warn("SniSidecar", $"ByeDPI 内核尝试失败: {effectiveHost}: {ex.Message}");
+                            }
+                        }
+
                         if (!recovered)
                         {
                             // 所有分片都失败：记住该域名，换一条连接用不分片方式重试一次。
@@ -834,6 +875,59 @@ namespace System.Application.Services.Implementation
             catch (Exception ex)
             {
                 return (host, null, ex);
+            }
+        }
+
+        async Task<TcpClient> ConnectViaByedpiAsync(
+            string effectiveHost,
+            string requestedHost,
+            int port,
+            bool excluded,
+            CancellationToken cancellationToken)
+        {
+            var getPort = ByedpiRuntime.GetPort;
+            if (getPort == null) throw new InvalidOperationException("ByeDPI 未注册端口");
+
+            var targetIp = await ResolveTargetIpAsync(
+                effectiveHost, port, excluded, cancellationToken).ConfigureAwait(false);
+
+            var targetHost = targetIp?.ToString();
+            if (string.IsNullOrEmpty(targetHost))
+            {
+                targetHost = IPAddress.TryParse(requestedHost, out var requestedIp)
+                    ? requestedIp.ToString()
+                    : effectiveHost;
+            }
+
+            var relay = new TcpClient { NoDelay = true };
+            try
+            {
+                var connectTask = relay.ConnectAsync(IPAddress.Loopback, getPort());
+                var completed = await Task.WhenAny(
+                    connectTask,
+                    Task.Delay(TimeSpan.FromSeconds(3), cancellationToken)).ConfigureAwait(false);
+                if (completed != connectTask)
+                {
+                    relay.Dispose();
+                    throw new TimeoutException("ByeDPI 本地端口连接超时");
+                }
+                await connectTask.ConfigureAwait(false);
+
+                await NegotiateUpstreamAsync(
+                    relay.GetStream(),
+                    targetHost!,
+                    port,
+                    null,
+                    null,
+                    cancellationToken).ConfigureAwait(false);
+
+                ProxyDiagnostics.Info("SniSidecar", $"经 ByeDPI 内核连接: {effectiveHost} -> {targetHost}:{port}");
+                return relay;
+            }
+            catch
+            {
+                relay.Dispose();
+                throw;
             }
         }
 
@@ -1679,6 +1773,15 @@ namespace System.Application.Services.Implementation
 
         public static void Stop()
         {
+            try
+            {
+                ByedpiRuntime.Stop?.Invoke();
+            }
+            catch
+            {
+                // 原生内核停止失败不影响 sidecar 停止
+            }
+
             lock (sync)
             {
                 if (server == null) return;
