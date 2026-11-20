@@ -310,6 +310,32 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         return handled;
     }
 
+    /// <summary>
+    /// 证书模式下的 Hugging Face 兜底：即使远程规则没有同步下来，也按 DevSidecar 的做法
+    /// 连接预置 IP，并把上游 SNI 改成 huggingface.cn。
+    /// </summary>
+    async Task<bool> TryApplyHuggingFaceFallbackAsync(SessionEventArgs e)
+    {
+        if (!IsRootCertificateInstalled) return false;
+
+        var host = e.HttpClient?.Request?.RequestUri?.Host;
+        if (string.IsNullOrEmpty(host) || !ProxyPresetIpProvider.IsHuggingFaceHost(host)) return false;
+
+        var presetIp = await PresetIpSelector.PickAsync(
+            ProxyPresetIpProvider.GetCandidates(host),
+            443,
+            TimeSpan.FromMilliseconds(800)).ConfigureAwait(false);
+
+        if (presetIp != null)
+        {
+            e.HttpClient.UpStreamEndPoint = new IPEndPoint(presetIp, 443);
+        }
+
+        ApplySniOverride(e, "huggingface.cn");
+        ProxyDiagnostics.Info("Rule", $"HF 证书模式兜底: {host} -> sni=huggingface.cn");
+        return true;
+    }
+
     async Task<IPAddress?> PickPresetIpAsync(ProxyRule rule, string host)
     {
         var ips = new List<string>();
@@ -486,6 +512,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             {
                 return;
             }
+
+            // 远程规则同步失败时，证书模式仍然要能用 DevSidecar 的 HF 方案。
+            if (await TryApplyHuggingFaceFallbackAsync(e)) return;
             return;
         }
 
@@ -494,6 +523,8 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         {
             return;
         }
+
+        if (await TryApplyHuggingFaceFallbackAsync(e)) return;
 
         //var item = ProxyDomains.FirstOrDefault(f => f.DomainNamesArray.Any(h => e.HttpClient.Request.RequestUri.AbsoluteUri.Contains(h, StringComparison.OrdinalIgnoreCase)));
 
@@ -894,7 +925,8 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         {
             if (e.HttpClient?.Request?.Host != null &&
                 IsRootCertificateInstalled &&
-                ProxyRuleEngine.Current.DomainRequiresMitm(e.HttpClient.Request.Host))
+                (ProxyRuleEngine.Current.DomainRequiresMitm(e.HttpClient.Request.Host) ||
+                 ProxyPresetIpProvider.IsHuggingFaceHost(e.HttpClient.Request.Host)))
             {
                 e.DecryptSsl = true;
             }
