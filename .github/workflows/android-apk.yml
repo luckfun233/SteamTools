@@ -130,6 +130,7 @@ jobs:
 
       - name: Upload to gofile
         if: success()
+        continue-on-error: true
         run: |
           set +e
           RESP=$(curl -s --max-time 300 -F "file=@${{ steps.apk.outputs.path }}" https://upload.gofile.io/uploadfile)
