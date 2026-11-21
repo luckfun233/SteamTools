@@ -82,6 +82,10 @@ namespace System.Application.Services.Implementation
                 var completed = await Task.WhenAny(connectTask, delayTask).ConfigureAwait(false);
                 if (completed != connectTask)
                 {
+                    // 取消/超时后必须回收 ConnectAsync，否则它稍后的异常会成为
+                    // TaskScheduler.UnobservedTaskException，大量堆积会拖死 UI 线程。
+                    client.Dispose();
+                    try { await connectTask.ConfigureAwait(false); } catch { }
                     return null;
                 }
                 await connectTask.ConfigureAwait(false);

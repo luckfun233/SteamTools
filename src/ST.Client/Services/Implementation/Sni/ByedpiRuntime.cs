@@ -13,5 +13,6 @@ namespace System.Application.Services.Implementation
         public static Func<bool>? IsRunning;
         public static Func<int>? GetPort;
         public static Func<string, bool>? ShouldUse;
+        public static Action? ResetFailure;
     }
 }

@@ -122,7 +122,7 @@ namespace System.Application.UI.Activities
 
             var testCard = AddSection("一键测试", "会依次检查规则集、DNS、DoH、TCP、直连 TLS、Sidecar TLS、Titanium 代理和 UDP。测试不会修改代理状态。");
             AddTextRow(testCard, "测试域名", out hostInput, AcceleratorLabService.DefaultHost);
-            AddTextRow(testCard, "策略矩阵次数", out runsInput, "3", InputTypes.ClassNumber);
+            AddTextRow(testCard, "策略矩阵次数", out runsInput, "1", InputTypes.ClassNumber);
 
             var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             row.AddView(CreateButton("运行全部", RunAllAsync, true), WeightedButtonParams());
@@ -215,10 +215,11 @@ namespace System.Application.UI.Activities
             if (string.IsNullOrWhiteSpace(host)) host = AcceleratorLabService.DefaultHost;
 
             var progress = ShowProgress("正在运行测试…");
+            var token = labCts?.Token ?? default;
             try
             {
                 var device = GetDeviceInfo();
-                var results = await Task.Run(() => AcceleratorLabService.RunAllAsync(host!, device, ProxyTestAsync));
+                var results = await Task.Run(() => AcceleratorLabService.RunAllAsync(host!, device, ProxyTestAsync, token));
                 lastResults = results;
                 lastReport = AcceleratorLabService.BuildReport(device, results);
                 ShowResults(results);
@@ -249,14 +250,24 @@ namespace System.Application.UI.Activities
                 runs = Math.Max(1, Math.Min(10, parsed));
             }
 
-            var progress = ShowProgress("正在逐项测试分片策略，每种会重复多次，请保持网络连接…");
+            var progress = ShowProgress("正在逐项测试分片策略，可点“取消”随时停止…");
+            var token = labCts?.Token ?? default;
             try
             {
-                var report = await Task.Run(() => SniConnectivityTester.RunStrategyMatrixAsync(host!, 443, 8, runs));
+                var report = await Task.Run(() => SniConnectivityTester.RunStrategyMatrixAsync(
+                    host!, 443, 5, runs, token,
+                    text => RunOnUiThread(() =>
+                    {
+                        if (resultsView != null) resultsView.Text = text;
+                    })));
                 lastReport = report;
                 if (resultsView != null) resultsView.Text = report;
                 RefreshStatus();
                 ShowTextDialog("分片策略矩阵", report);
+            }
+            catch (OperationCanceledException)
+            {
+                ToastShow("已取消分片矩阵");
             }
             catch (Exception ex)
             {
@@ -266,6 +277,16 @@ namespace System.Application.UI.Activities
             {
                 progress.Dismiss();
             }
+        }
+
+        CancellationTokenSource? labCts;
+
+        protected override void OnDestroy()
+        {
+            labCts?.Cancel();
+            labCts?.Dispose();
+            labCts = null;
+            base.OnDestroy();
         }
 
         Task<LabTestResult> ProxyTestAsync(CancellationToken cancellationToken)
@@ -552,12 +573,37 @@ namespace System.Application.UI.Activities
 
         AlertDialog ShowProgress(string message)
         {
+            labCts?.Cancel();
+            labCts?.Dispose();
+            labCts = new CancellationTokenSource();
+            var cts = labCts;
+
             var dialog = new AlertDialog.Builder(this)
                 .SetMessage(message)
-                .SetCancelable(false)
+                .SetCancelable(true)
+                .SetNegativeButton("取消", (_, _) =>
+                {
+                    cts.Cancel();
+                })
                 .Create();
+            dialog.SetOnCancelListener(new CancelListener(cts));
             dialog.Show();
             return dialog;
+        }
+
+        sealed class CancelListener : Java.Lang.Object, IDialogInterfaceOnCancelListener
+        {
+            readonly CancellationTokenSource cts;
+
+            public CancelListener(CancellationTokenSource cts)
+            {
+                this.cts = cts;
+            }
+
+            public void OnCancel(IDialogInterface? dialog)
+            {
+                cts.Cancel();
+            }
         }
 
         LinearLayout AddSection(string title, string description)

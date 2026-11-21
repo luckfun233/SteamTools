@@ -49,6 +49,15 @@
     <AndroidNativeLibrary Include="..\..\third_party\byedpi\x86_64\libbyedpi.so">
       <Abi>x86_64</Abi>
     </AndroidNativeLibrary>
+    <AndroidNativeLibrary Include="..\..\third_party\byedpi\arm64-v8a\libciadpi.so" Condition="Exists('..\..\third_party\byedpi\arm64-v8a\libciadpi.so')">
+      <Abi>arm64-v8a</Abi>
+    </AndroidNativeLibrary>
+    <AndroidNativeLibrary Include="..\..\third_party\byedpi\armeabi-v7a\libciadpi.so" Condition="Exists('..\..\third_party\byedpi\armeabi-v7a\libciadpi.so')">
+      <Abi>armeabi-v7a</Abi>
+    </AndroidNativeLibrary>
+    <AndroidNativeLibrary Include="..\..\third_party\byedpi\x86_64\libciadpi.so" Condition="Exists('..\..\third_party\byedpi\x86_64\libciadpi.so')">
+      <Abi>x86_64</Abi>
+    </AndroidNativeLibrary>
   </ItemGroup>
 
   <ItemGroup>

@@ -909,6 +909,7 @@ namespace System.Application.Services.Implementation
                 if (completed != connectTask)
                 {
                     relay.Dispose();
+                    try { await connectTask.ConfigureAwait(false); } catch { }
                     throw new TimeoutException("ByeDPI 本地端口连接超时");
                 }
                 await connectTask.ConfigureAwait(false);
@@ -950,6 +951,7 @@ namespace System.Application.Services.Implementation
                 if (completed != connectTask)
                 {
                     relay.Dispose();
+                    try { await connectTask.ConfigureAwait(false); } catch { }
                     throw new TimeoutException($"中继 {relayHost}:{relayPort} 连接超时");
                 }
                 await connectTask.ConfigureAwait(false);
@@ -983,6 +985,14 @@ namespace System.Application.Services.Implementation
                     Task.Delay(TimeSpan.FromSeconds(6), cancellationToken)).ConfigureAwait(false);
                 if (completed != connectTask)
                 {
+                    // 必须回收未完成的 ConnectAsync，否则取消后的 SocketException
+                    // 会成为未观察任务异常，大量堆积会卡死 UI。
+                    target.Dispose();
+                    try { await connectTask.ConfigureAwait(false); } catch { }
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException(cancellationToken);
+                    }
                     throw new TimeoutException($"连接 {host}:{port} 超时");
                 }
                 await connectTask.ConfigureAwait(false);
@@ -1723,6 +1733,7 @@ namespace System.Application.Services.Implementation
         public static void Start(bool force = false)
         {
             if (!force && !ShouldStart) return;
+            ByedpiRuntime.ResetFailure?.Invoke();
             lock (sync)
             {
                 if (server != null)

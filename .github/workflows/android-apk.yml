@@ -60,6 +60,35 @@ jobs:
       - name: Install .NET Android workload
         run: dotnet workload install android
 
+      - name: Build ByeDPI ciadpi for Android
+        continue-on-error: true
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -e
+          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+          if [ -z "$NDK" ]; then
+            NDK=$(ls -d "$ANDROID_SDK_ROOT"/ndk/* 2>/dev/null | tail -1)
+          fi
+          echo "Using NDK: $NDK"
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          git clone --depth 1 --branch v0.13 https://github.com/hufrea/byedpi.git /tmp/byedpi-src
+          build() {
+            abi="$1"
+            cc="$2"
+            make -C /tmp/byedpi-src clean >/dev/null
+            make -C /tmp/byedpi-src CC="$BIN/$cc" \
+              CFLAGS="-DANDROID -I. -std=c99 -Wall -Wno-unused -O2" \
+              LDFLAGS="-llog -landroid"
+            mkdir -p "third_party/byedpi/$abi"
+            cp /tmp/byedpi-src/ciadpi "third_party/byedpi/$abi/libciadpi.so"
+            ls -l "third_party/byedpi/$abi/libciadpi.so"
+          }
+          build arm64-v8a aarch64-linux-android21-clang
+          build armeabi-v7a armv7a-linux-androideabi21-clang
+          build x86_64 x86_64-linux-android21-clang
+
       - name: Verify SDK
         run: |
           dotnet --version

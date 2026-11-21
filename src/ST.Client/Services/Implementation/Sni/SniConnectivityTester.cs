@@ -91,7 +91,8 @@ namespace System.Application.Services.Implementation
             int port = 443,
             int timeoutSeconds = 8,
             int runs = 3,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string>? progress = null)
         {
             if (string.IsNullOrWhiteSpace(host)) return "请输入要测试的域名。";
             host = host.Trim();
@@ -110,6 +111,7 @@ namespace System.Application.Services.Implementation
             report.AppendLine($"分片策略矩阵: {host}:{port}，每种 {runs} 次");
             report.AppendLine($"DoH: {(ProxySettings.EnableDoh.Value ? ProxySettings.DohEndpoint.Value : "未开启")}；中继: {(ProxySettings.EnableSniUpstreamRelay.Value ? "开启" : "关闭")}");
             report.AppendLine();
+            progress?.Invoke(report.ToString());
 
             try
             {
@@ -118,6 +120,7 @@ namespace System.Application.Services.Implementation
                 var baseline = await ProbeViaSidecarAsync(
                     host, port, SniSidecarService.ActivePort, timeoutSeconds, cancellationToken).ConfigureAwait(false);
                 report.AppendLine($"不分片基准: {FormatProbe(baseline)}");
+                progress?.Invoke(report.ToString());
 
                 foreach (var strategy in new[]
                 {
@@ -132,6 +135,7 @@ namespace System.Application.Services.Implementation
                     TlsFragmentStrategy.Random,
                 })
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     ProxySettings.SniFragmentStrategy.Value = (int)strategy;
 
                     var successes = 0;
@@ -157,6 +161,7 @@ namespace System.Application.Services.Implementation
                     report.AppendLine(
                         $"{GetStrategyName((int)strategy),-16} 成功 {successes}/{runs} 中位 {median}ms" +
                         (lastError == null ? string.Empty : $"，最后错误: {lastError}"));
+                    progress?.Invoke(report.ToString());
                 }
             }
             finally
@@ -422,7 +427,13 @@ namespace System.Application.Services.Implementation
             var connectTask = client.ConnectAsync(host, port);
             var delayTask = Task.Delay(Timeout.Infinite, cancellationToken);
             var completed = await Task.WhenAny(connectTask, delayTask).ConfigureAwait(false);
-            if (completed != connectTask) throw new TimeoutException();
+            if (completed != connectTask)
+            {
+                client.Dispose();
+                try { await connectTask.ConfigureAwait(false); } catch { }
+                cancellationToken.ThrowIfCancellationRequested();
+                throw new TimeoutException();
+            }
             await connectTask.ConfigureAwait(false);
         }
 

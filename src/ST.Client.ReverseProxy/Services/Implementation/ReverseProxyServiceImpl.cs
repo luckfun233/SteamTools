@@ -1,4 +1,5 @@
 using System.Application.Models;
+using System.Application.Settings;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -164,7 +165,8 @@ abstract class ReverseProxyServiceImpl
 
     public async ValueTask<bool> StartProxy()
     {
-        IsRootCertificateInstalled = !IsCertificateLessMode && CertificateManager.IsRootCertificateInstalled;
+        IsRootCertificateInstalled = !IsCertificateLessMode &&
+            (CertificateManager.IsRootCertificateInstalled || ProxySettings.ForceCertificateMode.Value);
         if (!IsRootCertificateInstalled)
         {
             // Android 7+ 默认不信任用户证书，仍允许以 TLS 隧道模式启动；

@@ -259,6 +259,10 @@ namespace System.Application.UI.Activities
                 "Android 13 的系统 CA 位于只读 /system 分区，Shizuku 只有 shell 权限，无法写入系统 CA。\n" +
                 "如果已用 Shizuku/ADB 把本应用设为“设备所有者”，可以静默安装用户 CA（Chrome 信任）。");
 
+            AddSwitch(card, "强制使用证书模式",
+                "已安装证书但应用仍显示“未安装”时开启。Android 11+ 可能读不到用户 CA 列表；开启后跳过检测直接走 MITM。",
+                ProxySettings.ForceCertificateMode);
+
             var owner = AndroidCertificateInstaller.IsDeviceOwner(this);
             AddInfoText(card, $"设备所有者: {(owner ? "是，可静默安装用户 CA" : "否")}");
 
@@ -595,7 +599,7 @@ namespace System.Application.UI.Activities
                     : "未运行";
                 var cert = IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled
                     ? "已安装"
-                    : "未安装";
+                    : (ProxySettings.ForceCertificateMode.Value ? "检测不到（已强制启用）" : "未安装");
                 var byedpi = ByedpiRuntime.IsRunning?.Invoke() == true
                     ? $"运行中 127.0.0.1:{ByedpiRuntime.GetPort?.Invoke()}"
                     : (ProxySettings.EnableByedpi.Value ? "未运行" : "未启用");

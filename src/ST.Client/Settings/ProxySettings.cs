@@ -192,6 +192,13 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
     public static SerializableProperty<bool> IsCertificateLessMode { get; }
         = GetProperty(defaultValue: false, autoSave: true);
 
+    /// <summary>
+    /// 强制使用证书模式。Android 11+ 应用可能读不到用户 CA 列表，
+    /// 导致明明已安装证书仍被判为“未安装”；开启后跳过检测直接启用 MITM。
+    /// </summary>
+    public static SerializableProperty<bool> ForceCertificateMode { get; }
+        = GetProperty(defaultValue: false, autoSave: true);
+
     #region 实验性加速设置
 
     /// <summary>
@@ -643,6 +650,7 @@ public sealed partial class ProxySettings : SettingsHost2<ProxySettings>
         EnableCustomRules.Value = true;
 
         IsCertificateLessMode.Value = false;
+        ForceCertificateMode.Value = false;
 
         EnableSniFragment.Value = true;
         SniFragmentStrategy.Value = SniFragmentStrategyTlsRecordSplit;

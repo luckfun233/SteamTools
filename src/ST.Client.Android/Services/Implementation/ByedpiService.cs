@@ -24,6 +24,7 @@ namespace System.Application.Services.Implementation
         static readonly object sync = new();
         static Process? process;
         static int port;
+        static bool startFailed;
 
         public static bool IsRunning
         {
@@ -51,6 +52,7 @@ namespace System.Application.Services.Implementation
             ByedpiRuntime.IsRunning = () => IsRunning;
             ByedpiRuntime.GetPort = () => Port;
             ByedpiRuntime.ShouldUse = ShouldUse;
+            ByedpiRuntime.ResetFailure = ResetFailure;
         }
 
         public static bool ShouldUse(string host)
@@ -73,12 +75,14 @@ namespace System.Application.Services.Implementation
             lock (sync)
             {
                 if (process != null && !process.HasExited) return true;
+                if (startFailed) return false;
                 DisposeProcess();
 
                 var executable = GetExecutablePath();
                 if (executable == null)
                 {
-                    ProxyDiagnostics.Warn(TAG, "找不到 libbyedpi.so，已退回 C# 分片");
+                    startFailed = true;
+                    ProxyDiagnostics.Warn(TAG, "找不到 libciadpi.so / libbyedpi.so，已退回 C# 分片");
                     return false;
                 }
 
@@ -120,8 +124,9 @@ namespace System.Application.Services.Implementation
                         process = p;
                         port = candidate;
 
-                        if (WaitForPort(candidate, 2500))
+                        if (WaitForPort(candidate, 1500))
                         {
+                            startFailed = false;
                             ProxyDiagnostics.Info(TAG, $"已启动 127.0.0.1:{candidate}，参数: {string.Join(" ", BuildArgs(candidate))}");
                             return true;
                         }
@@ -131,6 +136,7 @@ namespace System.Application.Services.Implementation
                         p.Dispose();
                         process = null;
                         port = 0;
+                        break;
                     }
                     catch (Exception ex)
                     {
@@ -138,8 +144,16 @@ namespace System.Application.Services.Implementation
                     }
                 }
 
+                // 只尝试一次；避免每个连接都等 1.5 秒。用户改设置或重启应用后会重试。
+                startFailed = true;
+                ProxyDiagnostics.Warn(TAG, "ByeDPI 无法启动，本次进程内不再重试");
                 return false;
             }
+        }
+
+        public static void ResetFailure()
+        {
+            startFailed = false;
         }
 
         public static void Stop()
@@ -190,8 +204,14 @@ namespace System.Application.Services.Implementation
             {
                 var dir = AndroidApplication.Context.ApplicationInfo?.NativeLibraryDir;
                 if (string.IsNullOrEmpty(dir)) return null;
-                var path = Path.Combine(dir, "libbyedpi.so");
-                return File.Exists(path) ? path : null;
+
+                // 优先使用从 ByeDPI 源码编译的独立 ciadpi；JNI 版 libbyedpi.so 仅作兜底。
+                foreach (var name in new[] { "libciadpi.so", "libbyedpi.so" })
+                {
+                    var path = Path.Combine(dir, name);
+                    if (File.Exists(path)) return path;
+                }
+                return null;
             }
             catch
             {

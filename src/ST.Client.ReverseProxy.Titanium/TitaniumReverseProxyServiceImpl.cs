@@ -847,7 +847,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }
         if (ProxyDomains is null)
         {
-            if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName))
+            if (IsRootCertificateInstalled &&
+                (ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName) ||
+                 ProxyPresetIpProvider.IsHuggingFaceHost(e.SniHostName)))
             {
                 e.DecryptSsl = true;
             }

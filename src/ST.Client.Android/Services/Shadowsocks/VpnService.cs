@@ -112,7 +112,8 @@ namespace System.Application.Services.Native
                     // 只有免证书模式（或根本未安装根证书）才把 VPN 出口交给 SNI sidecar。
                     // 有证书时仍然走 Titanium 的 SOCKS5，否则 DevSidecar 的 SNI 伪装、镜像和请求头规则不会生效。
                     var certificateLess = ProxySettings.IsCertificateLessMode.Value ||
-                        !IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled;
+                        (!ProxySettings.ForceCertificateMode.Value &&
+                         !IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled);
                     if (certificateLess)
                     {
                         SniSidecarService.Start();
