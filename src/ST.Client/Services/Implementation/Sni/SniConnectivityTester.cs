@@ -170,6 +170,32 @@ namespace System.Application.Services.Implementation
                         (lastError == null ? string.Empty : $"，最后错误: {lastError}"));
                     progress?.Invoke(report.ToString());
                 }
+
+                // ByeDPI 自己也是一个 SOCKS5，可直接用同一套探针比较。
+                try
+                {
+                    if (ByedpiRuntime.EnsureStarted?.Invoke() == true)
+                    {
+                        var byedpiPort = ByedpiRuntime.GetPort?.Invoke() ?? 0;
+                        if (byedpiPort > 0)
+                        {
+                            var byedpi = await ProbeViaSidecarAsync(
+                                host, port, byedpiPort, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+                            var name = $"ByeDPI(预设{ProxySettings.ByedpiPreset.Value})";
+                            rows.Add((name, byedpi.Success ? 1 : 0, 1, byedpi.ElapsedMs, byedpi.Error));
+                            report.AppendLine($"{name,-16} {FormatProbe(byedpi)}");
+                            progress?.Invoke(report.ToString());
+                        }
+                    }
+                    else
+                    {
+                        report.AppendLine("ByeDPI: 未启用或启动失败");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    report.AppendLine("ByeDPI: " + ex.Message);
+                }
             }
             finally
             {
