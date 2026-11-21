@@ -507,6 +507,14 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             return "baidu.com";
         }
 
+        // CloudFront 上的 intercom 要求 SNI 与 Host 一致；g.cn 会返回 421 Misdirected Request。
+        // 返回 null 表示不做 SNI 改写，使用真实域名。
+        if (host.EndsWith(".intercom.io", StringComparison.OrdinalIgnoreCase) ||
+            host.Equals("intercom.io", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         return sni;
     }
 

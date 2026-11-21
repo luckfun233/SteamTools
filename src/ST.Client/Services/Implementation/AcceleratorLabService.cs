@@ -122,6 +122,7 @@ namespace System.Application.Services.Implementation
             results.Add(CheckByedpi());
             results.Add(await CheckCertificateModeAsync(cancellationToken).ConfigureAwait(false));
             results.Add(await CheckGoogleAsync(cancellationToken).ConfigureAwait(false));
+            results.Add(await CheckTitaniumHostAsync(host, cancellationToken).ConfigureAwait(false));
             results.Add(CheckDevice(deviceInfo));
 
             return results;
@@ -614,6 +615,39 @@ namespace System.Application.Services.Implementation
             catch (Exception ex)
             {
                 return new LabTestResult("证书模式链路", false, sw.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        static async Task<LabTestResult> CheckTitaniumHostAsync(string host, CancellationToken cancellationToken)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var socksPort = IReverseProxyService.Instance.Socks5ProxyPortId;
+                if (socksPort <= 0) socksPort = ProxySettings.Socks5ProxyPortId.Value;
+
+                if (socksPort <= 0 || !await SocksPortInUseAsync(socksPort).ConfigureAwait(false))
+                {
+                    return new LabTestResult(
+                        "Titanium 证书链路",
+                        true,
+                        0,
+                        "Titanium SOCKS5 未监听（请先启动加速）",
+                        informational: true);
+                }
+
+                var probe = await SniConnectivityTester.ProbeViaTitaniumAsync(
+                    host, 443, socksPort, 8, cancellationToken).ConfigureAwait(false);
+                return new LabTestResult(
+                    "Titanium 证书链路",
+                    probe.Success,
+                    sw.ElapsedMilliseconds,
+                    $"{host}: {(probe.Success ? probe.Detail : "失败 " + probe.Detail)}",
+                    informational: true);
+            }
+            catch (Exception ex)
+            {
+                return new LabTestResult("Titanium 证书链路", false, sw.ElapsedMilliseconds, ex.Message);
             }
         }
 

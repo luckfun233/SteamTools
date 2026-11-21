@@ -38,13 +38,23 @@ namespace System.Application.Services.Implementation
                 if (IPAddress.TryParse(value, out var ip)) candidates.Add(ip);
             }
             if (candidates.Count == 0) return null;
-            if (candidates.Count == 1)
-            {
-                Cache(key, candidates[0]);
-                return candidates[0];
-            }
 
             var timeoutMs = Math.Max(200, (int)timeout.TotalMilliseconds);
+            if (candidates.Count == 1)
+            {
+                // 只有一条预置 IP 时也要探测：远程配置里的 IP 可能已经过期，
+                // 直接使用会让整个规则组一直连不上（例如 startpage）。
+                var single = await ProbeAsync(candidates[0], port, timeoutMs, cancellationToken).ConfigureAwait(false);
+                if (single.HasValue)
+                {
+                    Cache(key, candidates[0]);
+                    return candidates[0];
+                }
+
+                ProxyDiagnostics.Warn("IPSelector", $"唯一预置 IP 不可用，回退 DNS: {key}");
+                return null;
+            }
+
             var probes = candidates.Select(ip => ProbeAsync(ip, port, timeoutMs, cancellationToken)).ToArray();
             var results = await Task.WhenAll(probes).ConfigureAwait(false);
 

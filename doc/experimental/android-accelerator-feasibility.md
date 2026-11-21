@@ -849,7 +849,43 @@ Host 头保持不变。
 
 另外修复了实验室 3 分钟硬超时导致后半段测试全被取消的问题，改为 10 分钟。
 
-## 20. 参考资料
+## 20. 其他规则组 SNI 审计（2026-11-21）
+
+用与手机相同的出口网络，对 `remote_config.json5` 里所有带 `sni` 的规则抽检了
+代表性 host：按规则给出的 SNI 连接真实源站，再发 `GET /`。结论：
+
+正常（TLS 握手成功，HTTP 2xx/3xx/4xx 属于路径或鉴权正常反应）：
+
+- GitHub 系：`github.com` / `api.github.com` / `gist` / `githubassets` /
+  `*.githubusercontent.com` / `github.io` / Collector / Gravatar → `baidu.com`
+- Google 系：`www.google.com.hk` / `www.gstatic.com` / `www.googleapis.com` /
+  YouTube / ytimg / ggpht → `www.google.cn`；`www.google.com` /
+  `accounts.google.com` / `ssl.gstatic.com` 需要 `baidu.com`（已做 host 归一化）
+- Docker（`baidu.com`）、`cloud.docker.com`（`goto.docker.com`）
+- Pixiv / pximg（`baidu.com`）
+- Wikipedia / Wikimedia / Wikidata / w.wiki（`mediawiki.org`）
+- DuckDuckGo、Archive、Dropbox、F-Droid、Startpage（新 IP 上 `www.baidu.com` 303）
+- Steam 社区/商店（`baidu.com`）、Steam 静态资源
+- Vue（`vuejs.org`）、Claude（真实 SNI）、Copilot SSO（`microsoft.com`）
+
+发现并修复：
+
+- **`*.intercom.io`**：规则给 `g.cn`，CloudFront 返回 `421 Misdirected Request`；
+  真实 SNI 返回 `301`。已改为不做 SNI 改写。
+- **`*apkmirror.com`**：规则是 `sni: none`，但 .NET/Android 无法发送“无 SNI”的
+  ClientHello，真实 SNI 会被重置；换成 `baidu.com` 能握手但返回 403。
+  目前没有可用写法，保留为已知限制。
+- **Startpage**：预设 IP `67.63.58.139` 已过期（TLS reset），新解析的 IP 正常。
+  `PresetIpSelector` 现在即使只有一条预置 IP 也会先做 TCP 探测，探测失败就回退 DNS。
+- **Reddit / OneDrive / cdn.steamcommunity / Instagram**：抽检返回 403 / TLS reset。
+  这些站点可能按出口 IP 或 SNI/Host 组合做 WAF 拦截，不能仅凭本次出口判定规则错误；
+  手机上如仍失败，需要单独抓日志确认。
+
+实验室新增 **“Titanium 证书链路”**：直接把“测试域名”输入框里的域名走一遍
+Titanium 的 SOCKS5 + MITM，报告 issuer 和 HTTP 状态行。以后怀疑某个规则组有问题，
+把域名填进去跑一次即可。
+
+## 21. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>
