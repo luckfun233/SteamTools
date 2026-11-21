@@ -3,6 +3,7 @@ using System.Application.ProxyRules;
 using System.Application.Settings;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -119,7 +120,7 @@ namespace System.Application.Services.Implementation
             results.Add(await CheckUdpAsync(host, cancellationToken).ConfigureAwait(false));
             results.AddRange(await CheckHuggingFaceAsync(cancellationToken).ConfigureAwait(false));
             results.Add(CheckByedpi());
-            results.Add(CheckCertificate());
+            results.Add(await CheckCertificateModeAsync(cancellationToken).ConfigureAwait(false));
             results.Add(CheckDevice(deviceInfo));
 
             return results;
@@ -573,21 +574,67 @@ namespace System.Application.Services.Implementation
             }
         }
 
-        static LabTestResult CheckCertificate()
+        static async Task<LabTestResult> CheckCertificateModeAsync(CancellationToken cancellationToken)
         {
+            var sw = Stopwatch.StartNew();
             try
             {
                 var installed = IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled;
+                var force = ProxySettings.ForceCertificateMode.Value;
+                var cerPath = IReverseProxyService.Instance.CertificateManager.GetCerFilePathGeneratedWhenNoFileExists();
+                var fileState = !string.IsNullOrEmpty(cerPath) && File.Exists(cerPath)
+                    ? $"{cerPath}（{new FileInfo(cerPath).Length}B）"
+                    : "未生成";
+
+                var detail = $"检测={installed}，强制证书模式={force}，CA 文件={fileState}";
+
+                var socksPort = IReverseProxyService.Instance.Socks5ProxyPortId;
+                if (socksPort <= 0) socksPort = ProxySettings.Socks5ProxyPortId.Value;
+
+                if (socksPort > 0 && !await SocksPortInUseAsync(socksPort).ConfigureAwait(false))
+                {
+                    detail += $"；Titanium SOCKS5 {socksPort} 未监听（请先启动加速）";
+                }
+                else if (socksPort > 0)
+                {
+                    var probe = await SniConnectivityTester.ProbeViaTitaniumAsync(
+                        "huggingface.co", 443, socksPort, 8, cancellationToken).ConfigureAwait(false);
+                    detail += $"；Titanium SOCKS5 {socksPort} 链路: " +
+                              (probe.Success ? probe.Detail : $"失败 {probe.Detail}");
+                }
+
                 return new LabTestResult(
-                    "根证书",
+                    "证书模式链路",
                     true,
-                    0,
-                    installed ? "已安装，可使用 MITM/镜像/SNI 伪装" : "未安装，只能使用免证书隧道或 IP/预置 IP",
+                    sw.ElapsedMilliseconds,
+                    detail,
                     informational: true);
             }
             catch (Exception ex)
             {
-                return new LabTestResult("根证书", false, 0, ex.Message);
+                return new LabTestResult("证书模式链路", false, sw.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        static async Task<bool> SocksPortInUseAsync(int port)
+        {
+            try
+            {
+                using var client = new TcpClient();
+                var task = client.ConnectAsync(IPAddress.Loopback, port);
+                var completed = await Task.WhenAny(task, Task.Delay(300)).ConfigureAwait(false);
+                if (completed != task)
+                {
+                    client.Dispose();
+                    try { await task.ConfigureAwait(false); } catch { }
+                    return false;
+                }
+                await task.ConfigureAwait(false);
+                return client.Connected;
+            }
+            catch
+            {
+                return false;
             }
         }
 

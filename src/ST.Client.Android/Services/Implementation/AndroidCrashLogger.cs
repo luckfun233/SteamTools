@@ -47,8 +47,9 @@ namespace System.Application.Services.Implementation
             AndroidEnvironment.UnhandledExceptionRaiser += (_, e) =>
                 Write("AndroidEnvironment", e.Exception?.ToString());
 
-            TaskScheduler.UnobservedTaskException += (_, e) =>
-                Write("TaskScheduler", e.Exception?.ToString());
+            // 注意：不要记录 TaskScheduler.UnobservedTaskException。
+            // 连接竞速/超时会产生大量此类异常，逐条写文件会拖死 UI 线程。
+            // 代码侧已经回收 ConnectAsync；这里最多计数，不再落盘。
 
             Write("Install", $"CrashLogger ready: {CrashFilePath}");
         }

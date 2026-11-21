@@ -53,9 +53,39 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
     protected override void OnException(Exception exception)
     {
+        // 代理在异常网络下会短时间产生大量客户端异常。
+        // 全部落盘会把 IO 和 UI 拖死，这里按 10 秒窗口限流，只保留前 20 条。
+        var write = false;
+        int skipped = 0;
+        lock (errorLogSync)
+        {
+            var now = Stopwatch.GetTimestamp();
+            if (now - errorLogWindow >= Stopwatch.Frequency * 10)
+            {
+                skipped = errorLogCount;
+                errorLogCount = 0;
+                errorLogWindow = now;
+            }
+            if (errorLogCount < 20)
+            {
+                errorLogCount++;
+                write = true;
+            }
+        }
+
+        if (skipped > 0)
+        {
+            ProxyDiagnostics.Warn("Proxy", $"上一个 10 秒窗口有 {skipped} 个客户端异常已省略");
+        }
+        if (!write) return;
+
         base.OnException(exception);
         ProxyDiagnostics.Error("Proxy", exception.ToString());
     }
+
+    static readonly object errorLogSync = new();
+    static int errorLogCount;
+    static long errorLogWindow = Stopwatch.GetTimestamp();
 
     public override bool ProxyRunning => proxyServer.ProxyRunning;
 
@@ -804,6 +834,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
 
             ProxyDiagnostics.Initialize();
             ProxyDiagnostics.Info("Proxy", $"启动: mode={ProxyMode}, certless={IsCertificateLessMode}, rootCert={IsRootCertificateInstalled}, socks5={Socks5ProxyEnable}, rules={ProxyRuleEngine.Current.Rules.Count}");
+            SniSidecarService.CertificateMode = IsRootCertificateInstalled;
             SniSidecarService.Start();
 
             if (ProxyMode == ProxyMode.System)
@@ -907,7 +938,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         //    e.TerminateSession();
         //    return Task.CompletedTask;
         //}
-        if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName))
+        if (IsRootCertificateInstalled &&
+            (ProxyRuleEngine.Current.DomainRequiresMitm(e.SniHostName) ||
+             ProxyPresetIpProvider.IsHuggingFaceHost(e.SniHostName)))
         {
             e.DecryptSsl = true;
             ProxyDiagnostics.Info("Rule", $"TLS MITM(DevSidecar): {e.SniHostName}");
@@ -989,7 +1022,9 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         //    e.TerminateSession();
         //    return Task.CompletedTask;
         //}
-        if (IsRootCertificateInstalled && ProxyRuleEngine.Current.DomainRequiresMitm(e.HttpClient.Request.Host))
+        if (IsRootCertificateInstalled &&
+            (ProxyRuleEngine.Current.DomainRequiresMitm(e.HttpClient.Request.Host) ||
+             ProxyPresetIpProvider.IsHuggingFaceHost(e.HttpClient.Request.Host)))
         {
             e.DecryptSsl = true;
             ProxyDiagnostics.Info("Rule", $"TLS MITM(DevSidecar): {e.HttpClient.Request.Host}");
@@ -1010,6 +1045,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
                 proxyServer.Stop();
             }
 
+            SniSidecarService.CertificateMode = false;
             SniSidecarService.Stop();
             ProxyDiagnostics.Info("Proxy", "已停止");
 

@@ -42,8 +42,9 @@ namespace System.Application.Services.Native
                 IForegroundService f = this;
                 (builder, mNotificationManager, notifyId) = AndroidNotificationServiceImpl.Instance.StartForeground(this, f.NotificationType, f.NotificationText, f.NotificationEntranceAction);
 
-                // 免证书模式要在 tun2socks 计算 SOCKS 出口前就绪。
-                SniSidecarService.Start();
+                // 免证书模式要在 tun2socks 计算 SOCKS 出口前就绪；
+                // 证书模式同样需要 sidecar 承接非 TLS/UDP 流量。
+                SniSidecarService.Start(force: true);
 
                 // DNS 单独走本地代理：tun2socks 的 SOCKS5 UDP ASSOCIATE 依赖上游支持，
                 // 而 --dnsgw 可以稳定接住 UDP:53，避免 ERR_NAME_NOT_RESOLVED。
@@ -109,23 +110,19 @@ namespace System.Application.Services.Native
                         ? IPAddress.Loopback
                         : s.ProxyIp;
 
-                    // 只有免证书模式（或根本未安装根证书）才把 VPN 出口交给 SNI sidecar。
-                    // 有证书时仍然走 Titanium 的 SOCKS5，否则 DevSidecar 的 SNI 伪装、镜像和请求头规则不会生效。
-                    var certificateLess = ProxySettings.IsCertificateLessMode.Value ||
-                        (!ProxySettings.ForceCertificateMode.Value &&
-                         !IReverseProxyService.Instance.CertificateManager.IsRootCertificateInstalled);
-                    if (certificateLess)
+                    // VPN 模式统一从 sidecar 出口：
+                    // 1. 它支持非 TLS 原始 TCP 和 UDP ASSOCIATE，不会把二进制流量交给 HTTP 解析器；
+                    // 2. 证书模式下需要 MITM 的域名由 sidecar 定向转发给 Titanium，
+                    //    其余流量仍走 SNI 分片/预置 IP，避免 Titanium 被全量流量拖死。
+                    SniSidecarService.Start(force: true);
+                    if (SniSidecarService.IsRunning)
                     {
-                        SniSidecarService.Start();
-                        if (SniSidecarService.IsRunning)
-                        {
-                            return $"{ip}:{SniSidecarService.ActivePort}";
-                        }
-
-                        // 端口被占用等异常情况下退回 Titanium 的 SOCKS5，至少保证网络可用；
-                        // 具体原因已写入诊断日志，加速实验室可以查看。
-                        ProxyDiagnostics.Warn("Vpn", "SNI sidecar 未运行，临时回退到 Titanium SOCKS5");
+                        return $"{ip}:{SniSidecarService.ActivePort}";
                     }
+
+                    // 端口被占用等异常情况下退回 Titanium 的 SOCKS5，至少保证网络可用；
+                    // 具体原因已写入诊断日志，加速实验室可以查看。
+                    ProxyDiagnostics.Warn("Vpn", "SNI sidecar 未运行，临时回退到 Titanium SOCKS5");
 
                     return $"{ip}:{s.Socks5ProxyPortId}";
                 }

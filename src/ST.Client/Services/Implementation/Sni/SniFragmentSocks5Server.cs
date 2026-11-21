@@ -94,6 +94,16 @@ namespace System.Application.Services.Implementation
             {
                 await HandleCoreAsync(client).ConfigureAwait(false);
             }
+            catch (Exception ex) when (!cts.IsCancellationRequested)
+            {
+                // 每个连接都是 fire-and-forget，异常必须在这里吃掉；
+                // 否则会变成 TaskScheduler.UnobservedTaskException 并堆积在终结器线程。
+                ProxyDiagnostics.Warn("SniSidecar", $"连接异常: {ex.Message}");
+            }
+            catch
+            {
+                // 停止代理时的取消/关闭异常不需要上报
+            }
             finally
             {
                 Interlocked.Decrement(ref activeConnections);
@@ -167,6 +177,48 @@ namespace System.Application.Services.Implementation
                     var payload = firstPayload.Data == null ? null : MaybeRewriteSni(firstPayload.Data, effectiveHost);
                     var excludedBySni = excluded || rules.IsExcluded(effectiveHost);
 
+                    // 证书模式：只有确实需要 MITM 的域名才转发给 Titanium，
+                    // 其余流量（含非 TLS、UDP、普通网页）继续由 sidecar 直连。
+                    // 这样 Titanium 不会收到二进制数据，避免大量 "Invalid HTTP request line" 拖死进程。
+                    if (payload != null && ShouldRelayToTitanium(effectiveHost, excludedBySni))
+                    {
+                        try
+                        {
+                            target = await ConnectViaTitaniumAsync(
+                                effectiveHost,
+                                req.Port,
+                                connectionCts.Token).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            target = null;
+                            ProxyDiagnostics.Warn("SniSidecar", $"Titanium MITM 不可用，回退直连: {effectiveHost}: {ex.Message}");
+                        }
+
+                        if (target != null)
+                        {
+                            target.NoDelay = true;
+                            var mitmStream = target.GetStream();
+                            try
+                            {
+                                await mitmStream.WriteAsync(payload, 0, payload.Length, connectionCts.Token).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                ProxyDiagnostics.Warn("SniSidecar", $"转发 ClientHello 到 Titanium 失败: {ex.Message}");
+                                return;
+                            }
+
+                            var mitmUp = PumpClientToTargetAsync(clientStream, mitmStream, connectionCts.Token);
+                            var mitmDown = PumpAsync(mitmStream, clientStream, connectionCts.Token);
+                            await Task.WhenAny(mitmUp, mitmDown).ConfigureAwait(false);
+                            connectionCts.Cancel();
+                            await AwaitQuietlyAsync(mitmUp).ConfigureAwait(false);
+                            await AwaitQuietlyAsync(mitmDown).ConfigureAwait(false);
+                            return;
+                        }
+                    }
+
                     try
                     {
                         target = await ConnectWithFallbackAsync(
@@ -202,14 +254,16 @@ namespace System.Application.Services.Implementation
                     }
 
                     var fragment = ShouldFragment(effectiveHost, payload!, excludedBySni) &&
-                                   !FragmentFallbackCache.ShouldSkip(effectiveHost);
+                                   (SniSidecarService.BenchmarkMode || !FragmentFallbackCache.ShouldSkip(effectiveHost));
 
                     // 记住上次在这个域名上成功的分片策略，后续连接直接使用。
                     // key 里带上用户当前选择的策略，用户改设置后旧缓存自动失效。
                     var configuredStrategy = (TlsFragmentStrategy)ProxySettings.SniFragmentStrategy.Value;
                     var learnedKey = GetLearnedKey(effectiveHost, configuredStrategy);
                     TlsFragmentStrategy? learnedStrategy = null;
-                    if (fragment && learnedStrategies.TryGetValue(learnedKey, out var cachedStrategy))
+                    if (!SniSidecarService.BenchmarkMode &&
+                        fragment &&
+                        learnedStrategies.TryGetValue(learnedKey, out var cachedStrategy))
                     {
                         learnedStrategy = cachedStrategy;
                     }
@@ -223,7 +277,9 @@ namespace System.Application.Services.Implementation
                         connectionCts.Token,
                         learnedStrategy).ConfigureAwait(false);
 
-                    if (probe.Closed && fragment && ProxySettings.EnableSniFragmentFallback.Value)
+                    if (probe.Closed && fragment &&
+                        !SniSidecarService.BenchmarkMode &&
+                        ProxySettings.EnableSniFragmentFallback.Value)
                     {
                         // 分片被重置：先尝试更强的策略，再回退到不分片。
                         // 很多 DPI 能重组普通 TLS record，但对 Tiny record 脉冲/ClientHello 填充无效。
@@ -928,6 +984,66 @@ namespace System.Application.Services.Implementation
             catch
             {
                 relay.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 证书模式下，是否应该把这条 TLS 连接交给 Titanium 做 MITM。
+        /// 只针对规则要求 MITM 的域名和 HF 兜底域名，避免 Titanium 接触非 TLS/UDP 流量。
+        /// </summary>
+        static bool ShouldRelayToTitanium(string host, bool excluded)
+        {
+            if (excluded || string.IsNullOrEmpty(host)) return false;
+            if (!SniSidecarService.CertificateMode) return false;
+
+            bool socksEnabled;
+            try { socksEnabled = IReverseProxyService.Instance.Socks5ProxyEnable; }
+            catch { socksEnabled = ProxySettings.Socks5ProxyEnable.Value; }
+            if (!socksEnabled) return false;
+
+            var rules = ProxyRuleEngine.Current;
+            if (rules.IsExcluded(host)) return false;
+            return rules.DomainRequiresMitm(host) || ProxyPresetIpProvider.IsHuggingFaceHost(host);
+        }
+
+        /// <summary>
+        /// 连接到本机 Titanium 的 SOCKS5，并把客户端原始 ClientHello 原样转发过去。
+        /// 不使用分片：Titanium 会自己与上游握手。
+        /// </summary>
+        static async Task<TcpClient> ConnectViaTitaniumAsync(
+            string host,
+            int port,
+            CancellationToken cancellationToken)
+        {
+            int titaniumPort;
+            try { titaniumPort = IReverseProxyService.Instance.Socks5ProxyPortId; }
+            catch { titaniumPort = ProxySettings.Socks5ProxyPortId.Value; }
+
+            if (titaniumPort <= 0 || titaniumPort > 65535)
+                throw new InvalidOperationException("Titanium SOCKS5 端口无效");
+            if (titaniumPort == SniSidecarService.ActivePort || titaniumPort == SniSidecarService.Port)
+                throw new InvalidOperationException("Titanium SOCKS5 端口与 sidecar 相同，已跳过以避免回环");
+
+            var client = await ConnectOnceAsync(
+                IPAddress.Loopback.ToString(),
+                titaniumPort,
+                cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await NegotiateUpstreamAsync(
+                    client.GetStream(),
+                    host,
+                    port,
+                    null,
+                    null,
+                    cancellationToken).ConfigureAwait(false);
+                ProxyDiagnostics.Info("SniSidecar", $"证书模式转发 Titanium: {host}:{port}");
+                return client;
+            }
+            catch
+            {
+                client.Dispose();
                 throw;
             }
         }
@@ -1702,6 +1818,18 @@ namespace System.Application.Services.Implementation
     {
         static readonly object sync = new();
         static SniFragmentSocks5Server? server;
+
+        /// <summary>
+        /// 加速实验室的分片对比模式：禁用“学习到的策略/回退缓存/自动升级”，
+        /// 保证每个策略都是独立测试，而不是被上一次的结果带偏。
+        /// </summary>
+        public static bool BenchmarkMode { get; set; }
+
+        /// <summary>
+        /// 当前是否处于证书/MITM 模式，由 Titanium 启动时写入。
+        /// sidecar 用它判断哪些域名需要转发给 Titanium。
+        /// </summary>
+        public static bool CertificateMode { get; set; }
 
         public static bool IsRunning
         {

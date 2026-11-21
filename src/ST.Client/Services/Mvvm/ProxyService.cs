@@ -170,7 +170,9 @@ namespace System.Application.Services
                             }
                         }
 
-                        var isRun = await reverseProxyService.StartProxy();
+                        // Titanium 的启动是同步阻塞的（绑定端口、探测 IPv6、证书存储），
+                        // 必须移出 UI 线程，否则 Android 上会 ANR。
+                        var isRun = await Task.Run(async () => await reverseProxyService.StartProxy());
 
                         if (isRun)
                         {
@@ -210,7 +212,7 @@ namespace System.Application.Services
                                             //platformService.RunShell($" \\cp \"{Path.Combine(IOPath.CacheDirectory, "hosts")}\" \"{platformService.HostsFilePath}\"");
                                         }
                                         Toast.Show(AppResources.OperationHostsError_.Format(r.Message));
-                                        await reverseProxyService.StopProxy();
+                                        await Task.Run(async () => await reverseProxyService.StopProxy());
                                         return;
                                     }
                                 }
@@ -227,7 +229,8 @@ namespace System.Application.Services
                     }
                     else
                     {
-                        await reverseProxyService.StopProxy();
+                        // 停止同样可能在等待会话释放，放到后台避免卡住 UI。
+                        await Task.Run(async () => await reverseProxyService.StopProxy());
                         StopTimer();
                         reverseProxyService.Scripts = null;
                         void OnStopRemoveHostsByTag()
@@ -828,7 +831,7 @@ namespace System.Application.Services
         {
             if (ProxyStatus)
             {
-                await reverseProxyService.StopProxy();
+                await Task.Run(async () => await reverseProxyService.StopProxy());
                 if (reverseProxyService.ProxyMode == ProxyMode.Hosts)
                 {
                     OnExitRestoreHosts();

@@ -120,13 +120,13 @@ namespace System.Application.UI.Activities
                 ToastShow("状态已刷新");
             }, false));
 
-            var testCard = AddSection("一键测试", "会依次检查规则集、DNS、DoH、TCP、直连 TLS、Sidecar TLS、Titanium 代理和 UDP。测试不会修改代理状态。");
+            var testCard = AddSection("一键测试", "会依次检查规则集、DNS、DoH、TCP、直连 TLS、Sidecar TLS、Titanium 代理、证书模式和 UDP。测试不会修改代理状态。");
             AddTextRow(testCard, "测试域名", out hostInput, AcceleratorLabService.DefaultHost);
             AddTextRow(testCard, "策略矩阵次数", out runsInput, "1", InputTypes.ClassNumber);
 
             var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             row.AddView(CreateButton("运行全部", RunAllAsync, true), WeightedButtonParams());
-            row.AddView(CreateButton("分片策略矩阵", RunMatrixAsync, false), WeightedButtonParams());
+            row.AddView(CreateButton("分片策略对比", RunMatrixAsync, false), WeightedButtonParams());
             testCard.AddView(row);
 
             var row2 = new LinearLayout(this) { Orientation = Orientation.Horizontal };
@@ -234,7 +234,7 @@ namespace System.Application.UI.Activities
             }
             finally
             {
-                progress.Dismiss();
+                DismissQuietly(progress);
             }
         }
 
@@ -250,7 +250,7 @@ namespace System.Application.UI.Activities
                 runs = Math.Max(1, Math.Min(10, parsed));
             }
 
-            var progress = ShowProgress("正在逐项测试分片策略，可点“取消”随时停止…");
+            var progress = ShowProgress("正在逐项对比所有分片策略（独立测试，不继承上次结果），可点“取消”随时停止…");
             var token = labCts?.Token ?? default;
             try
             {
@@ -263,19 +263,19 @@ namespace System.Application.UI.Activities
                 lastReport = report;
                 if (resultsView != null) resultsView.Text = report;
                 RefreshStatus();
-                ShowTextDialog("分片策略矩阵", report);
+                ShowTextDialog("分片策略对比", report);
             }
             catch (OperationCanceledException)
             {
-                ToastShow("已取消分片矩阵");
+                ToastShow("已取消分片对比");
             }
             catch (Exception ex)
             {
-                ToastShow("矩阵测试失败: " + ex.Message);
+                ToastShow("对比测试失败: " + ex.Message);
             }
             finally
             {
-                progress.Dismiss();
+                DismissQuietly(progress);
             }
         }
 
@@ -394,7 +394,7 @@ namespace System.Application.UI.Activities
             }
             finally
             {
-                progress.Dismiss();
+                DismissQuietly(progress);
             }
         }
 
@@ -576,6 +576,7 @@ namespace System.Application.UI.Activities
             labCts?.Cancel();
             labCts?.Dispose();
             labCts = new CancellationTokenSource();
+            labCts.CancelAfter(TimeSpan.FromMinutes(3));
             var cts = labCts;
 
             var dialog = new AlertDialog.Builder(this)
@@ -603,6 +604,19 @@ namespace System.Application.UI.Activities
             public void OnCancel(IDialogInterface? dialog)
             {
                 cts.Cancel();
+            }
+        }
+
+        void DismissQuietly(AlertDialog? dialog)
+        {
+            if (dialog == null) return;
+            try
+            {
+                if (!IsFinishing && !IsDestroyed) dialog.Dismiss();
+            }
+            catch
+            {
+                // 页面已经销毁时 Dismiss 会抛 BadTokenException，忽略即可
             }
         }
 

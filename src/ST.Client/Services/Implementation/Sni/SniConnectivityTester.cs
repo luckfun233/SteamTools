@@ -110,15 +110,20 @@ namespace System.Application.Services.Implementation
             var report = new StringBuilder();
             report.AppendLine($"分片策略矩阵: {host}:{port}，每种 {runs} 次");
             report.AppendLine($"DoH: {(ProxySettings.EnableDoh.Value ? ProxySettings.DohEndpoint.Value : "未开启")}；中继: {(ProxySettings.EnableSniUpstreamRelay.Value ? "开启" : "关闭")}");
+            report.AppendLine("对比模式：每个策略独立发送，不使用已学习策略、不回退、不升级。");
             report.AppendLine();
             progress?.Invoke(report.ToString());
 
+            var rows = new List<(string Name, int Success, int Runs, long Median, string? Error)>();
+            var previousBenchmark = SniSidecarService.BenchmarkMode;
             try
             {
+                SniSidecarService.BenchmarkMode = true;
                 ProxySettings.EnableSniFragment.Value = true;
 
                 var baseline = await ProbeViaSidecarAsync(
                     host, port, SniSidecarService.ActivePort, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+                rows.Add(("不分片基准", baseline.Success ? 1 : 0, 1, baseline.ElapsedMs, baseline.Error));
                 report.AppendLine($"不分片基准: {FormatProbe(baseline)}");
                 progress?.Invoke(report.ToString());
 
@@ -158,17 +163,31 @@ namespace System.Application.Services.Implementation
 
                     times.Sort();
                     var median = times.Count == 0 ? 0 : times[times.Count / 2];
+                    var name = GetStrategyName((int)strategy);
+                    rows.Add((name, successes, runs, median, lastError));
                     report.AppendLine(
-                        $"{GetStrategyName((int)strategy),-16} 成功 {successes}/{runs} 中位 {median}ms" +
+                        $"{name,-16} {(successes == runs ? "PASS" : successes == 0 ? "FAIL" : "PART")} 成功 {successes}/{runs} 中位 {median}ms" +
                         (lastError == null ? string.Empty : $"，最后错误: {lastError}"));
                     progress?.Invoke(report.ToString());
                 }
             }
             finally
             {
+                SniSidecarService.BenchmarkMode = previousBenchmark;
                 ProxySettings.SniFragmentStrategy.Value = originalStrategy;
                 ProxySettings.EnableSniFragment.Value = originalEnabled;
                 if (!wasRunning) SniSidecarService.Stop();
+            }
+
+            report.AppendLine();
+            report.AppendLine("== 对比汇总（按成功率、延迟排序）==");
+            foreach (var row in rows
+                .OrderByDescending(x => x.Runs == 0 ? 0 : (double)x.Success / x.Runs)
+                .ThenBy(x => x.Median))
+            {
+                report.AppendLine(
+                    $"{row.Name,-16} {row.Success}/{row.Runs} 中位 {row.Median}ms" +
+                    (row.Error == null ? string.Empty : $" ({row.Error})"));
             }
 
             report.AppendLine();
@@ -324,19 +343,89 @@ namespace System.Application.Services.Implementation
             }
         }
 
+        /// <summary>
+        /// 通过 Titanium 的 SOCKS5 做一次 TLS 握手，用于确认证书模式链路是否真的在工作：
+        /// 成功且证书 issuer 是本地 CA，说明 MITM 已生效；成功但 issuer 是远端，说明只是隧道。
+        /// </summary>
+        public static async Task<TitaniumProbeResult> ProbeViaTitaniumAsync(
+            string host,
+            int port,
+            int titaniumSocksPort,
+            int timeoutSeconds,
+            CancellationToken cancellationToken)
+        {
+            var sw = Stopwatch.StartNew();
+            using var client = new TcpClient();
+            try
+            {
+                using var timeout = CreateTimeout(cancellationToken, timeoutSeconds);
+                await ConnectWithTimeoutAsync(client, IPAddress.Loopback.ToString(), titaniumSocksPort, timeout.Token).ConfigureAwait(false);
+
+                var stream = client.GetStream();
+                if (!await SocksConnectAsync(stream, host, port, timeout.Token).ConfigureAwait(false))
+                {
+                    return TitaniumProbeResult.Fail(sw.ElapsedMilliseconds, "Titanium SOCKS5 连接被拒绝");
+                }
+
+                var ssl = new SslStream(stream, true, (_, _, _, _) => true);
+                var auth = ssl.AuthenticateAsClientAsync(host);
+                var completed = await Task.WhenAny(auth, Task.Delay(Timeout.Infinite, timeout.Token)).ConfigureAwait(false);
+                if (completed != auth)
+                {
+                    ssl.Dispose();
+                    try { await auth.ConfigureAwait(false); } catch { }
+                    throw new TimeoutException();
+                }
+
+                try
+                {
+                    await auth.ConfigureAwait(false);
+                    var cert = ssl.RemoteCertificate;
+                    var issuer = cert?.Issuer ?? "未知";
+                    var mitm = issuer.Contains("Watt", StringComparison.OrdinalIgnoreCase) ||
+                               issuer.Contains("Steam", StringComparison.OrdinalIgnoreCase) ||
+                               issuer.Contains("SteamTools", StringComparison.OrdinalIgnoreCase);
+                    return TitaniumProbeResult.Ok(
+                        sw.ElapsedMilliseconds,
+                        $"TLS 握手成功；MITM={(mitm ? "是" : "否")}；issuer={issuer}");
+                }
+                finally
+                {
+                    ssl.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                return TitaniumProbeResult.Fail(sw.ElapsedMilliseconds, Describe(ex));
+            }
+        }
+
         static async Task<bool> HandshakeAsync(
             System.IO.Stream stream,
             string host,
             int timeoutSeconds,
             CancellationToken cancellationToken)
         {
-            using var ssl = new SslStream(stream, true, (_, _, _, _) => true);
+            var ssl = new SslStream(stream, true, (_, _, _, _) => true);
             using var timeout = CreateTimeout(cancellationToken, timeoutSeconds);
             var task = ssl.AuthenticateAsClientAsync(host);
             var completed = await Task.WhenAny(task, Task.Delay(Timeout.Infinite, timeout.Token)).ConfigureAwait(false);
-            if (completed != task) throw new TimeoutException();
-            await task.ConfigureAwait(false);
-            return ssl.IsAuthenticated;
+            if (completed != task)
+            {
+                // 超时后必须回收握手任务，否则它的异常会变成未观察任务异常。
+                ssl.Dispose();
+                try { await task.ConfigureAwait(false); } catch { }
+                throw new TimeoutException();
+            }
+            try
+            {
+                await task.ConfigureAwait(false);
+                return ssl.IsAuthenticated;
+            }
+            finally
+            {
+                ssl.Dispose();
+            }
         }
 
         static async Task<bool> SocksConnectAsync(
@@ -461,6 +550,26 @@ namespace System.Application.Services.Implementation
             if (ex is SocketException socket) return $"网络错误 {socket.SocketErrorCode}";
             if (ex is System.Security.Authentication.AuthenticationException) return "TLS 认证失败";
             return ex.Message;
+        }
+
+        public sealed class TitaniumProbeResult
+        {
+            TitaniumProbeResult(bool success, long elapsedMs, string detail)
+            {
+                Success = success;
+                ElapsedMs = elapsedMs;
+                Detail = detail;
+            }
+
+            public bool Success { get; }
+
+            public long ElapsedMs { get; }
+
+            public string Detail { get; }
+
+            public static TitaniumProbeResult Ok(long elapsedMs, string detail) => new(true, elapsedMs, detail);
+
+            public static TitaniumProbeResult Fail(long elapsedMs, string error) => new(false, elapsedMs, error);
         }
 
         public sealed class SniProbeResult
