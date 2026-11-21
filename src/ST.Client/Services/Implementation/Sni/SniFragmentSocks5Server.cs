@@ -168,7 +168,10 @@ namespace System.Application.Services.Implementation
                         !string.IsNullOrWhiteSpace(payloadSni))
                     {
                         effectiveHost = payloadSni!;
-                        if (!string.Equals(effectiveHost, host, StringComparison.OrdinalIgnoreCase))
+                        // VPN 下 SOCKS 目标永远是 IP，这里如果每个连接都写日志会产生大量 IO。
+                        // 只记录用户关心的分片域名，普通连接交给统计计数器。
+                        if (!string.Equals(effectiveHost, host, StringComparison.OrdinalIgnoreCase) &&
+                            IsDomainAllowed(effectiveHost, ProxySettings.SniFragmentDomains.Value))
                         {
                             ProxyDiagnostics.Info("SniSidecar", $"从 ClientHello 识别域名: {host} -> {effectiveHost}");
                         }
@@ -890,7 +893,11 @@ namespace System.Application.Services.Implementation
                 }
                 else
                 {
-                    ProxyDiagnostics.Info("SniSidecar", $"直连: {effectiveHost} -> {result.Host}:{port}");
+                    // 普通连接不逐个落盘，避免浏览网页时把日志和磁盘 IO 打满。
+                    if (IsDomainAllowed(effectiveHost, ProxySettings.SniFragmentDomains.Value))
+                    {
+                        ProxyDiagnostics.Info("SniSidecar", $"直连: {effectiveHost} -> {result.Host}:{port}");
+                    }
                 }
                 return result.Client;
             }

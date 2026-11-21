@@ -283,8 +283,8 @@ namespace System.Application.UI.Activities
 
         protected override void OnDestroy()
         {
+            // 只取消不 Dispose：后台任务可能还持有这个 token 的注册。
             labCts?.Cancel();
-            labCts?.Dispose();
             labCts = null;
             base.OnDestroy();
         }
@@ -574,7 +574,6 @@ namespace System.Application.UI.Activities
         AlertDialog ShowProgress(string message)
         {
             labCts?.Cancel();
-            labCts?.Dispose();
             labCts = new CancellationTokenSource();
             labCts.CancelAfter(TimeSpan.FromMinutes(3));
             var cts = labCts;
