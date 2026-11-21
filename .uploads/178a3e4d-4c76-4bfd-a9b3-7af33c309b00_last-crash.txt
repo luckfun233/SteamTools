@@ -1,0 +1,1288 @@
+[2026-11-21 11:01:09] Install
+Device: OPPO PDSM00 / API 33
+CrashLogger ready: /storage/emulated/0/Android/data/net.steampp.app/files/last-crash.txt
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:48] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:52] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:52] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:52] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:52] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:52] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:01:52] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:02] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Connection reset by peer)
+ ---> System.Net.Sockets.SocketException (104): Connection reset by peer
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:17] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:02:50] Install
+Device: OPPO PDSM00 / API 33
+CrashLogger ready: /storage/emulated/0/Android/data/net.steampp.app/files/last-crash.txt
+
+[2026-11-21 11:03:03] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:03] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:03] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:03] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:03] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:06] TaskScheduler
+Device: OPPO PDSM00 / API 33
+System.AggregateException: A Task's exception(s) were not observed either by Waiting on the Task or accessing its Exception property. As a result, the unobserved exception was rethrown by the finalizer thread. (Operation Canceled)
+ ---> System.Net.Sockets.SocketException (125): Operation Canceled
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+   at System.Threading.Tasks.ValueTask.ValueTaskSourceAsTask.<>c.<.cctor>b__4_0(Object state)
+--- End of stack trace from previous location ---
+   at System.Net.Sockets.TcpClient.CompleteConnectAsync(Task task)
+   --- End of inner exception stack trace ---
+
+[2026-11-21 11:03:41] Install
+Device: OPPO PDSM00 / API 33
+CrashLogger ready: /storage/emulated/0/Android/data/net.steampp.app/files/last-crash.txt
+

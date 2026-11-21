@@ -1,0 +1,359 @@
+Watt Toolkit Android 诊断日志
+时间: 2026-11-21 11:04:34 +08:00
+设备: OPPO PDSM00 / Android 13 (API 33) / arm64-v8a,armeabi-v7a,armeabi
+
+代理模式: VPN
+免证书模式: False
+DevSidecar 规则: True（分组 31 个，服务 174 个，关闭组: ）
+远程规则: 69 条，实际启用 69 条，预置 IP 59 组
+自定义规则: True，0 条
+SNI 分片: True，策略: TLS record 拆分
+分片参数: 大小 64B，段数 3，延迟 10ms，抖动 0ms，填充 4096B
+分片域名: github.com;*.githubusercontent.com;*.githubassets.com;github.dev;huggingface.co;*.huggingface.co;hf.co;*.hf.co;*.xethub.hf.co;pixiv.net;*.pixiv.net;*.pixiv.org;pximg.net;*.pximg.net;*.fanbox.cc
+分片回退: True，探测 1200ms，缓存 10 分钟
+SNI 改写: False，目标: baidu.com
+Sidecar 端口: 8869，实际: 8869
+上游中继: False，127.0.0.1:7890，域名: 全部
+DoH: True，JSON: https://doh.pub/dns-query，wire: https://doh.pub/dns-query，回退: True
+DNS 代理: True，端口: 8870，实际: 8870，回退 DNS: 223.5.5.5;119.29.29.29
+DNS 预置 IP: True，HuggingFace 兜底: True，UDP/QUIC: True
+ByeDPI: True，域名: huggingface.co;*.huggingface.co;hf.co;*.hf.co，预设: 0，端口: 8871
+诊断日志: True，级别 0，保留 7 天
+仅浏览器 VPN: False
+
+== 最近日志 ==
+--- proxy-2026-11-21.log ---
+2026-11-21 11:01:13.147 [INFO] [Rules] 自定义 0 条 + 远程启用 0 条 = 0 条，关闭组 ，关闭服务 
+2026-11-21 11:01:13.196 [INFO] [SniSidecar] SOCKS5 已启动 127.0.0.1:8869
+2026-11-21 11:01:13.234 [INFO] [DnsProxy] 本地 DNS 代理已启动 127.0.0.1:8870
+2026-11-21 11:01:31.733 [INFO] [Rules] 自定义 0 条 + 远程启用 0 条 = 0 条，关闭组 ，关闭服务 
+2026-11-21 11:01:32.801 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:01:32.802 [INFO] [Rules] 启动后台同步 DevSidecar 配置完成
+2026-11-21 11:01:33.982 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:01:36.518 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:01:37.419 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:01:45.533 [ERROR] [Proxy] System.Exception: Failed to make system trust root certificate  for Root\CurrentUser store location. You may need admin rights.
+ ---> System.Security.Cryptography.CryptographicException: Access is denied.
+   at Internal.Cryptography.Pal.StorePal.FromSystemStore(String storeName, StoreLocation storeLocation, OpenFlags openFlags)
+   at System.Security.Cryptography.X509Certificates.X509Store.Open(OpenFlags flags)
+   at Titanium.Web.Proxy.Network.CertificateManager.installCertificate(StoreName storeName, StoreLocation storeLocation)
+   --- End of inner exception stack trace ---
+2026-11-21 11:01:45.550 [INFO] [Proxy] 启动: mode=System, certless=False, rootCert=False, socks5=True, rules=69
+2026-11-21 11:01:46.292 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4846:400:: -> firebaseinstallations.googleapis.com
+2026-11-21 11:01:46.735 [WARN] [DoH] DoH wire 查询失败: Connection reset
+2026-11-21 11:01:46.736 [WARN] [DoH] DoH wire 查询失败: Connection reset
+2026-11-21 11:01:46.756 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::1bf -> mgw.alipay.com
+2026-11-21 11:01:46.769 [INFO] [SniSidecar] 使用预置 IP 连接: firebaseinstallations.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:46.799 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::1bf -> mgw.alipay.com
+2026-11-21 11:01:46.801 [INFO] [SniSidecar] 从 ClientHello 识别域名: 203.209.250.114 -> amdc.alipay.com.cn
+2026-11-21 11:01:46.802 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.115.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:46.802 [INFO] [SniSidecar] 从 ClientHello 识别域名: 120.236.182.248 -> onepush-pilot-cn.heytapmobi.com
+2026-11-21 11:01:46.804 [INFO] [SniSidecar] 直连: mgw.alipay.com -> 2400:b200:1000:f010::1bf:443
+2026-11-21 11:01:46.808 [INFO] [DnsProxy] 预置 IP: mtalk.google.com -> 142.251.189.206
+2026-11-21 11:01:46.934 [INFO] [SniSidecar] 直连: mgw.alipay.com -> 2400:b200:1000:f010::1bf:443
+2026-11-21 11:01:46.935 [INFO] [SniSidecar] 直连: amdc.alipay.com.cn -> 203.209.250.114:443
+2026-11-21 11:01:46.935 [INFO] [SniSidecar] 直连: onepush-pilot-cn.heytapmobi.com -> 120.236.182.248:443
+2026-11-21 11:01:46.940 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> mtalk.google.com
+2026-11-21 11:01:46.945 [INFO] [SniSidecar] 从 ClientHello 识别域名: 47.94.74.21 -> im3.okii.com
+2026-11-21 11:01:46.988 [INFO] [SniSidecar] 直连: im3.okii.com -> 47.94.74.21:8002
+2026-11-21 11:01:46.995 [INFO] [SniSidecar] 从 ClientHello 识别域名: 111.206.136.124 -> smartcard.apps.coloros.com
+2026-11-21 11:01:47.028 [INFO] [SniSidecar] 直连: smartcard.apps.coloros.com -> 111.206.136.124:443
+2026-11-21 11:01:47.054 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:47.192 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4846:400:: -> firebaseinstallations.googleapis.com
+2026-11-21 11:01:47.225 [INFO] [DnsProxy] 预置 IP: android.apis.google.com -> 142.251.189.206
+2026-11-21 11:01:47.243 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> android.apis.google.com
+2026-11-21 11:01:47.436 [INFO] [SniSidecar] 使用预置 IP 连接: firebaseinstallations.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:47.452 [INFO] [SniSidecar] 直连: 157.255.51.32 -> 157.255.51.32:8080
+2026-11-21 11:01:47.507 [INFO] [SniSidecar] 使用预置 IP 连接: android.apis.google.com -> 142.251.189.206:443
+2026-11-21 11:01:47.666 [INFO] [SniSidecar] 直连: mtalk.google.com -> mtalk.google.com:5228
+2026-11-21 11:01:47.691 [INFO] [SniSidecar] 直连: 157.255.50.55 -> 157.255.50.55:80
+2026-11-21 11:01:47.709 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4844:400:: -> firebaseinstallations.googleapis.com
+2026-11-21 11:01:47.924 [INFO] [SniSidecar] 从 ClientHello 识别域名: 203.209.250.114 -> amdc.alipay.com.cn
+2026-11-21 11:01:47.943 [INFO] [SniSidecar] 使用预置 IP 连接: firebaseinstallations.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:48.010 [INFO] [SniSidecar] 直连: amdc.alipay.com.cn -> 203.209.250.114:443
+2026-11-21 11:01:48.257 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.118.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:48.368 [INFO] [SniSidecar] 从 ClientHello 识别域名: 157.255.49.147 -> pantanal-sys-cn.allawntech.com
+2026-11-21 11:01:48.450 [INFO] [SniSidecar] 直连: pantanal-sys-cn.allawntech.com -> 157.255.49.147:443
+2026-11-21 11:01:48.489 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:48.722 [INFO] [SniSidecar] 从 ClientHello 识别域名: 183.215.62.188 -> sipzzh17.hbq.r.10086.cn
+2026-11-21 11:01:48.735 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4845:400:: -> android.googleapis.com
+2026-11-21 11:01:48.737 [INFO] [SniSidecar] 直连: sipzzh17.hbq.r.10086.cn -> 183.215.62.188:5260
+2026-11-21 11:01:48.740 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.114.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:48.751 [INFO] [SniSidecar] 直连: 2408:80f1:21:c124::1f -> 2408:80f1:21:c124::1f:80
+2026-11-21 11:01:48.969 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:48.991 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:49.009 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::1bf -> ashort.alipay.com.cn
+2026-11-21 11:01:49.043 [INFO] [SniSidecar] 直连: ashort.alipay.com.cn -> 2400:b200:1000:f010::1bf:443
+2026-11-21 11:01:49.431 [INFO] [SniSidecar] 直连: 119.188.166.178 -> 119.188.166.178:80
+2026-11-21 11:01:49.741 [INFO] [SniSidecar] 从 ClientHello 识别域名: 111.206.137.181 -> uc-track-gl.heytapmobi.com
+2026-11-21 11:01:49.767 [INFO] [SniSidecar] 从 ClientHello 识别域名: 157.255.145.117 -> cloudconf-app-cn.heytapmobi.com
+2026-11-21 11:01:49.767 [INFO] [SniSidecar] 从 ClientHello 识别域名: 157.255.145.117 -> cloudconf-app-cn.heytapmobi.com
+2026-11-21 11:01:49.771 [INFO] [SniSidecar] 从 ClientHello 识别域名: 157.255.145.117 -> cloudconf-app-cn.heytapmobi.com
+2026-11-21 11:01:49.863 [INFO] [SniSidecar] 直连: cloudconf-app-cn.heytapmobi.com -> 157.255.145.117:443
+2026-11-21 11:01:49.863 [INFO] [SniSidecar] 直连: cloudconf-app-cn.heytapmobi.com -> 157.255.145.117:443
+2026-11-21 11:01:49.863 [INFO] [SniSidecar] 直连: cloudconf-app-cn.heytapmobi.com -> cloudconf-app-cn.heytapmobi.com:443
+2026-11-21 11:01:49.872 [INFO] [SniSidecar] 直连: uc-track-gl.heytapmobi.com -> 111.206.137.181:443
+2026-11-21 11:01:50.129 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.119.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:50.132 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4846:400:: -> android.googleapis.com
+2026-11-21 11:01:50.378 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:50.396 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:50.679 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4847:400:: -> android.googleapis.com
+2026-11-21 11:01:50.680 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.113.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:50.921 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:50.930 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:50.965 [INFO] [DnsProxy] 预置 IP: www.google.com -> 142.251.189.206
+2026-11-21 11:01:50.983 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> www.google.com
+2026-11-21 11:01:51.039 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:5000:b000::c8 -> amdc-thirdparty.alipay.com
+2026-11-21 11:01:51.039 [INFO] [SniSidecar] 直连: 157.148.33.165 -> 157.148.33.165:80
+2026-11-21 11:01:51.076 [INFO] [SniSidecar] 直连: amdc-thirdparty.alipay.com -> 2400:b200:5000:b000::c8:443
+2026-11-21 11:01:51.181 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.116.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:51.203 [INFO] [SniSidecar] 直连: 2408:8752:e00:a17:3::21 -> 2408:8752:e00:a17:3::21:80
+2026-11-21 11:01:51.210 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4843:400:: -> android.googleapis.com
+2026-11-21 11:01:51.223 [INFO] [SniSidecar] 使用预置 IP 连接: www.google.com -> 142.251.189.206:443
+2026-11-21 11:01:51.417 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:51.477 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:51.670 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.112.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:51.743 [INFO] [SniSidecar] 直连: 157.148.61.199 -> 157.148.61.199:8080
+2026-11-21 11:01:51.941 [INFO] [SniSidecar] 直连: 182.50.10.149 -> 182.50.10.149:80
+2026-11-21 11:01:51.954 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:51.946 [INFO] [SniSidecar] 直连: 140.207.56.26 -> 140.207.56.26:80
+2026-11-21 11:01:52.134 [INFO] [SniSidecar] 直连: 2408:873d:a00:19::57 -> 2408:873d:a00:19::57:8080
+2026-11-21 11:01:52.329 [WARN] [SniSidecar] 连接 36.155.242.141:63861 失败: 连接 36.155.242.141:63861 超时
+2026-11-21 11:01:52.489 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.117.4 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:52.747 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:53.018 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2001:4860:4841:400:: -> voilatile-pa.googleapis.com
+2026-11-21 11:01:53.153 [INFO] [DnsProxy] 预置 IP: voilatile-pa.googleapis.com -> 142.251.189.206
+2026-11-21 11:01:53.160 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:53.258 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:873c:7a00:2005::7 -> aps.amap.com
+2026-11-21 11:01:53.258 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:d0fb:70::11 -> lbs.map.qq.com
+2026-11-21 11:01:53.345 [INFO] [SniSidecar] 直连: lbs.map.qq.com -> 2408:8756:d0fb:70::11:443
+2026-11-21 11:01:53.355 [INFO] [SniSidecar] 直连: aps.amap.com -> 2408:873c:7a00:2005::7:443
+2026-11-21 11:01:53.417 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:53.439 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:c52:1329:0:ff:b018:c0a7 -> loc.map.baidu.com
+2026-11-21 11:01:53.504 [INFO] [SniSidecar] 直连: loc.map.baidu.com -> 2408:8756:c52:1329:0:ff:b018:c0a7:443
+2026-11-21 11:01:53.571 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:01:54.182 [INFO] [SniSidecar] 从 ClientHello 识别域名: 111.206.136.128 -> b1-data.ads.heytapmobi.com
+2026-11-21 11:01:54.223 [INFO] [SniSidecar] 直连: b1-data.ads.heytapmobi.com -> 111.206.136.128:443
+2026-11-21 11:01:54.793 [INFO] [SniSidecar] 从 ClientHello 识别域名: 111.202.28.87 -> obus-cn.dc.heytapmobi.com
+2026-11-21 11:01:54.856 [INFO] [SniSidecar] 直连: obus-cn.dc.heytapmobi.com -> 111.202.28.87:443
+2026-11-21 11:01:56.750 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> voilatile-pa.googleapis.com
+2026-11-21 11:01:56.832 [INFO] [SniSidecar] 从 ClientHello 识别域名: 111.202.28.106 -> dc-dragate-cn.heytapmobi.com
+2026-11-21 11:01:56.876 [INFO] [SniSidecar] 直连: dc-dragate-cn.heytapmobi.com -> 111.202.28.106:443
+2026-11-21 11:01:57.004 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 11:02:00.366 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:1901:0:5e8a:: -> o4510860521897984.ingest.us.sentry.io
+2026-11-21 11:02:00.550 [INFO] [SniSidecar] 直连: o4510860521897984.ingest.us.sentry.io -> 2600:1901:0:5e8a:::443
+2026-11-21 11:02:00.664 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8749:c110:800:70::3 -> github.akams.cn
+2026-11-21 11:02:00.674 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.101 -> cn.bing.com
+2026-11-21 11:02:00.679 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.101 -> cn.bing.com
+2026-11-21 11:02:00.736 [INFO] [SniSidecar] 直连: github.akams.cn -> 2408:8749:c110:800:70::3:443
+2026-11-21 11:02:00.739 [INFO] [SniSidecar] 直连: cn.bing.com -> 202.89.233.101:443
+2026-11-21 11:02:00.745 [INFO] [SniSidecar] 直连: cn.bing.com -> 202.89.233.101:443
+2026-11-21 11:02:00.991 [INFO] [SniSidecar] 从 ClientHello 识别域名: 1.15.144.40 -> umami.akams.cn
+2026-11-21 11:02:01.053 [INFO] [SniSidecar] 直连: umami.akams.cn -> 1.15.144.40:443
+2026-11-21 11:02:01.140 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:1901:0:5e8a:: -> o4510860521897984.ingest.us.sentry.io
+2026-11-21 11:02:01.309 [INFO] [SniSidecar] 直连: o4510860521897984.ingest.us.sentry.io -> 2600:1901:0:5e8a:::443
+2026-11-21 11:02:01.975 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.101 -> cn.bing.com
+2026-11-21 11:02:02.064 [INFO] [SniSidecar] 直连: cn.bing.com -> 202.89.233.101:443
+2026-11-21 11:02:02.800 [INFO] [SniSidecar] 从 ClientHello 识别域名: 58.144.178.186 -> ws-keyboard.shouji.sogou.com
+2026-11-21 11:02:02.845 [INFO] [SniSidecar] 直连: ws-keyboard.shouji.sogou.com -> 58.144.178.186:443
+2026-11-21 11:02:03.219 [INFO] [SniSidecar] 直连: 157.148.33.165 -> 157.148.33.165:80
+2026-11-21 11:02:04.574 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.42.73.29 -> self.events.data.microsoft.com
+2026-11-21 11:02:04.928 [INFO] [SniSidecar] 直连: self.events.data.microsoft.com -> self.events.data.microsoft.com:443
+2026-11-21 11:02:05.026 [INFO] [SniSidecar] 从 ClientHello 识别域名: 23.210.216.84 -> sgepodownload.mediatek.com
+2026-11-21 11:02:05.173 [INFO] [SniSidecar] 直连: sgepodownload.mediatek.com -> sgepodownload.mediatek.com:443
+2026-11-21 11:02:06.318 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> www.google.com
+2026-11-21 11:02:06.565 [INFO] [SniSidecar] 使用预置 IP 连接: www.google.com -> 142.251.189.206:443
+2026-11-21 11:02:12.029 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 11:02:12.033 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 11:02:12.292 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 11:02:12.295 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 11:02:12.304 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 11:02:12.315 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 11:02:12.323 [INFO] [SniSidecar] 从 ClientHello 识别域名: 135.149.147.5 -> nav-edge.smartscreen.microsoft.com
+2026-11-21 11:02:12.334 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 11:02:12.468 [INFO] [SniSidecar] 直连: nav-edge.smartscreen.microsoft.com -> 135.149.147.5:443
+2026-11-21 11:02:12.967 [INFO] [IPSelector] 选择 2600:9000:2751:a000:17:b174:6d00:93a1 (239ms): 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129,2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:13.114 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1:443
+2026-11-21 11:02:13.196 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=TlsRecordSplit 段数=3 大小=1796 延迟=10ms 抖动=0ms
+2026-11-21 11:02:13.430 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:14.105 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> TinyRecords
+2026-11-21 11:02:14.237 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:14.282 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=Padding 段数=3 大小=5896 延迟=10ms 抖动=0ms
+2026-11-21 11:02:14.314 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> Padding
+2026-11-21 11:02:16.105 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:873c:7a00:2005::6 -> cgicol.amap.com
+2026-11-21 11:02:16.158 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:4700:3037::ac43:d687 -> api.autorefresh.io
+2026-11-21 11:02:16.188 [INFO] [SniSidecar] 直连: cgicol.amap.com -> 2408:873c:7a00:2005::6:443
+2026-11-21 11:02:16.357 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 11:02:16.379 [INFO] [SniSidecar] 直连: api.autorefresh.io -> 2606:4700:3037::ac43:d687:443
+2026-11-21 11:02:16.480 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:16.524 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=TlsRecordSplit 段数=3 大小=1764 延迟=10ms 抖动=0ms
+2026-11-21 11:02:16.672 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:16.851 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> TinyRecords
+2026-11-21 11:02:16.928 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:16.954 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=Padding 段数=3 大小=5864 延迟=10ms 抖动=0ms
+2026-11-21 11:02:16.969 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> Padding
+2026-11-21 11:02:17.016 [WARN] [ByeDPI] 启动后端口 8871 未监听，已停止
+2026-11-21 11:02:17.203 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 11:02:17.371 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1:443
+2026-11-21 11:02:17.398 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=TlsRecordSplit 段数=3 大小=1764 延迟=10ms 抖动=0ms
+2026-11-21 11:02:17.620 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:02:18.036 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> TinyRecords
+2026-11-21 11:02:18.325 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 3.167.200.113:443
+2026-11-21 11:02:18.351 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=Padding 段数=3 大小=5864 延迟=10ms 抖动=0ms
+2026-11-21 11:02:18.390 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> Padding
+2026-11-21 11:02:20.073 [INFO] [SniSidecar] 从 ClientHello 识别域名: 23.210.216.84 -> sgepodownload.mediatek.com
+2026-11-21 11:02:20.364 [INFO] [SniSidecar] 直连: sgepodownload.mediatek.com -> 23.210.216.84:443
+2026-11-21 11:02:21.676 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> www.google.com
+2026-11-21 11:02:23.269 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:c52:1329:0:ff:b018:c0a7 -> loc.map.baidu.com
+2026-11-21 11:02:23.308 [INFO] [SniSidecar] 直连: loc.map.baidu.com -> 2408:8756:c52:1329:0:ff:b018:c0a7:443
+2026-11-21 11:02:25.285 [INFO] [SniSidecar] 从 ClientHello 识别域名: 157.255.139.71 -> iwisdom.apps.coloros.com
+2026-11-21 11:02:25.326 [INFO] [SniSidecar] 直连: iwisdom.apps.coloros.com -> 157.255.139.71:443
+2026-11-21 11:02:25.768 [INFO] [SniSidecar] 从 ClientHello 识别域名: 111.206.136.128 -> adx.ads.heytapmobi.com
+2026-11-21 11:02:25.807 [INFO] [SniSidecar] 直连: adx.ads.heytapmobi.com -> 111.206.136.128:443
+2026-11-21 11:02:26.140 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.101 -> cn.bing.com
+2026-11-21 11:02:26.183 [INFO] [SniSidecar] 直连: cn.bing.com -> cn.bing.com:443
+2026-11-21 11:02:27.453 [INFO] [SniSidecar] 从 ClientHello 识别域名: 123.58.104.120 -> nearby.dc.oppomobile.com
+2026-11-21 11:02:27.497 [INFO] [SniSidecar] 直连: nearby.dc.oppomobile.com -> 123.58.104.120:443
+2026-11-21 11:02:28.187 [WARN] [SniSidecar] 连接 www.google.com:443 失败: 连接 www.google.com:443 超时
+2026-11-21 11:02:52.271 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:02:52.405 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:02:52.453 [INFO] [SniSidecar] SOCKS5 已启动 127.0.0.1:8869
+2026-11-21 11:02:52.492 [INFO] [DnsProxy] 本地 DNS 代理已启动 127.0.0.1:8870
+2026-11-21 11:02:59.517 [ERROR] [Proxy] System.Exception: Failed to make system trust root certificate  for Root\CurrentUser store location. You may need admin rights.
+ ---> System.Security.Cryptography.CryptographicException: Access is denied.
+   at Internal.Cryptography.Pal.StorePal.FromSystemStore(String storeName, StoreLocation storeLocation, OpenFlags openFlags)
+   at System.Security.Cryptography.X509Certificates.X509Store.Open(OpenFlags flags)
+   at Titanium.Web.Proxy.Network.CertificateManager.installCertificate(StoreName storeName, StoreLocation storeLocation)
+   --- End of inner exception stack trace ---
+2026-11-21 11:02:59.527 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:02:59.528 [INFO] [Rules] 启动后台同步 DevSidecar 配置完成
+2026-11-21 11:02:59.533 [INFO] [Proxy] 启动: mode=System, certless=False, rootCert=False, socks5=True, rules=69
+2026-11-21 11:03:00.050 [INFO] [SniSidecar] 从 ClientHello 识别域名: 203.209.250.41 -> amdc.alipay.com.cn
+2026-11-21 11:03:00.080 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::1b8 -> mgw.alipay.com
+2026-11-21 11:03:00.131 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::1b8 -> mgw.alipay.com
+2026-11-21 11:03:00.145 [INFO] [SniSidecar] 直连: amdc.alipay.com.cn -> 203.209.250.41:443
+2026-11-21 11:03:00.312 [WARN] [DoH] DoH wire 查询失败: Failed to connect to doh.pub/1.12.12.12:443
+2026-11-21 11:03:00.312 [WARN] [DoH] DoH wire 查询失败: Connection reset
+2026-11-21 11:03:00.323 [INFO] [SniSidecar] 直连: mgw.alipay.com -> 2400:b200:1000:f010::1b8:443
+2026-11-21 11:03:00.324 [INFO] [SniSidecar] 直连: mgw.alipay.com -> 2400:b200:1000:f010::1b8:443
+2026-11-21 11:03:00.405 [INFO] [SniSidecar] 直连: 157.255.51.32 -> 157.255.51.32:8080
+2026-11-21 11:03:00.532 [INFO] [SniSidecar] 直连: 2408:8752:e00:a17:3::22 -> 2408:8752:e00:a17:3::22:80
+2026-11-21 11:03:00.552 [INFO] [SniSidecar] 直连: 121.51.30.164 -> 121.51.30.164:80
+2026-11-21 11:03:00.571 [INFO] [SniSidecar] 从 ClientHello 识别域名: 39.105.13.185 -> im3.okii.com
+2026-11-21 11:03:00.609 [INFO] [SniSidecar] 直连: 182.50.10.149 -> 182.50.10.149:80
+2026-11-21 11:03:00.611 [INFO] [SniSidecar] 直连: im3.okii.com -> 39.105.13.185:8002
+2026-11-21 11:03:00.739 [INFO] [SniSidecar] 直连: 2408:873d:a00:19::57 -> 2408:873d:a00:19::57:8080
+2026-11-21 11:03:00.739 [INFO] [SniSidecar] 直连: 140.207.56.104 -> 140.207.56.104:8080
+2026-11-21 11:03:01.136 [INFO] [SniSidecar] SOCKS5 已停止
+2026-11-21 11:03:01.137 [INFO] [Proxy] 已停止
+2026-11-21 11:03:01.138 [WARN] [SniSidecar] 连接 36.155.242.141:23861 失败: 连接 36.155.242.141:23861 超时
+2026-11-21 11:03:01.139 [INFO] [DnsProxy] 本地 DNS 代理已停止
+2026-11-21 11:03:02.187 [INFO] [SniSidecar] SOCKS5 已启动 127.0.0.1:8869
+2026-11-21 11:03:02.187 [INFO] [DnsProxy] 本地 DNS 代理已启动 127.0.0.1:8870
+2026-11-21 11:03:02.479 [ERROR] [Proxy] System.Exception: Failed to make system trust root certificate  for Root\CurrentUser store location. You may need admin rights.
+ ---> System.Security.Cryptography.CryptographicException: Access is denied.
+   at Internal.Cryptography.Pal.StorePal.FromSystemStore(String storeName, StoreLocation storeLocation, OpenFlags openFlags)
+   at System.Security.Cryptography.X509Certificates.X509Store.Open(OpenFlags flags)
+   at Titanium.Web.Proxy.Network.CertificateManager.installCertificate(StoreName storeName, StoreLocation storeLocation)
+   --- End of inner exception stack trace ---
+2026-11-21 11:03:02.480 [INFO] [Proxy] 启动: mode=System, certless=False, rootCert=False, socks5=True, rules=69
+2026-11-21 11:03:02.832 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:f50:1008::28 -> gateway.kugou.com
+2026-11-21 11:03:02.883 [INFO] [SniSidecar] 从 ClientHello 识别域名: 47.94.74.21 -> im3.okii.com
+2026-11-21 11:03:02.897 [INFO] [SniSidecar] 直连: gateway.kugou.com -> 2408:8756:f50:1008::28:443
+2026-11-21 11:03:02.928 [INFO] [SniSidecar] 直连: 112.60.23.248 -> 112.60.23.248:443
+2026-11-21 11:03:02.931 [INFO] [SniSidecar] 直连: 112.60.23.248 -> 112.60.23.248:14000
+2026-11-21 11:03:02.931 [INFO] [SniSidecar] 直连: 183.194.189.96 -> 183.194.189.96:80
+2026-11-21 11:03:02.936 [INFO] [SniSidecar] 直连: im3.okii.com -> 47.94.74.21:8002
+2026-11-21 11:03:02.942 [INFO] [SniSidecar] 直连: 111.30.185.79 -> 111.30.185.79:8080
+2026-11-21 11:03:03.027 [INFO] [SniSidecar] 直连: 2409:8c54:871:1008::1e -> 2409:8c54:871:1008::1e:443
+2026-11-21 11:03:03.086 [INFO] [SniSidecar] 从 ClientHello 识别域名: 203.209.250.114 -> amdc.alipay.com.cn
+2026-11-21 11:03:03.195 [INFO] [SniSidecar] 直连: 2409:8c54:871:1008::1e -> 2409:8c54:871:1008::1e:14000
+2026-11-21 11:03:03.196 [INFO] [SniSidecar] 直连: 120.238.146.50 -> 120.238.146.50:80
+2026-11-21 11:03:03.196 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::b -> mgw.alipay.com
+2026-11-21 11:03:03.202 [INFO] [SniSidecar] 直连: amdc.alipay.com.cn -> 203.209.250.114:443
+2026-11-21 11:03:03.266 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::b -> mgw.alipay.com
+2026-11-21 11:03:03.412 [INFO] [SniSidecar] 直连: mgw.alipay.com -> 2400:b200:1000:f010::b:443
+2026-11-21 11:03:03.438 [INFO] [SniSidecar] 直连: mgw.alipay.com -> mgw.alipay.com:443
+2026-11-21 11:03:03.483 [INFO] [DnsProxy] 预置 IP: voilatile-pa.googleapis.com -> 142.251.189.206
+2026-11-21 11:03:03.541 [INFO] [SniSidecar] 直连: 111.206.147.210 -> 111.206.147.210:8080
+2026-11-21 11:03:03.562 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:1000:f010::1c9 -> ashort.alipay.com.cn
+2026-11-21 11:03:03.566 [INFO] [SniSidecar] 直连: 2402:4e00:b1:fff::d8 -> 2402:4e00:b1:fff::d8:80
+2026-11-21 11:03:03.577 [INFO] [SniSidecar] 直连: 119.188.166.178 -> 119.188.166.178:80
+2026-11-21 11:03:03.592 [INFO] [SniSidecar] 直连: 157.255.218.80 -> 157.255.218.80:20115
+2026-11-21 11:03:03.609 [INFO] [SniSidecar] 直连: ashort.alipay.com.cn -> 2400:b200:1000:f010::1c9:443
+2026-11-21 11:03:03.625 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.119.4 -> android.googleapis.com
+2026-11-21 11:03:03.634 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> voilatile-pa.googleapis.com
+2026-11-21 11:03:03.666 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:f50:1008::28 -> gateway.kugou.com
+2026-11-21 11:03:03.711 [INFO] [DnsProxy] 预置 IP: mtalk.google.com -> 142.251.189.206
+2026-11-21 11:03:03.735 [INFO] [SniSidecar] 直连: 157.255.218.80 -> 157.255.218.80:20115
+2026-11-21 11:03:03.735 [INFO] [SniSidecar] 直连: gateway.kugou.com -> gateway.kugou.com:443
+2026-11-21 11:03:03.776 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> mtalk.google.com
+2026-11-21 11:03:03.827 [INFO] [SniSidecar] 直连: 157.148.56.77 -> 157.148.56.77:1028
+2026-11-21 11:03:03.988 [INFO] [SniSidecar] 从 ClientHello 识别域名: 183.215.62.188 -> sipzzh17.hbq.r.10086.cn
+2026-11-21 11:03:03.990 [INFO] [SniSidecar] 直连: 112.65.193.167 -> 112.65.193.167:80
+2026-11-21 11:03:04.039 [INFO] [SniSidecar] 直连: sipzzh17.hbq.r.10086.cn -> 183.215.62.188:5260
+2026-11-21 11:03:04.041 [INFO] [SniSidecar] 直连: 2408:873d:a00:3002::11 -> 2408:873d:a00:3002::11:80
+2026-11-21 11:03:04.353 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.101 -> cn.bing.com
+2026-11-21 11:03:04.405 [INFO] [SniSidecar] 直连: cn.bing.com -> 202.89.233.101:443
+2026-11-21 11:03:04.462 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.100 -> cn.bing.com
+2026-11-21 11:03:04.506 [INFO] [SniSidecar] 直连: cn.bing.com -> 202.89.233.100:443
+2026-11-21 11:03:04.529 [INFO] [SniSidecar] 直连: mtalk.google.com -> mtalk.google.com:5228
+2026-11-21 11:03:04.822 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:5000:b000::c8 -> amdc-thirdparty.alipay.com
+2026-11-21 11:03:04.865 [INFO] [SniSidecar] 直连: amdc-thirdparty.alipay.com -> 2400:b200:5000:b000::c8:443
+2026-11-21 11:03:05.225 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 11:03:05.370 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 11:03:05.372 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 11:03:05.374 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 11:03:05.417 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 11:03:05.418 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 11:03:05.499 [INFO] [SniSidecar] 从 ClientHello 识别域名: 157.255.49.147 -> pantanal-sys-cn.allawntech.com
+2026-11-21 11:03:05.542 [INFO] [SniSidecar] 直连: pantanal-sys-cn.allawntech.com -> 157.255.49.147:443
+2026-11-21 11:03:06.053 [INFO] [IPSelector] 选择 2600:9000:2751:a800:17:b174:6d00:93a1 (119ms): 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129,2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.054 [INFO] [IPSelector] 选择 2600:9000:2751:a800:17:b174:6d00:93a1 (112ms): 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129,2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.175 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a800:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.250 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=TlsRecordSplit 段数=3 大小=1732 延迟=10ms 抖动=0ms
+2026-11-21 11:03:06.270 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a800:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.311 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:5000:b000::c8 -> amdc-thirdparty.alipay.com
+2026-11-21 11:03:06.334 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=TlsRecordSplit 段数=3 大小=1732 延迟=10ms 抖动=0ms
+2026-11-21 11:03:06.353 [INFO] [SniSidecar] 直连: amdc-thirdparty.alipay.com -> 2400:b200:5000:b000::c8:443
+2026-11-21 11:03:06.356 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.472 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a800:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.484 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> TinyRecords
+2026-11-21 11:03:06.516 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> TinyRecords
+2026-11-21 11:03:06.522 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a800:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.558 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=Padding 段数=3 大小=5832 延迟=10ms 抖动=0ms
+2026-11-21 11:03:06.562 [INFO] [SniSidecar] 使用预置 IP 连接: huggingface.co -> 2600:9000:2751:a800:17:b174:6d00:93a1:443
+2026-11-21 11:03:06.565 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> Padding
+2026-11-21 11:03:06.587 [INFO] [SniSidecar] 分片: huggingface.co:443 策略=Padding 段数=3 大小=5832 延迟=10ms 抖动=0ms
+2026-11-21 11:03:06.683 [WARN] [SniSidecar] 分片策略升级仍被重置: huggingface.co -> Padding
+2026-11-21 11:03:07.233 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:c52:1329:0:ff:b018:c0a7 -> loc.map.baidu.com
+2026-11-21 11:03:07.233 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:8756:d0fb:70::11 -> lbs.map.qq.com
+2026-11-21 11:03:07.306 [INFO] [SniSidecar] 直连: lbs.map.qq.com -> 2408:8756:d0fb:70::11:443
+2026-11-21 11:03:07.308 [INFO] [SniSidecar] 直连: loc.map.baidu.com -> loc.map.baidu.com:443
+2026-11-21 11:03:07.466 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2408:873c:7a00:2005::6 -> aps.amap.com
+2026-11-21 11:03:07.511 [INFO] [SniSidecar] 直连: aps.amap.com -> 2408:873c:7a00:2005::6:443
+2026-11-21 11:03:07.818 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2400:b200:5000:b000::c8 -> amdc-thirdparty.alipay.com
+2026-11-21 11:03:07.903 [INFO] [SniSidecar] 直连: amdc-thirdparty.alipay.com -> 2400:b200:5000:b000::c8:443
+2026-11-21 11:03:07.949 [INFO] [DnsProxy] 预置 IP: www.google.com -> 142.251.189.206
+2026-11-21 11:03:07.961 [INFO] [SniSidecar] 从 ClientHello 识别域名: 142.251.189.206 -> www.google.com
+2026-11-21 11:03:07.991 [INFO] [SniSidecar] 直连: 157.148.33.165 -> 157.148.33.165:80
+2026-11-21 11:03:08.469 [INFO] [SniSidecar] 从 ClientHello 识别域名: 40.74.98.197 -> self.events.data.microsoft.com
+2026-11-21 11:03:08.603 [INFO] [SniSidecar] 直连: self.events.data.microsoft.com -> 40.74.98.197:443
+2026-11-21 11:03:09.176 [WARN] [ByeDPI] 启动后端口 8871 未监听，已停止
+2026-11-21 11:03:10.139 [WARN] [SniSidecar] 连接 android.googleapis.com:443 失败: 连接 172.217.119.4:443 超时
+2026-11-21 11:03:10.152 [WARN] [SniSidecar] 连接 voilatile-pa.googleapis.com:443 失败: 连接 voilatile-pa.googleapis.com:443 超时
+2026-11-21 11:03:10.153 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.114.4 -> android.googleapis.com
+2026-11-21 11:03:14.464 [WARN] [SniSidecar] 连接 www.google.com:443 失败: 连接 www.google.com:443 超时
+2026-11-21 11:03:16.662 [WARN] [SniSidecar] 连接 android.googleapis.com:443 失败: 连接 android.googleapis.com:443 超时
+2026-11-21 11:03:16.692 [INFO] [SniSidecar] 从 ClientHello 识别域名: 172.217.113.4 -> android.googleapis.com
+2026-11-21 11:03:18.126 [INFO] [SniSidecar] 从 ClientHello 识别域名: 202.89.233.100 -> cn.bing.com
+2026-11-21 11:03:18.178 [INFO] [SniSidecar] 直连: cn.bing.com -> 202.89.233.100:443
+2026-11-21 11:03:23.211 [WARN] [SniSidecar] 连接 android.googleapis.com:443 失败: 连接 172.217.113.4:443 超时
+2026-11-21 11:03:42.888 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:03:43.043 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:03:43.100 [INFO] [SniSidecar] SOCKS5 已启动 127.0.0.1:8869
+2026-11-21 11:03:43.126 [INFO] [DnsProxy] 本地 DNS 代理已启动 127.0.0.1:8870
+2026-11-21 11:03:59.320 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 11:03:59.321 [INFO] [Rules] 启动后台同步 DevSidecar 配置完成
+2026-11-21 11:04:33.063 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+
