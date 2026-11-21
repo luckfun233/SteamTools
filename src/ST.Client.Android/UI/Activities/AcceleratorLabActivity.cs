@@ -575,7 +575,8 @@ namespace System.Application.UI.Activities
         {
             labCts?.Cancel();
             labCts = new CancellationTokenSource();
-            labCts.CancelAfter(TimeSpan.FromMinutes(3));
+            // 网络差时单项就可能 8 秒，整套测试超过 3 分钟很正常；放宽到 10 分钟。
+            labCts.CancelAfter(TimeSpan.FromMinutes(10));
             var cts = labCts;
 
             var dialog = new AlertDialog.Builder(this)

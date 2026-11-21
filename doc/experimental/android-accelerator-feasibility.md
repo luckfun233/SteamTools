@@ -814,7 +814,42 @@ AuthenticationException
 - 证书模式不再把 GMS/Play 的 `*.googleapis.com`、`mTalk`、`*.gstatic.com` 等系统域名
   转发给 Titanium，避免证书固定导致的握手失败和日志洪水。
 
-## 19. 参考资料
+## 19. Google 证书模式（2026-11-21 18:39 日志）
+
+HF 打通后，Google 仍然失败。18:39 的日志显示 MITM 本身已经成功：
+
+```
+[Rule] www.google.com/ -> 部分需要走其它代理的服务
+ProxyHttpException ... AuthenticationException
+```
+
+这次失败发生在 **上游 TLS 握手**，不是客户端拒绝证书。实测不同的 Google 前端对 SNI 的要求不同：
+
+| Host | 可用 SNI | 结果 |
+| --- | --- | --- |
+| www.google.com | baidu.com | 302 → www.google.com.hk |
+| www.google.com.hk | www.google.cn | 200 |
+| accounts.google.com | baidu.com | 302 |
+| ssl.gstatic.com | baidu.com | 404（TLS 正常） |
+| www.gstatic.com | www.google.cn | TLS 正常 |
+| www.googleapis.com | www.google.cn | TLS 正常 |
+
+DevSidecar 的通用规则给所有 `*.google.com` 都设了 `www.google.cn`，但 `www.google.com` /
+`accounts.google.com` / `ssl.gstatic.com` 这三个前端用这个 SNI 会被直接断开。
+因此在规则应用之后增加 `NormalizeSniForHost`，只对这三个 host 改用 `baidu.com`，
+Host 头保持不变。
+
+同时收窄了 GMS 排除列表：只排除 `mtalk.google.com`、`android*.googleapis.com`、
+`firebaseinstallations`、`digitalassetlinks`、`play.googleapis.com` 等确实有证书固定的端点，
+不再一刀切排除 `*.gstatic.com` / `*.googleapis.com`（DevSidecar 需要 MITM 这些 Web 资源）。
+
+实验室新增“Google 证书链路”，通过 Titanium SOCKS5 分别请求 `www.google.com` 和
+`www.google.com.hk`，报告 MITM issuer 与 HTTP 状态行，便于区分“客户端拒绝证书”和
+“上游 SNI/路由失败”。
+
+另外修复了实验室 3 分钟硬超时导致后半段测试全被取消的问题，改为 10 分钟。
+
+## 20. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>

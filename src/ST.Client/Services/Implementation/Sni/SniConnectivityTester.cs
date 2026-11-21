@@ -411,9 +411,10 @@ namespace System.Application.Services.Implementation
                     var mitm = issuer.Contains("Watt", StringComparison.OrdinalIgnoreCase) ||
                                issuer.Contains("Steam", StringComparison.OrdinalIgnoreCase) ||
                                issuer.Contains("SteamTools", StringComparison.OrdinalIgnoreCase);
+                    var http = await TryReadHttpStatusAsync(ssl, host, timeout.Token).ConfigureAwait(false);
                     return TitaniumProbeResult.Ok(
                         sw.ElapsedMilliseconds,
-                        $"TLS 握手成功；MITM={(mitm ? "是" : "否")}；issuer={issuer}");
+                        $"TLS 握手成功；MITM={(mitm ? "是" : "否")}；issuer={issuer}；HTTP={http}");
                 }
                 finally
                 {
@@ -451,6 +452,31 @@ namespace System.Application.Services.Implementation
             finally
             {
                 ssl.Dispose();
+            }
+        }
+
+        static async Task<string> TryReadHttpStatusAsync(
+            SslStream ssl,
+            string host,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var request = Encoding.ASCII.GetBytes(
+                    $"GET / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: WattToolkitLab\r\nConnection: close\r\n\r\n");
+                await ssl.WriteAsync(request, 0, request.Length, cancellationToken).ConfigureAwait(false);
+
+                var buffer = new byte[256];
+                var read = await ssl.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+                if (read <= 0) return "空响应";
+
+                var text = Encoding.ASCII.GetString(buffer, 0, read);
+                var line = text.Split('\n')[0].Trim();
+                return string.IsNullOrEmpty(line) ? "无状态行" : line;
+            }
+            catch (Exception ex)
+            {
+                return "读取失败: " + Describe(ex);
             }
         }
 

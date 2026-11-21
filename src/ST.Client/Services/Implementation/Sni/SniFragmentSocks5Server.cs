@@ -1018,12 +1018,19 @@ namespace System.Application.Services.Implementation
         }
 
         static bool IsSystemServiceHost(string host)
-            => host.EndsWith(".googleapis.com", StringComparison.OrdinalIgnoreCase) ||
-               host.EndsWith(".gstatic.com", StringComparison.OrdinalIgnoreCase) ||
-               host.EndsWith(".googlevideo.com", StringComparison.OrdinalIgnoreCase) ||
-               host.EndsWith(".gvt1.com", StringComparison.OrdinalIgnoreCase) ||
-               host.EndsWith(".gvt2.com", StringComparison.OrdinalIgnoreCase) ||
-               host.Equals("mtalk.google.com", StringComparison.OrdinalIgnoreCase);
+        {
+            // 只排除确实有证书固定的 GMS/Play 端点；gstatic/googleapis 的普通 Web 服务
+            // 需要按 DevSidecar 规则做 MITM，不能一刀切。
+            var value = host.TrimEnd('.');
+            return value.Equals("mtalk.google.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("android.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("android.apis.google.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("android-context-data.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("firebaseinstallations.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("digitalassetlinks.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("play.googleapis.com", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("voilatile-pa.googleapis.com", StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// 连接到本机 Titanium 的 SOCKS5，并把客户端原始 ClientHello 原样转发过去。

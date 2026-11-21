@@ -300,7 +300,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             {
                 e.HttpClient.UpStreamEndPoint = new IPEndPoint(presetIp, 443);
             }
-            ApplySniOverride(e, rule.RemoveSni ? "none" : rule.Sni ?? rule.VerifyHost);
+            ApplySniOverride(e, rule.RemoveSni ? "none" : NormalizeSniForHost(host, rule.Sni ?? rule.VerifyHost));
             handled = true;
         }
 
@@ -409,7 +409,7 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             if (ip == null || IPAddress.IsLoopback(ip) || ip.Equals(IPAddress.Any)) continue;
 
             e.HttpClient.UpStreamEndPoint = new IPEndPoint(ip, 443);
-            ApplySniOverride(e, rule.RemoveSni ? "none" : rule.Sni ?? rule.VerifyHost ?? proxyHost);
+            ApplySniOverride(e, rule.RemoveSni ? "none" : NormalizeSniForHost(host, rule.Sni ?? rule.VerifyHost ?? proxyHost));
             ProxyDiagnostics.Info("Rule", $"反代: {host} -> {proxyHost}");
             return true;
         }
@@ -492,6 +492,22 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         }
         var combined = target.TrimEnd('/') + original.PathAndQuery;
         return Uri.TryCreate(combined, UriKind.Absolute, out var result) ? result : baseUri;
+    }
+
+    static string? NormalizeSniForHost(string host, string? sni)
+    {
+        if (string.IsNullOrEmpty(sni)) return sni;
+
+        // 实测：www.google.cn 作为 SNI 时，这几个 Google 前端会直接断开连接；
+        // 改用白名单 SNI（baidu.com）+ 原始 Host 头，服务端才会按 Host 路由并返回 302/404。
+        if (host.Equals("www.google.com", StringComparison.OrdinalIgnoreCase) ||
+            host.Equals("accounts.google.com", StringComparison.OrdinalIgnoreCase) ||
+            host.Equals("ssl.gstatic.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return "baidu.com";
+        }
+
+        return sni;
     }
 
     static void ApplySniOverride(SessionEventArgs e, string? sni)

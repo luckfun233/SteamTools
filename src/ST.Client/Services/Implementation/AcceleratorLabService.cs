@@ -121,6 +121,7 @@ namespace System.Application.Services.Implementation
             results.AddRange(await CheckHuggingFaceAsync(cancellationToken).ConfigureAwait(false));
             results.Add(CheckByedpi());
             results.Add(await CheckCertificateModeAsync(cancellationToken).ConfigureAwait(false));
+            results.Add(await CheckGoogleAsync(cancellationToken).ConfigureAwait(false));
             results.Add(CheckDevice(deviceInfo));
 
             return results;
@@ -613,6 +614,46 @@ namespace System.Application.Services.Implementation
             catch (Exception ex)
             {
                 return new LabTestResult("证书模式链路", false, sw.ElapsedMilliseconds, ex.Message);
+            }
+        }
+
+        static async Task<LabTestResult> CheckGoogleAsync(CancellationToken cancellationToken)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var socksPort = IReverseProxyService.Instance.Socks5ProxyPortId;
+                if (socksPort <= 0) socksPort = ProxySettings.Socks5ProxyPortId.Value;
+
+                if (socksPort <= 0 || !await SocksPortInUseAsync(socksPort).ConfigureAwait(false))
+                {
+                    return new LabTestResult(
+                        "Google 证书链路",
+                        true,
+                        0,
+                        "Titanium SOCKS5 未监听（请先启动加速）",
+                        informational: true);
+                }
+
+                var www = await SniConnectivityTester.ProbeViaTitaniumAsync(
+                    "www.google.com", 443, socksPort, 8, cancellationToken).ConfigureAwait(false);
+                var hk = await SniConnectivityTester.ProbeViaTitaniumAsync(
+                    "www.google.com.hk", 443, socksPort, 8, cancellationToken).ConfigureAwait(false);
+
+                var detail =
+                    $"www.google.com: {(www.Success ? www.Detail : "失败 " + www.Detail)}；" +
+                    $"www.google.com.hk: {(hk.Success ? hk.Detail : "失败 " + hk.Detail)}";
+
+                return new LabTestResult(
+                    "Google 证书链路",
+                    www.Success || hk.Success,
+                    sw.ElapsedMilliseconds,
+                    detail,
+                    informational: true);
+            }
+            catch (Exception ex)
+            {
+                return new LabTestResult("Google 证书链路", false, sw.ElapsedMilliseconds, ex.Message);
             }
         }
 
