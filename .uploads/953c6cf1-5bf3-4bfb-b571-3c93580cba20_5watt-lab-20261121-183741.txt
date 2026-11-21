@@ -1,0 +1,458 @@
+Watt Toolkit 加速实验室报告
+时间: 2026-11-21 18:37:40 +08:00
+设备: OPPO PDSM00 / Android 13 (API 33) / arm64-v8a,armeabi-v7a,armeabi
+VPN: 已授权，根证书: 已安装
+
+== 设置快照 ==
+代理模式: VPN
+免证书模式: False
+DevSidecar 规则: True（分组 31 个，服务 174 个，关闭组: ）
+远程规则: 69 条，实际启用 69 条，预置 IP 59 组
+自定义规则: True，0 条
+SNI 分片: True，策略: TLS record 拆分
+分片参数: 大小 64B，段数 3，延迟 10ms，抖动 0ms，填充 4096B
+分片域名: github.com;*.githubusercontent.com;*.githubassets.com;github.dev;huggingface.co;*.huggingface.co;hf.co;*.hf.co;*.xethub.hf.co;pixiv.net;*.pixiv.net;*.pixiv.org;pximg.net;*.pximg.net;*.fanbox.cc
+分片回退: True，探测 1200ms，缓存 10 分钟
+SNI 改写: False，目标: baidu.com
+Sidecar 端口: 8869，实际: 8869
+上游中继: False，127.0.0.1:7890，域名: 全部
+DoH: True，JSON: https://doh.pub/dns-query，wire: https://doh.pub/dns-query，回退: True
+DNS 代理: True，端口: 8870，实际: 8870，回退 DNS: 223.5.5.5;119.29.29.29
+DNS 预置 IP: True，HuggingFace 兜底: True，UDP/QUIC: True
+ByeDPI: True，域名: huggingface.co;*.huggingface.co;hf.co;*.hf.co，预设: 0，端口: 8871
+诊断日志: True，级别 0，保留 7 天
+仅浏览器 VPN: False
+
+== 测试结果 ==
+[PASS] 规则集 (1ms) 自定义 0 条，远程启用 69 条，服务 174 个，分组 31 个，排除 53 条，预置 IP 59 组，dns.mapping 1 条；HF MITM 规则: 未匹配
+[INFO] 当前设置 (0ms) 模式=VPN，免证书=False，SNI 分片=True，策略=TLS record 拆分，DoH=True，中继=False
+[PASS] 系统 DNS (9ms) 2a03:2880:f11b:83:face:b00c:0:25de, 69.63.178.13
+[PASS] DoH 解析 (98ms) 108.138.246.79, 108.138.246.71, 108.138.246.85, 108.138.246.67
+[PASS] DoH wire (44ms) 响应 468 字节，RCODE=0，https://doh.pub/dns-query
+[PASS] 本地 DNS 代理 (6ms) 127.0.0.1:8870，响应 112 字节，RCODE=0
+[FAIL] TCP 443 (6005ms) 连接超时
+[FAIL] 直连 TLS 握手 (5954ms) 超时/已取消
+[FAIL] Sidecar TLS 握手 (23ms) 超时/已取消
+[FAIL] Sidecar TLS（IP + SNI） (8ms) 超时/已取消
+[FAIL] Sidecar UDP ASSOCIATE (10ms) A task was canceled.
+[FAIL] Titanium 代理 HTTP (41ms) github.com=A task was canceled.；huggingface.co=A task was canceled.
+[FAIL] UDP 443 探测 (9ms) A task was canceled.
+[INFO] HF SNI 对照 (12ms) 3.167.200.113；对照(cloudfront.net)=超时/已取消；真实(huggingface.co)=超时/已取消；白名单 SNI 也失败 => IP/路由被阻断，换 SNI 也无法绕过
+[FAIL] HF IPv6 TLS (2600:9000:2751:0:17:b174:6d00:93a1) (1ms) 超时/已取消
+[FAIL] HF IPv6 TLS (2600:9000:2751:a800:17:b174:6d00:93a1) (1ms) 超时/已取消
+[PASS] ByeDPI 内核 (0ms) 运行中 127.0.0.1:8871，域名: huggingface.co;*.huggingface.co;hf.co;*.hf.co
+[INFO] 证书模式链路 (222ms) 检测=True，强制证书模式=True，CA 文件=/data/user/0/net.steampp.app/files/SteamTools.Certificate.cer（1085B）；Titanium SOCKS5 8868 链路: 失败 超时/已取消
+[INFO] 设备 (0ms) OPPO PDSM00 / Android 13 (API 33) / arm64-v8a,armeabi-v7a,armeabi
+VPN: 已授权，根证书: 已安装
+
+== 运行统计 ==
+连接 201 / 分片 0 / 改写 0 / 预置IP 28 / 中继 0 / 回退 0 / 重连 0 / 失败 0
+策略命中: 无
+回退域名: 无
+DNS 代理: 查询 198，缓存 37，DoH 尝试 161 成功 162，回退 0，预置IP改写 28，失败 0，上行 7451B，下行 75685B
+回退缓存条目: 0
+规则分组: apkmirror=1，Claude.ai=1，docker=2，DockerHub=3，Dropbox=1，DS_DOWNLOAD配置=4，DuckDuckGo=2，f-droid=3，GitHub=13，Google=16，GreasyFork=5，HuggingFace=1，Microsoft=1，OneDrive=1，other=23，Pixiv=6，Pixiv站点相关=5，Reddit=5，startpage=1，Steam=8，vueJS=1，WebArchive=2，Wikipedia=3，X/Twitter=4，YouTube=6，Z-lib=2，其它站点=7，加进默认DNS加速映射，否则VSCode装扩展会卡死（docmirror/dev-sidecar#666）。=1，增强模式=29，按真实域名校验即可，不需要unVerifySsl；只有证书对不上真实域名时才用verifyHost。=1，未分组=16
+
+== 最近诊断日志 ==
+--- proxy-2026-11-21.log ---
+2026-11-21 12:27:31.878 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'digitalassetlinks.googleapis.com' with certificate '*.googleapis.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:31.889 [INFO] [SniSidecar] 证书模式转发 Titanium: digitalassetlinks.googleapis.com:443
+2026-11-21 12:27:31.898 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'mtalk.google.com' with certificate '*.google.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:31.930 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'voilatile-pa.googleapis.com' with certificate 'voilatile-pa.googleapis.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:32.062 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'digitalassetlinks.googleapis.com' with certificate '*.googleapis.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:32.072 [INFO] [SniSidecar] 证书模式转发 Titanium: digitalassetlinks.googleapis.com:443
+2026-11-21 12:27:32.242 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'digitalassetlinks.googleapis.com' with certificate '*.googleapis.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:32.253 [INFO] [SniSidecar] 证书模式转发 Titanium: digitalassetlinks.googleapis.com:443
+2026-11-21 12:27:32.409 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'digitalassetlinks.googleapis.com' with certificate '*.googleapis.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:32.420 [INFO] [SniSidecar] 证书模式转发 Titanium: digitalassetlinks.googleapis.com:443
+2026-11-21 12:27:32.469 [INFO] [DnsProxy] 本地 DNS 代理已停止
+2026-11-21 12:27:32.471 [INFO] [SniSidecar] SOCKS5 已停止
+2026-11-21 12:27:32.471 [INFO] [Proxy] 已停止
+2026-11-21 12:27:32.673 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'digitalassetlinks.googleapis.com' with certificate '*.googleapis.com'.
+ ---> System.IO.IOException:  Received an unexpected EOF or 0 bytes from the transport stream.
+   at System.Net.Security.SslStream.<ReceiveBlobAsync>d__176`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 12:27:42.052 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 12:27:51.753 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 18:35:48.389 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 18:35:48.547 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 18:35:48.578 [INFO] [SniSidecar] SOCKS5 已启动 127.0.0.1:8869
+2026-11-21 18:35:48.594 [INFO] [DnsProxy] 本地 DNS 代理已启动 127.0.0.1:8870
+2026-11-21 18:35:56.970 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 18:35:56.970 [INFO] [Rules] 启动后台同步 DevSidecar 配置完成
+2026-11-21 18:36:19.307 [INFO] [Rules] 自定义 0 条 + 远程启用 69 条 = 69 条，关闭组 ，关闭服务 
+2026-11-21 18:36:21.774 [ERROR] [Proxy] System.Exception: Failed to make system trust root certificate  for Root\CurrentUser store location. You may need admin rights.
+ ---> System.Security.Cryptography.CryptographicException: Access is denied.
+   at Internal.Cryptography.Pal.StorePal.FromSystemStore(String storeName, StoreLocation storeLocation, OpenFlags openFlags)
+   at System.Security.Cryptography.X509Certificates.X509Store.Open(OpenFlags flags)
+   at Titanium.Web.Proxy.Network.CertificateManager.installCertificate(StoreName storeName, StoreLocation storeLocation)
+   --- End of inner exception stack trace ---
+2026-11-21 18:36:21.903 [INFO] [Proxy] 启动: mode=System, certless=False, rootCert=True, socks5=True, rules=69
+2026-11-21 18:36:22.317 [INFO] [DnsProxy] 预置 IP: firebaseinstallations.googleapis.com -> 142.251.189.206
+2026-11-21 18:36:22.700 [INFO] [SniSidecar] 使用预置 IP 连接: firebaseinstallations.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:26.962 [INFO] [DnsProxy] 预置 IP: www.google.com -> 142.251.189.206
+2026-11-21 18:36:27.029 [INFO] [SniSidecar] 证书模式转发 Titanium: www.google.com:443
+2026-11-21 18:36:28.053 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'www.google.com' with certificate '*.google.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:36:37.640 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 18:36:37.664 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 18:36:37.679 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 18:36:37.694 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 18:36:37.850 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 18:36:37.856 [INFO] [DnsProxy] 预置 IP: huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 18:36:37.887 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:37.895 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:39.139 [INFO] [IPSelector] 选择 18.155.129.129 (334ms): 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129:443
+2026-11-21 18:36:39.147 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:41.962 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:41.962 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:41.970 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:41.976 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:42.148 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.106 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.111 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.129 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:43.129 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:43.133 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:43.134 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:43.136 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> huggingface.co
+2026-11-21 18:36:43.143 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:43.155 [INFO] [SniSidecar] 证书模式转发 Titanium: www.google.com:443
+2026-11-21 18:36:43.173 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:43.174 [INFO] [SniSidecar] 证书模式转发 Titanium: huggingface.co:443
+2026-11-21 18:36:43.325 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.369 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.396 [WARN] [Proxy] 上一个 10 秒窗口有 2 个客户端异常已省略
+2026-11-21 18:36:43.401 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'www.google.com' with certificate '*.google.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:36:43.462 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.462 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:43.807 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:44.117 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:44.773 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:44.922 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.217 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.219 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.229 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.361 [INFO] [DnsProxy] 预置 IP: cdn-avatars.huggingface.co -> 3.167.200.113,18.155.129.4,18.155.129.31,18.155.129.60,18.155.129.129
+2026-11-21 18:36:45.368 [INFO] [DnsProxy] 预置 IP: cdn-avatars.huggingface.co -> 2600:9000:2751:0:17:b174:6d00:93a1,2600:9000:2751:a800:17:b174:6d00:93a1,2600:9000:2751:dc00:17:b174:6d00:93a1,2600:9000:2751:a000:17:b174:6d00:93a1
+2026-11-21 18:36:45.384 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> cdn-avatars.huggingface.co
+2026-11-21 18:36:45.385 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> cdn-avatars.huggingface.co
+2026-11-21 18:36:45.389 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> cdn-avatars.huggingface.co
+2026-11-21 18:36:45.393 [INFO] [SniSidecar] 证书模式转发 Titanium: cdn-avatars.huggingface.co:443
+2026-11-21 18:36:45.395 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> cdn-avatars.huggingface.co
+2026-11-21 18:36:45.397 [INFO] [SniSidecar] 证书模式转发 Titanium: cdn-avatars.huggingface.co:443
+2026-11-21 18:36:45.397 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> cdn-avatars.huggingface.co
+2026-11-21 18:36:45.403 [INFO] [SniSidecar] 证书模式转发 Titanium: cdn-avatars.huggingface.co:443
+2026-11-21 18:36:45.409 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2600:9000:2751:0:17:b174:6d00:93a1 -> cdn-avatars.huggingface.co
+2026-11-21 18:36:45.410 [INFO] [SniSidecar] 证书模式转发 Titanium: cdn-avatars.huggingface.co:443
+2026-11-21 18:36:45.410 [INFO] [SniSidecar] 证书模式转发 Titanium: cdn-avatars.huggingface.co:443
+2026-11-21 18:36:45.447 [INFO] [SniSidecar] 证书模式转发 Titanium: cdn-avatars.huggingface.co:443
+2026-11-21 18:36:45.580 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.584 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.828 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.832 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:45.896 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.168 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.373 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.430 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.493 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.500 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.503 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.703 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.719 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.775 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.794 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.828 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:46.890 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.120 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.122 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.134 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.154 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.234 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.467 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.564 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.827 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.874 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:47.959 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/1616186257611-60104afcc75e19ac1738fe70.png -> *.huggingface.co
+2026-11-21 18:36:47.958 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/66f19ed428ae41c20c470792/8y7msN6A6W82LdQhQd85a.png -> *.huggingface.co
+2026-11-21 18:36:47.987 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/1592839207516-noauth.png -> *.huggingface.co
+2026-11-21 18:36:48.009 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/652db071b62cf1f8463221e2/CxxwFiaomTa1MCX_B7-pT.png -> *.huggingface.co
+2026-11-21 18:36:48.022 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/1583646260758-5e64858c87403103f9f1055d.png -> *.huggingface.co
+2026-11-21 18:36:48.071 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/5dd96eb166059660ed1ee413/WtA3YYitedOr9n02eHfJe.png -> *.huggingface.co
+2026-11-21 18:36:48.164 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.178 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.189 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.251 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.460 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.491 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.491 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:48.518 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:49.375 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/60985a0547dc3dbf8a976607/rRv-TjtvhN66uwh-xYaCf.png -> *.huggingface.co
+2026-11-21 18:36:49.453 [INFO] [Rule] cdn-avatars.huggingface.co/v1/production/uploads/1625001569797-60db8b5ad8b4797b129145d5.png -> *.huggingface.co
+2026-11-21 18:36:53.496 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:53.967 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.034 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.155 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.325 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.328 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.453 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.543 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.741 [INFO] [DnsProxy] 预置 IP: mtalk.google.com -> 142.251.189.206
+2026-11-21 18:36:54.743 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:54.929 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:54.931 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:54.938 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:55.437 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:55.439 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:55.484 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:55.835 [INFO] [DnsProxy] 预置 IP: android.googleapis.com -> 142.251.189.206
+2026-11-21 18:36:56.101 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:56.109 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:56.110 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:56.409 [INFO] [Rule] HF 证书模式兜底: huggingface.co -> sni=huggingface.cn
+2026-11-21 18:36:56.633 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:56.900 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:57.148 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:57.429 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:57.468 [INFO] [DnsProxy] 预置 IP: voilatile-pa.googleapis.com -> 142.251.189.206
+2026-11-21 18:36:57.656 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:57.668 [INFO] [DnsProxy] 预置 IP: github.com -> 20.200.245.247,20.27.177.113,20.205.243.166
+2026-11-21 18:36:57.749 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:57.795 [INFO] [DnsProxy] 预置 IP: github.com -> 20.200.245.247,20.27.177.113,20.205.243.166
+2026-11-21 18:36:57.803 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.200.245.247 -> github.com
+2026-11-21 18:36:57.810 [INFO] [SniSidecar] 证书模式转发 Titanium: github.com:443
+2026-11-21 18:36:57.953 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:58.431 [INFO] [SniSidecar] 证书模式转发 Titanium: www.google.com:443
+2026-11-21 18:36:58.463 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:58.540 [INFO] [Rule] github.com/leonwu85/bv -> 油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令
+2026-11-21 18:36:58.601 [WARN] [Proxy] 上一个 10 秒窗口有 1 个客户端异常已省略
+2026-11-21 18:36:58.606 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'www.google.com' with certificate '*.google.com'.
+ ---> System.Security.Authentication.AuthenticationException: Authentication failed, see inner exception.
+ ---> Interop+AndroidCrypto+SslException: Exception of type 'Interop+AndroidCrypto+SslException' was thrown.
+   --- End of inner exception stack trace ---
+   at System.Net.Security.SslStream.<ForceAuthenticationAsync>d__175`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:36:58.641 [INFO] [IPSelector] 选择 20.27.177.113 (53ms): 20.200.245.247,20.27.177.113,20.205.243.166:443
+2026-11-21 18:36:58.735 [INFO] [SniSidecar] 使用预置 IP 连接: android.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:58.997 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:36:59.543 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:00.020 [INFO] [DnsProxy] 预置 IP: avatars.githubusercontent.com -> 185.199.111.133,185.199.108.133,185.199.109.133,185.199.110.133
+2026-11-21 18:37:00.028 [INFO] [SniSidecar] 从 ClientHello 识别域名: 185.199.111.133 -> avatars.githubusercontent.com
+2026-11-21 18:37:00.032 [INFO] [SniSidecar] 证书模式转发 Titanium: avatars.githubusercontent.com:443
+2026-11-21 18:37:00.123 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:00.150 [INFO] [DnsProxy] 预置 IP: github.githubassets.com -> 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154
+2026-11-21 18:37:00.154 [INFO] [DnsProxy] 预置 IP: github.githubassets.com -> 185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154
+2026-11-21 18:37:00.165 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:00.171 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:00.431 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:00.432 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:00.435 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:00.436 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:00.444 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:00.444 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:00.449 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:00.452 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:00.453 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:00.481 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:00.647 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:00.950 [INFO] [Rule] avatars.githubusercontent.com/u/231908363?v=4&size=64 -> *.githubusercontent.com
+2026-11-21 18:37:01.171 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:01.543 [INFO] [DnsProxy] 预置 IP: android-context-data.googleapis.com -> 142.251.189.206
+2026-11-21 18:37:01.703 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:01.763 [INFO] [IPSelector] 选择 185.199.111.133 (172ms): 185.199.111.133,185.199.108.133,185.199.109.133,185.199.110.133:443
+2026-11-21 18:37:01.767 [INFO] [Rule] 已替换请求头 1 项: avatars.githubusercontent.com
+2026-11-21 18:37:01.998 [INFO] [Rule] github.githubassets.com/assets/index-BTXEzGZV.css -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:02.059 [INFO] [Rule] github.githubassets.com/assets/index-BBy0sQ30.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:02.092 [INFO] [Rule] github.githubassets.com/assets/router-Cew2oMdA.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:02.103 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~tree~tree-delete~repo-overv~fv2f6nh5-C5yDgOyb.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:02.114 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~tree~repo-overview~layout~b~fc4yifcq-DsQ-VHAg.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:02.137 [INFO] [Rule] github.githubassets.com/assets/octicons~index~layout~index~Pulls~Issues~preload-quick-search~quick-search~route-components~hri8oyyr-DOqZrNWq.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:02.226 [INFO] [IPSelector] 选择 185.199.109.154 (160ms): 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154,185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154:443
+2026-11-21 18:37:02.237 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:02.255 [INFO] [SniSidecar] 使用预置 IP 连接: android-context-data.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:02.284 [INFO] [SniSidecar] 使用预置 IP 连接: voilatile-pa.googleapis.com -> 142.251.189.206:443
+2026-11-21 18:37:02.321 [INFO] [IPSelector] 选择 185.199.108.154 (163ms): 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154,185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154:443
+2026-11-21 18:37:02.332 [INFO] [IPSelector] 选择 185.199.109.154 (160ms): 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154,185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154:443
+2026-11-21 18:37:02.342 [INFO] [IPSelector] 选择 185.199.109.154 (154ms): 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154,185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154:443
+2026-11-21 18:37:02.407 [INFO] [IPSelector] 选择 185.199.109.154 (159ms): 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154,185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154:443
+2026-11-21 18:37:02.913 [INFO] [IPSelector] 选择 185.199.111.154 (151ms): 2606:50c0:8000::154,2606:50c0:8001::154,2606:50c0:8002::154,2606:50c0:8003::154,185.199.108.154,185.199.109.154,185.199.110.154,185.199.111.154:443
+2026-11-21 18:37:03.333 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~route-components~Layout~Com~kksho1bj-BNbLmsFu.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:03.469 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~preload-quick-search~quick-~nfj1a067-C1b7ufil.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:03.558 [INFO] [SniSidecar] 从 ClientHello 识别域名: 185.199.111.133 -> avatars.githubusercontent.com
+2026-11-21 18:37:03.576 [INFO] [SniSidecar] 证书模式转发 Titanium: avatars.githubusercontent.com:443
+2026-11-21 18:37:03.739 [INFO] [Rule] avatars.githubusercontent.com/u/8167832?s=60&v=4 -> *.githubusercontent.com
+2026-11-21 18:37:03.740 [INFO] [Rule] 已替换请求头 1 项: avatars.githubusercontent.com
+2026-11-21 18:37:03.777 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~tree~repo-overview~layout~p~c6c1lg2x-CNYa2qF_.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.111 [INFO] [Rule] github.githubassets.com/assets/octicons~index~layout~index~preload-quick-search~quick-search~route-components~Layout~Creat~lkaron92-DUzG4BYK.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.111 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~quick-search~route-componen~h35vlqr6-DZBoG2ny.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.113 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~tree~repo-overview~layout~p~h5zmsbk5-D_FcOTyd.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.297 [INFO] [Rule] github.githubassets.com/assets/octicons~index~SavedSearchesDialog~layout~index~preload-quick-search~quick-search~route-com~cc5vlvig-BBnG3ZjS.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.343 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~quick-search~route-componen~bid84g9f-CAGab35B.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.352 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~repo-layout~tree~tree-delet~ewrmvoq5-ByFYW-XX.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.508 [INFO] [Rule] github.githubassets.com/assets/octicons~index~layout~index~tree~repo-overview~blob~blame~route-components~Layout~IssueView~c7xc4yky-Br84SXIK.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.588 [INFO] [Rule] github.githubassets.com/assets/octicons~index~blob-layout~file-tree-layout~tree~global-nav-layout~global-nav-layout~layout~f6xryc1n-CzZLQdZB.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.598 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~SavedSearchesDialog~layout~index~tree~tr~k3w2escb-DqsgoH1F.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.696 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~tree~repo-overview~blob~blame~quick-sear~ishouyug-Cwduz6LB.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.829 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~tree~repo-overview~layout~p~oxj9obdy-DTO7p4Bm.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.829 [INFO] [Rule] github.githubassets.com/assets/octicons~index~tree~repo-overview~layout~blob~blame~route-components~Layout~IssueViewer~Das~ihoss97u-FGBQ3yBY.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.893 [INFO] [Rule] github.githubassets.com/assets/octicons~index~global-nav-layout~global-nav-layout~layout~index~tree~repo-overview~blob~bla~95dz406g-CDX_FjVW.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:04.920 [INFO] [Rule] github.githubassets.com/assets/octicons~index~blob~blame~route-components~Layout~IssueViewer~DashboardIssueViewerWrapper~C~d9o3wafg-IL7dcz97.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.048 [INFO] [Rule] github.githubassets.com/assets/octicons~index~layout~index~tree~repo-overview~layout~blob~blame~route-components~Layout~Is~jr92y5t9-COxf_rSJ.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.063 [INFO] [Rule] github.githubassets.com/assets/octicons~index~route-components~Layout~IssueViewer~DashboardIssueViewerWrapper~CopilotImmer~bwrqatc0-B7l1dOAt.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.086 [INFO] [Rule] github.githubassets.com/assets/global-nav-layout-4WHuG1LX.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.087 [INFO] [Rule] github.githubassets.com/assets/GlobalNavLayout-C8yQkQHm.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.121 [INFO] [Rule] github.githubassets.com/assets/handoff-storage-DFv3zXXR.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.311 [INFO] [Rule] github.githubassets.com/assets/relay-command-observation-Wq3q6Sei.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.317 [INFO] [Rule] github.githubassets.com/assets/use-implicit-references-Cemngpf4.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.326 [INFO] [Rule] github.githubassets.com/assets/NavigableRef-frNCRTEY.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.575 [INFO] [Rule] github.githubassets.com/assets/one-copilot-context-entry-Cy1TbGAj.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.577 [INFO] [Rule] github.githubassets.com/assets/LazyOcticon-BDn8_w2I.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.582 [INFO] [Rule] github.githubassets.com/assets/use-multi-ref-C0WnSB0s.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.593 [INFO] [Rule] github.githubassets.com/assets/ipm-telemetry-BlF26Q-4.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.713 [INFO] [Rule] github.githubassets.com/assets/IpmNudgeHost-cUL_0upT.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.785 [INFO] [Rule] github.githubassets.com/assets/SimpleBanners-CZp6b-o9.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.802 [INFO] [Rule] github.githubassets.com/assets/SimpleBanner-D7oe1oFO.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.817 [INFO] [Rule] github.githubassets.com/assets/src-BQWhNHhk.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.833 [INFO] [Rule] github.githubassets.com/assets/EnterpriseAnnouncementBanner-CKDKr6Gp.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.924 [INFO] [Rule] github.githubassets.com/assets/global-nav-layout-BRo5c2E-.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:05.992 [INFO] [Rule] github.githubassets.com/assets/repo-layout-CRy1e0dz.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.032 [INFO] [Rule] github.githubassets.com/assets/layout-SCwsEhxI.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.087 [INFO] [Rule] github.githubassets.com/assets/octicons~layout~index~tree~repo-overview~layout~CopilotImmersiveEmbedded~ChatAppEmbeddedPar~c4qvd6iv-AWxNXSMh.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.117 [INFO] [Rule] github.githubassets.com/assets/FilesPageInfoContext-KLwQNYWJ.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.207 [INFO] [Rule] github.githubassets.com/assets/repos-file-tree-view-D1AWqif5.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.307 [INFO] [Rule] github.githubassets.com/assets/use-tree-list-CWy8SG2q.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.334 [INFO] [Rule] github.githubassets.com/assets/ReposHeaderRefSelector-DwPPn4yM.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.439 [INFO] [Rule] github.githubassets.com/assets/ExpandButton-C3e53MdP.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.502 [INFO] [Rule] github.githubassets.com/assets/use-route-payload-wCikTo8V.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.551 [INFO] [Rule] github.githubassets.com/assets/CodeViewBannersContext-CBu8bvDy.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.592 [INFO] [Rule] github.githubassets.com/assets/BudgetThresholdBanner-Cs1PP5cs.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.629 [INFO] [Rule] github.githubassets.com/assets/CodeNavContext-uFudbKgA.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.688 [INFO] [Rule] github.githubassets.com/assets/SharedPageLayout-CwYpu-UD.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.757 [INFO] [Rule] github.githubassets.com/assets/CodeViewHeader-Gqo7AYRo.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.833 [INFO] [Rule] github.githubassets.com/assets/repo-overview-B-7fevmM.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.836 [INFO] [Rule] github.githubassets.com/assets/RecentlyTouchedBranches-DikpFKb5.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:06.877 [INFO] [Rule] github.githubassets.com/assets/use-update-ref-info-and-path-CTmon3-L.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.148 [INFO] [Rule] github.githubassets.com/assets/useIsFetching-CEMOCi9o.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.151 [INFO] [Rule] github.githubassets.com/assets/NewAgentTaskButton-CFy0pwRW.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.153 [INFO] [Rule] github.githubassets.com/assets/ReposOverviewPage-BnwlHTHZ.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.376 [INFO] [Rule] github.githubassets.com/assets/LocalTab-UD1-6gvZ.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.394 [INFO] [Rule] github.githubassets.com/assets/CodeViewContextBanners-DKPlvp3i.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.528 [INFO] [Rule] github.githubassets.com/assets/commit-attribution-CNGJdTxi.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:07.690 [INFO] [Rule] github.githubassets.com/assets/AddFileDropdownButton-DHR7D0L8.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:22.852 [INFO] [Rule] github.githubassets.com/assets/setup-DMM8wGIK.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:22.857 [INFO] [Rule] github.githubassets.com/assets/datadog-rum-BS3osPaE.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:22.859 [INFO] [Rule] github.githubassets.com/assets/web-vitals-DQQvK79D.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:23.124 [INFO] [Rule] github.githubassets.com/assets/include-fragment-zjwxqb_S.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:23.158 [INFO] [SniSidecar] 证书模式转发 Titanium: collector.github.com:443
+2026-11-21 18:37:23.459 [INFO] [SniSidecar] 证书模式转发 Titanium: collector.github.com:443
+2026-11-21 18:37:23.672 [INFO] [SniSidecar] 证书模式转发 Titanium: collector.github.com:443
+2026-11-21 18:37:23.717 [INFO] [SniSidecar] 证书模式转发 Titanium: collector.github.com:443
+2026-11-21 18:37:23.728 [INFO] [Rule] github.githubassets.com/assets/hovercards-provider-DZENtLxx.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:23.731 [INFO] [Rule] github.githubassets.com/assets/hovercards-provider-DL4Oww5Y.css -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:24.689 [WARN] [Proxy] 上一个 10 秒窗口有 1 个客户端异常已省略
+2026-11-21 18:37:24.694 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'collector.github.com' with certificate '*.github.com'.
+ ---> System.IO.IOException:  Received an unexpected EOF or 0 bytes from the transport stream.
+   at System.Net.Security.SslStream.<ReceiveBlobAsync>d__176`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:37:24.750 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'collector.github.com' with certificate '*.github.com'.
+ ---> System.IO.IOException:  Received an unexpected EOF or 0 bytes from the transport stream.
+   at System.Net.Security.SslStream.<ReceiveBlobAsync>d__176`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:37:24.756 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'collector.github.com' with certificate '*.github.com'.
+ ---> System.IO.IOException:  Received an unexpected EOF or 0 bytes from the transport stream.
+   at System.Net.Security.SslStream.<ReceiveBlobAsync>d__176`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:37:24.758 [ERROR] [Proxy] Titanium.Web.Proxy.Exceptions.ProxyConnectException: Couldn't authenticate host 'collector.github.com' with certificate '*.github.com'.
+ ---> System.IO.IOException:  Received an unexpected EOF or 0 bytes from the transport stream.
+   at System.Net.Security.SslStream.<ReceiveBlobAsync>d__176`1[[System.Net.Security.AsyncReadWriteAdapter, System.Net.Security, Version=6.0.0.0, Culture=neutral, PublicKeyToken=***
+2026-11-21 18:37:24.799 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:24.802 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:25.092 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:25.094 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:25.118 [INFO] [SniSidecar] 从 ClientHello 识别域名: 2606:50c0:8000::154 -> github.githubassets.com
+2026-11-21 18:37:25.121 [INFO] [SniSidecar] 证书模式转发 Titanium: github.githubassets.com:443
+2026-11-21 18:37:25.490 [INFO] [Rule] github.githubassets.com/assets/hovercards-provider-DL4Oww5Y.css -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:25.490 [INFO] [Rule] github.githubassets.com/assets/hovercards-provider-DZENtLxx.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:25.521 [INFO] [Rule] github.githubassets.com/assets/main-BI1-mB1R.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:25.595 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.200.245.247 -> github.com
+2026-11-21 18:37:25.599 [INFO] [SniSidecar] 证书模式转发 Titanium: github.com:443
+2026-11-21 18:37:25.967 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.200.245.247 -> github.com
+2026-11-21 18:37:25.967 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.200.245.247 -> github.com
+2026-11-21 18:37:25.970 [INFO] [SniSidecar] 证书模式转发 Titanium: github.com:443
+2026-11-21 18:37:25.971 [INFO] [SniSidecar] 证书模式转发 Titanium: github.com:443
+2026-11-21 18:37:26.509 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.200.245.247 -> github.com
+2026-11-21 18:37:26.512 [INFO] [SniSidecar] 证书模式转发 Titanium: github.com:443
+2026-11-21 18:37:26.647 [INFO] [SniSidecar] 从 ClientHello 识别域名: 20.200.245.247 -> github.com
+2026-11-21 18:37:26.650 [INFO] [SniSidecar] 证书模式转发 Titanium: github.com:443
+2026-11-21 18:37:26.671 [INFO] [Rule] github.githubassets.com/assets/GlobalNavMenu-BJ7VNDD7.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:26.692 [INFO] [Rule] github.com/notifications/indicator -> 油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令
+2026-11-21 18:37:26.692 [INFO] [Rule] github.com/leonwu85/bv/branch-infobar/feature-customisation-0001 -> 油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令
+2026-11-21 18:37:26.692 [INFO] [Rule] github.com/leonwu85/bv/overview-files/feature-customisation-0001 -> 油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令
+2026-11-21 18:37:26.695 [INFO] [Rule] github.githubassets.com/assets/GlobalNavUserMenu-Bas-u94u.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:26.723 [INFO] [Rule] github.com/leonwu85/bv/_sidebar -> 油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令
+2026-11-21 18:37:26.843 [INFO] [Rule] github.githubassets.com/assets/ErrorDialog-DRwXk_Ck.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:26.856 [INFO] [Rule] github.com/github-copilot/chat -> 油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令
+2026-11-21 18:37:26.915 [INFO] [Rule] github.githubassets.com/assets/AccountSwitchDialog-DUBN3SEe.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:27.596 [INFO] [SniSidecar] 证书模式转发 Titanium: collector.github.com:443
+2026-11-21 18:37:27.602 [INFO] [SniSidecar] 从 ClientHello 识别域名: 185.199.111.133 -> avatars.githubusercontent.com
+2026-11-21 18:37:27.608 [INFO] [SniSidecar] 证书模式转发 Titanium: avatars.githubusercontent.com:443
+2026-11-21 18:37:27.765 [INFO] [Rule] github.githubassets.com/assets/CopilotImmersiveEmbedded-C0zrG7E3.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:27.767 [INFO] [Rule] github.githubassets.com/assets/octicons~quick-search~route-components~Layout~CopilotImmersiveEmbedded~ChatAppEmbeddedParti~k7nuz067-4_oEMLvH.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:27.782 [INFO] [Rule] avatars.githubusercontent.com/u/55780452?v=4&size=40 -> *.githubusercontent.com
+2026-11-21 18:37:27.783 [INFO] [Rule] 已替换请求头 1 项: avatars.githubusercontent.com
+2026-11-21 18:37:27.783 [INFO] [Rule] collector.github.com/github/collect -> collector.github.com
+2026-11-21 18:37:27.902 [INFO] [DoH] huggingface.co -> 108.138.246.79,108.138.246.71,108.138.246.85,108.138.246.67
+2026-11-21 18:37:28.590 [INFO] [Rule] github.githubassets.com/assets/dist-BRPXcMcF.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:28.608 [INFO] [Rule] github.githubassets.com/assets/js-yaml-CPR584b0.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:29.254 [INFO] [Rule] github.githubassets.com/assets/CodeMirror-SHTDFhm3.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:29.530 [INFO] [Rule] github.githubassets.com/assets/dist-3v8NYTiV.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:29.547 [INFO] [Rule] github.githubassets.com/assets/dist-Bcd7GePs.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:29.640 [INFO] [Rule] github.githubassets.com/assets/dist-6DBqvd_d.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:29.905 [INFO] [Rule] github.githubassets.com/assets/dist-C6pIVz5g.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:30.049 [INFO] [Rule] github.githubassets.com/assets/firefox-empty-editor-caret-BW6hFduq.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:30.117 [INFO] [Rule] github.githubassets.com/assets/relay-registry-DnZtzme4.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:30.317 [INFO] [Rule] github.githubassets.com/assets/use-environments-CKuUY0rB.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:30.571 [INFO] [Rule] github.githubassets.com/assets/established-ahp-prompt-markdown-fdPrsB1X.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:30.720 [INFO] [Rule] github.githubassets.com/assets/diff-parts-DEyAZB8k.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:30.867 [INFO] [Rule] github.githubassets.com/assets/SessionLoadingIndicator-DWuaHTvT.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:31.151 [INFO] [Rule] github.githubassets.com/assets/UserChoiceCard-BW9AmMVA.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:31.452 [INFO] [Rule] github.githubassets.com/assets/uuid-DrMXBdZd.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:31.644 [INFO] [Rule] github.githubassets.com/assets/task-complete-DKS48Dct.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:31.782 [INFO] [Rule] github.githubassets.com/assets/environment-display-B6UiRMKr.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:31.948 [INFO] [Rule] github.githubassets.com/assets/ContributedInstructionsContext-CB6QalL-.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:31.950 [INFO] [Rule] github.githubassets.com/assets/use-activation-trace-url-CnRzuCt8.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:32.336 [INFO] [Rule] github.githubassets.com/assets/useTasks-qiA4VkZr.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:32.356 [INFO] [Rule] github.githubassets.com/assets/model-selection-DuijffMh.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:32.603 [INFO] [Rule] github.githubassets.com/assets/instruction-rules-publisher-BWCH0LOV.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:32.697 [INFO] [Rule] github.githubassets.com/assets/use-optimistic-recovery-turns-CkkEe-NT.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:32.710 [INFO] [Rule] github.githubassets.com/assets/CopilotAnimation-BaqPqcE_.js -> 图片、JS文件、CSS文件，缓存1年
+2026-11-21 18:37:40.599 [INFO] [ByeDPI] 已启动 127.0.0.1:8871，参数: -i 127.0.0.1 -p 8871 -x 1 -c 256 -K t --disorder 1 --tlsrec 1+s
+2026-11-21 18:37:40.619 [INFO] [ByeDPI] accept: fd=7
+2026-11-21 18:37:40.620 [INFO] [ByeDPI] close: fds=7,-1
+
