@@ -1004,6 +1004,9 @@ namespace System.Application.Services.Implementation
             if (excluded || string.IsNullOrEmpty(host)) return false;
             if (!SniSidecarService.CertificateMode) return false;
 
+            // GMS / Play / 媒体分发这些域名有证书固定，MITM 只会让系统服务报错，且它们并不需要加速。
+            if (IsSystemServiceHost(host)) return false;
+
             bool socksEnabled;
             try { socksEnabled = IReverseProxyService.Instance.Socks5ProxyEnable; }
             catch { socksEnabled = ProxySettings.Socks5ProxyEnable.Value; }
@@ -1013,6 +1016,14 @@ namespace System.Application.Services.Implementation
             if (rules.IsExcluded(host)) return false;
             return rules.DomainRequiresMitm(host) || ProxyPresetIpProvider.IsHuggingFaceHost(host);
         }
+
+        static bool IsSystemServiceHost(string host)
+            => host.EndsWith(".googleapis.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".gstatic.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".googlevideo.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".gvt1.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".gvt2.com", StringComparison.OrdinalIgnoreCase) ||
+               host.Equals("mtalk.google.com", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// 连接到本机 Titanium 的 SOCKS5，并把客户端原始 ClientHello 原样转发过去。

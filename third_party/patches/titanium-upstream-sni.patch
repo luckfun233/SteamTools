@@ -1,0 +1,41 @@
+diff --git a/src/Titanium.Web.Proxy/EventArguments/SessionEventArgsBase.cs b/src/Titanium.Web.Proxy/EventArguments/SessionEventArgsBase.cs
+index fe9007f..991f91c 100644
+--- a/src/Titanium.Web.Proxy/EventArguments/SessionEventArgsBase.cs
++++ b/src/Titanium.Web.Proxy/EventArguments/SessionEventArgsBase.cs
+@@ -93,6 +93,13 @@ namespace Titanium.Web.Proxy.EventArguments
+         /// </summary>
+         public bool IsHttps => HttpClient.Request.IsHttps;
+ 
++        /// <summary>
++        ///     强制上游 TLS 握手使用的 SNI（不影响 Host 头）。
++        ///     null 表示使用原始域名。Android 上不能把 TargetHost 设成 IP，
++        ///     否则 SSL_set_tlsext_host_name 会抛异常。
++        /// </summary>
++        public string? UpStreamSniHostName { get; set; }
++
+         /// <summary>
+         ///     Client Local End Point.
+         /// </summary>
+diff --git a/src/Titanium.Web.Proxy/Network/TcpConnection/TcpConnectionFactory.cs b/src/Titanium.Web.Proxy/Network/TcpConnection/TcpConnectionFactory.cs
+index bd0b7b1..9e69039 100644
+--- a/src/Titanium.Web.Proxy/Network/TcpConnection/TcpConnectionFactory.cs
++++ b/src/Titanium.Web.Proxy/Network/TcpConnection/TcpConnectionFactory.cs
+@@ -587,12 +587,13 @@ retry:
+                         CertificateRevocationCheckMode = proxyServer.CheckCertificateRevocation
+                     };
+ 
+-                    if (!socks)
++                    // 注意：不要把 TargetHost 设成 upStreamEndPoint 的 IP。
++                    // Android 的 SSLStreamSetTargetHost 会对 IP 抛 SslException，
++                    // 导致所有使用预置 IP 的规则在证书模式下握手失败。
++                    // 需要伪装 SNI 时由调用方通过 UpStreamSniHostName 指定。
++                    if (!string.IsNullOrEmpty(sessionArgs?.UpStreamSniHostName))
+                     {
+-                        if (upStreamEndPoint != null)
+-                        {
+-                            options.TargetHost = upStreamEndPoint.Address.ToString();
+-                        }
++                        options.TargetHost = sessionArgs!.UpStreamSniHostName!;
+                     }
+ 
+                     await sslStream.AuthenticateAsClientAsync(options, cancellationToken);

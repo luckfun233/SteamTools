@@ -3,6 +3,7 @@ using System.Application.ProxyRules;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -351,8 +352,13 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
         var host = e.HttpClient?.Request?.RequestUri?.Host;
         if (string.IsNullOrEmpty(host) || !ProxyPresetIpProvider.IsHuggingFaceHost(host)) return false;
 
+        var candidates = ProxyPresetIpProvider.GetCandidates(host);
+        // HF 的 IPv6 边缘在这类网络里常见“TCP 能连、TLS 立刻 reset”，优先 IPv4。
+        var ipv4 = candidates
+            .Where(x => IPAddress.TryParse(x, out var parsed) && parsed.AddressFamily == AddressFamily.InterNetwork)
+            .ToList();
         var presetIp = await PresetIpSelector.PickAsync(
-            ProxyPresetIpProvider.GetCandidates(host),
+            ipv4.Count > 0 ? ipv4 : candidates,
             443,
             TimeSpan.FromMilliseconds(800)).ConfigureAwait(false);
 
@@ -361,8 +367,17 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
             e.HttpClient.UpStreamEndPoint = new IPEndPoint(presetIp, 443);
         }
 
-        ApplySniOverride(e, "huggingface.cn");
-        ProxyDiagnostics.Info("Rule", $"HF 证书模式兜底: {host} -> sni=huggingface.cn");
+        // 实测：CloudFront 只在 Host=huggingface.co 时接受 SNI=huggingface.cn；
+        // hf.co / *.hf.co 用自己的 IP、保持真实 SNI 才能正常 307/200。
+        if (host.Equals("huggingface.co", StringComparison.OrdinalIgnoreCase))
+        {
+            ApplySniOverride(e, "huggingface.cn");
+            ProxyDiagnostics.Info("Rule", $"HF 证书模式兜底: {host} -> sni=huggingface.cn");
+        }
+        else
+        {
+            ProxyDiagnostics.Info("Rule", $"HF 证书模式兜底: {host} -> 使用真实 SNI");
+        }
         return true;
     }
 
@@ -482,14 +497,21 @@ sealed class TitaniumReverseProxyServiceImpl : ReverseProxyServiceImpl, IReverse
     static void ApplySniOverride(SessionEventArgs e, string? sni)
     {
         if (string.IsNullOrEmpty(sni)) return;
-        var extensions = e.HttpClient.ConnectRequest?.ClientHelloInfo?.Extensions;
-        if (extensions == null) return;
 
         if (string.Equals(sni, "none", StringComparison.OrdinalIgnoreCase))
         {
-            extensions.Remove("server_name");
+            // .NET/Android 无法发送“无 SNI”的 ClientHello，这里只能退回原始域名。
+            e.UpStreamSniHostName = null;
+            e.HttpClient.ConnectRequest?.ClientHelloInfo?.Extensions.Remove("server_name");
             return;
         }
+
+        // Titanium 的 ClientHelloInfo.Extensions 只用于展示，不会影响真实上游握手；
+        // 必须同时写入 UpStreamSniHostName，TcpConnectionFactory 才会把它用作 TargetHost。
+        e.UpStreamSniHostName = sni;
+
+        var extensions = e.HttpClient.ConnectRequest?.ClientHelloInfo?.Extensions;
+        if (extensions == null) return;
 
         var current = extensions["server_name"];
         if (current == null) return;

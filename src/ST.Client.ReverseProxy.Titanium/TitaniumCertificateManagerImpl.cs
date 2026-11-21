@@ -21,8 +21,10 @@ sealed partial class TitaniumCertificateManagerImpl : CertificateManagerImpl, IC
 
         // mac 和 ios 的证书信任时间不能超过300天
         manager.CertificateValidDays = ICertificateManager.CertificateValidDays;
-        // 按域名缓存伪造证书，减少 Android 上每次握手重新生成证书的 CPU 开销。
-        manager.SaveFakeCertificates = true;
+        // 按域名缓存伪造证书，减少重复生成的 CPU 开销。
+        // Android 上 Titanium 的默认缓存目录会解析成只读的 /crts，
+        // 打开后每次握手都会抛 “Failed to save fake certificate”，所以只在桌面启用。
+        manager.SaveFakeCertificates = !OperatingSystem2.IsAndroid();
 
         manager.RootCertificate = manager.LoadRootCertificate();
 

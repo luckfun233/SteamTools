@@ -30,6 +30,12 @@ jobs:
             references/ArchiSteamFarm \
             references/Titanium-Web-Proxy
 
+      - name: Patch Titanium upstream SNI
+        run: |
+          # 让 Titanium 支持按会话覆盖上游 SNI，并避免 Android 把 TargetHost 设成 IP。
+          git -C references/Titanium-Web-Proxy apply \
+            "${{ github.workspace }}/third_party/patches/titanium-upstream-sni.patch"
+
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:

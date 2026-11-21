@@ -780,7 +780,41 @@ ByeDPI 的 `--fake`/TTL 等参数在不同运营商效果不同，需要配合�
 - 实验室新增“证书模式链路”：显示证书文件、强制模式、Titanium SOCKS5 是否监听，
   并通过 Titanium 对 `huggingface.co` 做一次 TLS 握手，报告 MITM 证书 issuer。
 
-## 18. 参考资料
+## 18. HF 证书模式真正打通的最后一步（2026-11-21 12:27 日志）
+
+12:27 的日志里，证书模式已经能 MITM `huggingface.co`，随后报：
+
+```
+AuthenticationException
+ ---> Interop+AndroidCrypto+SslException
+   at Interop.AndroidCrypto.SSLStreamSetTargetHost
+```
+
+根因有两层：
+
+1. Titanium 的 `ApplySniOverride` 只改了 `ClientHelloInfo.Extensions`，这个对象只用于展示，
+   不影响真实上游握手；上游 SNI 仍然是 `SslClientAuthenticationOptions.TargetHost`。
+2. 设置预置 IP 时，Titanium 把 `TargetHost` 改成了 IP（IPv4 或 IPv6）。
+   Android 的 `SSL_set_tlsext_host_name` 对 IP 字面量直接抛异常，于是所有“预置 IP + MITM”
+   的请求全部失败，Chrome 显示空响应。
+
+修复：
+
+- 给 Titanium 增加 `SessionEventArgsBase.UpStreamSniHostName`，由
+  `ApplySniOverride` 写入；`TcpConnectionFactory` 用它作为上游 `TargetHost`。
+- 删除 `TargetHost = upStreamEndPoint.Address` 的逻辑，Android 不再对 IP 设置 SNI。
+- 实测结论（本机 egress 与 HF 边缘一致）：
+  - `SNI=huggingface.co` → TLS reset；
+  - `SNI=huggingface.cn` + `Host: huggingface.co` → HTTP 200（CloudFront 接受）；
+  - `hf.co` / `*.hf.co` 保持真实 SNI，用 `HfCoIpList`/`HfCdnIpList` 的 IP → 307/200。
+    给它们套 `huggingface.cn` 反而 403。
+  因此 HF 兜底只对 apex `huggingface.co` 改写 SNI，`hf.co` 系域名保持真实 SNI。
+- Android 上关闭 `SaveFakeCertificates`：Titanium 默认缓存目录在 Android 会解析成只读的
+  `/crts`，每个握手都抛 `Failed to save fake certificate`。
+- 证书模式不再把 GMS/Play 的 `*.googleapis.com`、`mTalk`、`*.gstatic.com` 等系统域名
+  转发给 Titanium，避免证书固定导致的握手失败和日志洪水。
+
+## 19. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>
