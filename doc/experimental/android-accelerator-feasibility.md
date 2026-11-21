@@ -754,7 +754,33 @@ TCP + TLS，C# 层没有更多手段。本轮把 ByeDPI（MIT）作为最后一�
 安全边界：只监听 127.0.0.1，不接受外部连接；不修改系统设置；不请求 root。
 ByeDPI 的 `--fake`/TTL 等参数在不同运营商效果不同，需要配合实验室逐项尝试。
 
-## 17. 参考资料
+## 17. VPN 出口重构与卡死修复（2026-11-21 第四轮日志）
+
+11:19 日志暴露了两个独立问题：
+
+1. **证书模式把全部 VPN 流量交给了 Titanium**：Titanium 的 SOCKS5 只解析端口和目标
+   ClientHello，非 TLS/二进制/UDP 流量会进入 HTTP 解析器，产生大量
+   `Invalid HTTP request line`。客户端反复重连后形成正反馈，CPU、线程池和日志 IO
+   一起被打满，表现为“开始时卡死、实验室点不动、返回键无响应”。
+2. **停止代理时同步阻塞 UI 线程**：`ProxyService` 的启动/停止在 MainThreadScheduler 上
+   同步执行，Titanium 清理会话、等待上游 DNS 时会把主线程卡住；日志里“已停止”之后
+   10 秒仍在处理旧会话。
+
+本轮改法：
+
+- VPN 出口固定为本地 SNI sidecar（它本来就支持非 TLS 原样转发和 UDP ASSOCIATE）。
+- 证书模式下，sidecar 只把 `DomainRequiresMitm` 或 Hugging Face 域名通过 SOCKS5
+  转发给 Titanium；其余流量继续走分片直连。Titanium 不再接触二进制/UDP。
+- 启动/停止 Titanium 用 `Task.Run` 移出 UI 线程。
+- sidecar 的每个连接统一捕获异常；Titanium 的客户端异常日志按 10 秒窗口限流
+  （最多 20 条），避免 `File.AppendAllText` 级联拖慢。
+- sidecar 的“识别域名/直连”日志只对分片域名输出，普通网页不再逐连接落盘。
+- 实验室的分片策略对比进入 `BenchmarkMode`：禁用学习策略、回退缓存和自动升级，
+  每个策略都是独立测试，结束后按成功率和延迟排序。
+- 实验室新增“证书模式链路”：显示证书文件、强制模式、Titanium SOCKS5 是否监听，
+  并通过 Titanium 对 `huggingface.co` 做一次 TLS 握手，报告 MITM 证书 issuer。
+
+## 18. 参考资料
 - DevSidecar：<https://github.com/docmirror/dev-sidecar>
 - DevSidecar 内核：<https://github.com/Blue-Frontier/ds-core>
 - 默认远程配置：<https://github.com/Blue-Frontier/ds-core/blob/main/core/src/config/remote_config.json5>
